@@ -59,7 +59,7 @@ Examples: `feature/dev1-auth`, `feature/dev1-employee`, `feature/dev1-leave`, `f
 ```
 git checkout main
 git pull origin main
-git checkout -b feature/dev1-auth
+git checkout -b feature/jasmine-auth
 ```
 
 **While working:**
@@ -79,7 +79,7 @@ This replays your changes on top of the latest main and surfaces any conflicts i
 
 **Push and open a PR:**
 ```
-git push origin feature/dev1-auth
+git push origin feature/jasmine-auth
 ```
 Open a Pull Request into `main`. Request a review from at least one teammate before merging — even a quick look catches problems early.
 
