@@ -1,2 +1,2 @@
-// Owner: Dev 3
+// Owner: Series
 // Purpose: Notification schema — in-app notifications per user.

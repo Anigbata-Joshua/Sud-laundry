@@ -1,2 +1,2 @@
-// Owner: Dev 3
+// Owner: series
 // Purpose: customer-facing notification feed, mark-as-read.

@@ -1,2 +1,2 @@
-// Owner: Dev 2
+// Owner: Josh
 // Purpose: StockMovement schema — purchase / sale / usage events.

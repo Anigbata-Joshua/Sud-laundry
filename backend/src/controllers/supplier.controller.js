@@ -1,2 +1,2 @@
-// Owner: Dev 3
+// Owner: Series
 // Purpose: simple CRUD for supplier reference records.

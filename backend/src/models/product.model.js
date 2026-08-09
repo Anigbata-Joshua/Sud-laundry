@@ -1,2 +1,2 @@
-// Owner: Dev 2
+// Owner: Josh
 // Purpose: Product schema — branch-scoped inventory with reorder_point.
