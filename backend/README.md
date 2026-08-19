@@ -8,3 +8,8 @@ Each developer: read your guide in /guides before touching any file.
 - guides/dev3-guide.md
 
 Run `npm install` only after the team has agreed on the dependency list together.
+
+
+
+
+create or wait for other schema's to be created and update your code
