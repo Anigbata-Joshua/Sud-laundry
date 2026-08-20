@@ -19,6 +19,8 @@ export const authorizeRoles = (...allowedRoles) => {
     };
 };
 
+export const authorize = authorizeRoles;
+
 /**
  * Enforce branch-scoping logic for Branch Managers and Employees.
  * Admins bypass this. Users without a branch_id (unless Admin) are denied access.
