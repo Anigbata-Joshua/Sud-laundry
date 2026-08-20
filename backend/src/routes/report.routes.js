@@ -1,10 +1,9 @@
 // Owner: Series
 // Purpose: /api/v1/reports routes.
 
-
 import express from 'express';
-import authMiddleware from '../middlewares/auth.middleware.js';
-import roleMiddleware from '../middlewares/role.middleware.js';
+import authenticate from '../middlewares/auth.middleware.js';
+import { authorize } from '../middlewares/role.middleware.js';
 import {
   getRevenueReport,
   getPaymentMethodsReport,
@@ -18,7 +17,7 @@ import {
 const router = express.Router();
 
 // Only admins and branch managers can view any reports at all
-router.use(authMiddleware, roleMiddleware(['admin', 'branch_manager']));
+router.use(authenticate, authorize('admin', 'branch_manager'));
 
 router.get('/revenue', getRevenueReport);
 router.get('/payment-methods', getPaymentMethodsReport);
