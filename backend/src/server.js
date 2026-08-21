@@ -3,7 +3,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
-import errorHandler from './middlewares/errorHandler.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 
@@ -17,7 +16,6 @@ connectDB();
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 
-app.use(errorHandler);
 
 const PORT = process.env.PORT || 3573;
 
