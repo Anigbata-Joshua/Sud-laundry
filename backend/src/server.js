@@ -1,24 +1,62 @@
 // Shared foundation.
 // Purpose: server entry point — connects DB then starts listening.
+<<<<<<< HEAD
 import express from 'express';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+=======
+>>>>>>> 6749327baeb6a7cf7f9ca0691b79a07c86db9ff4
 
-dotenv.config();
+import { env } from './config/env.js';
+import { connectDatabase, closeDatabase } from './config/db.js';
+import app from './app.js';
 
-const app = express();
-app.use(express.json());
+// Global Uncaught Error Listeners
+const handleFatalError = async (err, type) => {
+    console.error(`❌ ${type}! Shutting down gracefully...`, err);
+    try {
+        await closeDatabase();
+    } catch (dbErr) {
+        console.error('Failed to close DB on crash:', dbErr.message);
+    }
+    process.exit(1);
+};
 
-connectDB();
+process.on('uncaughtException', (err) => handleFatalError(err, 'UNCAUGHT EXCEPTION'));
+process.on('unhandledRejection', (err) => handleFatalError(err, 'UNHANDLED REJECTION'));
 
-app.use('/api/v1/payments', paymentRoutes);
-app.use('/api/v1/notifications', notificationRoutes);
+// Connect to database
+await connectDatabase();
 
-
-const PORT = process.env.PORT || 3573;
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+<<<<<<< HEAD
+=======
+const PORT = env.port;
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📦 Environment: ${env.nodeEnv}`);
+    console.log(`🌐 Frontend URI: ${env.frontendURI}`);
+    if (env.corsOrigins.length > 0) {
+        console.log(`🔗 CORS Origins: ${env.corsOrigins.join(', ')}`);
+    }
 });
+>>>>>>> 6749327baeb6a7cf7f9ca0691b79a07c86db9ff4
+
+// Graceful shutdown — handles both a local Ctrl+C (SIGINT) and a
+// hosting platform's stop/restart signal (SIGTERM).
+const gracefulShutdown = async (signal) => {
+    console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+    try {
+        await closeDatabase();
+    } catch (dbErr) {
+        console.error('Error closing database during shutdown:', dbErr.message);
+    }
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
