@@ -13,6 +13,7 @@ const userSchema = new Schema(
         email: {
             type: String,
             required: [true, 'Email is required'],
+            unique: true, //Josh updated this filed
             lowercase: true,
             match: [/.+@.+\..+/, 'Invalid email format'],
         },
