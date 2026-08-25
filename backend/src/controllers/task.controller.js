@@ -6,6 +6,8 @@ import Employee from '../models/employee.model.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { syncOrderStatusFromTasks } from '../services/orderStatusSync.service.js';
+
 
 export const createTask = asyncHandler(async (req, res, next) => {
     const { employee_id, order_id, stage } = req.body;
@@ -38,8 +40,11 @@ export const createTask = asyncHandler(async (req, res, next) => {
     await task.populate('employee_id');
     await task.populate('order_id');
 
+    await syncOrderStatusFromTasks(order_id);
+
     return apiResponse(res, 201, task, 'Task created successfully');
 });
+
 
 export const getEmployeeTasks = asyncHandler(async (req, res, next) => {
     const currentUser = req.user;
