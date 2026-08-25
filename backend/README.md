@@ -9,11 +9,7 @@ Each developer: read your guide in /guides before touching any file.
 
 Run `npm install` only after the team has agreed on the dependency list together.
 
-   
- - JASMINE PROBLEMS
 
 
-- I can not  create employee with out branch_ID
-- I can't create task because i need employee_id and order_id and leave
 
-                                                                                                                                                     
+create or wait for other schema's to be created and update your code

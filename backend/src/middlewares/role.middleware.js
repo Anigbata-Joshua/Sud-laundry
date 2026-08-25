@@ -3,35 +3,42 @@
 
 import ApiError from '../utils/apiError.js';
 
-export const authorize = (...allowedRoles) => {
+/**
+ * Authorize only specific user roles to access an endpoint.
+ * Example: authorizeRoles('admin', 'branch_manager')
+ */
+export const authorizeRoles = (...allowedRoles) => {
     return (req, res, next) => {
         if (!req.user) {
-            return next(new ApiError(401, 'User not authenticated'));
+            return next(new ApiError(401, 'Authentication required'));
         }
-
         if (!allowedRoles.includes(req.user.role)) {
-            return next(new ApiError(403, 'Insufficient permissions'));
+            return next(new ApiError(403, `Access denied: Role '${req.user.role}' is not authorized`));
         }
-
         next();
     };
 };
 
-export const branchScoped = (req, res, next) => {
+export const authorize = authorizeRoles;
+
+/**
+ * Enforce branch-scoping logic for Branch Managers and Employees.
+ * Admins bypass this. Users without a branch_id (unless Admin) are denied access.
+ */
+export const enforceBranchScope = (req, res, next) => {
     if (!req.user) {
-        return next(new ApiError(401, 'User not authenticated'));
+        return next(new ApiError(401, 'Authentication required'));
     }
 
+    // Admins have access to all branches
     if (req.user.role === 'admin') {
-        // Admins can access all branches
-        next();
-    } else if (req.user.branchId) {
-        // Other users can only access their own branch
-        req.branchId = req.user.branchId;
-        next();
-    } else {
-        return next(new ApiError(403, 'No branch assigned'));
+        return next();
     }
-};
 
-export default { authorize, branchScoped };
+    // Non-admins must have a branch assignment
+    if (!req.user.branch_id) {
+        return next(new ApiError(403, 'Access denied: User is not assigned to any branch'));
+    }
+
+    next();
+};

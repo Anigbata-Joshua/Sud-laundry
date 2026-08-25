@@ -2,17 +2,26 @@
 // Purpose: rate limiting for auth and general API routes.
 
 import rateLimit from 'express-rate-limit';
-
-export const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.',
-});
+import { env } from '../config/env.js';
 
 export const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 requests per windowMs
-    message: 'Too many authentication attempts, please try again later.',
+    windowMs: env.rateLimit,
+    max: env.rateLimitMax,
+    message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again later.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
-export default { generalLimiter, authLimiter };
+export const apiLimiter = rateLimit({
+    windowMs: env.rateLimit,
+    max: env.generalRateLimitMax,
+    message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again later.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});

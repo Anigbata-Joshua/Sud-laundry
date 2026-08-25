@@ -2,44 +2,30 @@
 // Purpose: load and export environment variables in one place.
 
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+dotenv.config();
 
-// Load .env from root directory (../../.env)
-dotenv.config({ path: join(__dirname, '../../.env') });
+const nodeEnv = process.env.NODE_ENV || 'development';
 
 export const env = {
-    nodeEnv: process.env.NODE_ENV || 'development',
-    isProduction: process.env.NODE_ENV === 'production',
-    port: parseInt(process.env.PORT || '5000', 10),
+    port: parseInt(process.env.PORT, 10) || 3573,
+    databaseUrl: process.env.DATABASE_URL || 'mongodb://localhost:27017/laundry',
 
-    MONGO_URI: process.env.MONGO_URI || 'mongodb://jasminechinasanweke_db_user:jasmine2020@ac-25zs6bm-shard-00-00.omqr22g.mongodb.net:27017,ac-25zs6bm-shard-00-01.omqr22g.mongodb.net:27017,ac-25zs6bm-shard-00-02.omqr22g.mongodb.net:27017/?ssl=true&replicaSet=atlas-10nvb9-shard-0&authSource=admin&appName=Cluster0',
-    frontendUri: process.env.FRONTEND_URI || 'http://localhost:5173',
-
-    corsOrigins: (process.env.CORS_ORIGINS || '')
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean),
-
-    jwtSecret: process.env.JWT_SECRET || 'thisismykeys',
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-
+    mongoUri: process.env.DATABASE_URL || 'mongodb://localhost:27017/laundry',
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-    // Cloudinary
-    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
-    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',
-    cloudinaryName: process.env.CLOUDINARY_NAME || '',
+    jwtSecret: process.env.JWT_SECRET || 'secret-key-change-me',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
 
-    // Email (SMTP)
-    smtpHost: process.env.SMTP_HOST,
-    smtpPort: process.env.SMTP_PORT,
-    smtpUser: process.env.SMTP_USER,
-    smtpPass: process.env.SMTP_PASS,
+    nodeEnv,
+    isProduction: nodeEnv === 'production',
+
+    corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [],
+    frontendURI: process.env.FRONTEND_URI || process.env.CLIENT_URL || 'http://localhost:5173',
+
+    rateLimit: parseInt(process.env.RATE_LIMIT_WINDOW_MS || process.env.RATE_LIMIT_WINDOW, 10) || 15 * 60 * 1000, // 15 mins default
+    generalRateLimitMax: parseInt(process.env.GENERAL_RATE_LIMIT_MAX || process.env.RATE_LIMIT_MAX, 10) || 100,
+    rateLimitMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 20, // strict limiter max
 };
 
-
-
+export default env;

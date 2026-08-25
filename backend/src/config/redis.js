@@ -4,14 +4,13 @@
 import Redis from 'ioredis';
 import { env } from './env.js';
 
-export const redis = new Redis(env.redisUrl);
+let redisClient;
+try {
+    redisClient = new Redis(env.redisUrl);
+    redisClient.on('connect', () => console.log('Redis Connected'));
+    redisClient.on('error', (err) => console.error('Redis Connection Error:', err));
+} catch (error) {
+    console.error('Failed to initialize Redis client:', error.message);
+}
 
-redis.on('connect', () => {
-    console.log('✓ Redis connected');
-});
-
-redis.on('error', (error) => {
-    console.error('✗ Redis error:', error.message);
-});
-
-export default redis;
+export default redisClient;
