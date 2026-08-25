@@ -1,14 +1,5 @@
 // Shared foundation.
 // Purpose: server entry point — connects DB then starts listening.
-<<<<<<< HEAD
-import express from 'express';
-import dotenv from 'dotenv';
-import connectDB from './config/db.js';
-import paymentRoutes from './routes/payment.routes.js';
-import notificationRoutes from './routes/notification.routes.js';
-=======
->>>>>>> 6749327baeb6a7cf7f9ca0691b79a07c86db9ff4
-
 import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
 import app from './app.js';
@@ -30,8 +21,6 @@ process.on('unhandledRejection', (err) => handleFatalError(err, 'UNHANDLED REJEC
 // Connect to database
 await connectDatabase();
 
-<<<<<<< HEAD
-=======
 const PORT = env.port;
 const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
@@ -41,7 +30,6 @@ const server = app.listen(PORT, () => {
         console.log(`🔗 CORS Origins: ${env.corsOrigins.join(', ')}`);
     }
 });
->>>>>>> 6749327baeb6a7cf7f9ca0691b79a07c86db9ff4
 
 // Graceful shutdown — handles both a local Ctrl+C (SIGINT) and a
 // hosting platform's stop/restart signal (SIGTERM).
