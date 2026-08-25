@@ -18,6 +18,7 @@ import brancheRoutes from './routes/branch.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import productRoutes from './routes/product.routes.js';
+import stockMovementRoutes from './routes/stockMovement.routes.js';
 
 const app = express();
 
@@ -55,7 +56,9 @@ app.use('/api/v1/branches', brancheRoutes);
 app.use('/api/v1/services', serviceRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/products', productRoutes);
-// TODO: mount stockMovementRoutes once stockMovement.routes.js exists
+app.use('/api/v1/stock-movements', stockMovementRoutes);
+
+
 
 // Global Error Handler
 app.use(errorHandler);
