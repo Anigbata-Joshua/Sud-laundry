@@ -13,7 +13,7 @@ export const createEmployee = asyncHandler(async (req, res, next) => {
 
     // Admin can create employees at any branch
     // Branch Manager can only create at their own branch
-    if (currentUser.role === 'branch_manager' && currentUser.branchId !== branch_id.toString()) {
+    if (currentUser.role === 'branch_manager' && currentUser.branch_id !== branch_id.toString()) {
         throw new ApiError(403, 'You can only create employees at your own branch');
     }
 
@@ -54,7 +54,7 @@ export const getEmployees = asyncHandler(async (req, res, next) => {
 
     // Branch managers see only their branch employees
     if (currentUser.role === 'branch_manager') {
-        query.branch_id = currentUser.branchId;
+        query.branch_id = currentUser.branch_id;
     }
     // Admins see all employees
     // Employees can't view employee list
@@ -83,7 +83,7 @@ export const getEmployeeById = asyncHandler(async (req, res, next) => {
     }
 
     // Branch managers can only view employees from their branch
-    if (currentUser.role === 'branch_manager' && currentUser.branchId !== employee.branch_id.toString()) {
+    if (currentUser.role === 'branch_manager' && currentUser.branch_id !== employee.branch_id.toString()) {
         throw new ApiError(403, 'You can only view employees from your own branch');
     }
 
@@ -101,7 +101,7 @@ export const updateEmployee = asyncHandler(async (req, res, next) => {
     }
 
     // Branch managers can only update employees from their branch
-    if (currentUser.role === 'branch_manager' && currentUser.branchId !== employee.branch_id.toString()) {
+    if (currentUser.role === 'branch_manager' && currentUser.branch_id !== employee.branch_id.toString()) {
         throw new ApiError(403, 'You can only update employees from your own branch');
     }
 

@@ -8,7 +8,7 @@ import {
     getTaskById,
     updateTaskStatus,
 } from '../controllers/task.controller.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
+import  authenticate  from '../middlewares/auth.middleware.js';
 
 const router = Router();
 

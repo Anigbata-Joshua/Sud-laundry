@@ -8,13 +8,13 @@ import {
     getEmployeeById,
     updateEmployee,
 } from '../controllers/employee.controller.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
-import { branchScoped } from '../middlewares/role.middleware.js';
+import authenticate from '../middlewares/auth.middleware.js';
+import { enforceBranchScope } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
 router.use(authenticate);
-router.use(branchScoped);
+router.use(enforceBranchScope);
 
 router.post('/create', createEmployee);
 router.get('/get/all', getEmployees);

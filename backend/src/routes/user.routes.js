@@ -8,7 +8,7 @@ import {
     deactivateUser,
     reactivateUser,
 } from '../controllers/user.controller.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
+import  authenticate  from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/role.middleware.js';
 
 const router = Router();

@@ -3,7 +3,7 @@
 
 import { Router } from 'express';
 import { register, login, forgotPassword, resetPassword } from '../controllers/auth.controller.js';
-import { validate } from '../middlewares/validate.middleware.js';
+import validate  from '../middlewares/validate.middleware.js';
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator.js';
 import { authLimiter } from '../middlewares/rateLimiter.middleware.js';
 

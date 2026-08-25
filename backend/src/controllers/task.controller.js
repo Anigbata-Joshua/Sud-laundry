@@ -23,7 +23,7 @@ export const createTask = asyncHandler(async (req, res, next) => {
     }
 
     // Branch managers can only assign to their branch employees
-    if (currentUser.role === 'branch_manager' && currentUser.branchId !== employee.branch_id.toString()) {
+    if (currentUser.role === 'branch_manager' && currentUser.branch_id !== employee.branch_id.toString()) {
         throw new ApiError(403, 'You can only assign tasks to employees in your branch');
     }
 
@@ -55,7 +55,7 @@ export const getEmployeeTasks = asyncHandler(async (req, res, next) => {
     }
     // Branch managers and admins can see all tasks in their scope
     else if (currentUser.role === 'branch_manager') {
-        const employees = await Employee.find({ branch_id: currentUser.branchId });
+        const employees = await Employee.find({ branch_id: currentUser.branch_id });
         const employeeIds = employees.map(e => e._id);
         query.employee_id = { $in: employeeIds };
     }
@@ -91,7 +91,7 @@ export const getTaskById = asyncHandler(async (req, res, next) => {
     // Branch managers can only view tasks for their branch
     else if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(task.employee_id._id);
-        if (employee.branch_id.toString() !== currentUser.branchId) {
+        if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only view tasks for your branch');
         }
     }
@@ -119,7 +119,7 @@ export const updateTaskStatus = asyncHandler(async (req, res, next) => {
     // Branch managers and admins can update any task in their scope
     else if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(task.employee_id);
-        if (employee.branch_id.toString() !== currentUser.branchId) {
+        if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only update tasks for your branch');
         }
     }
