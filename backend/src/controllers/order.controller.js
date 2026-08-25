@@ -37,7 +37,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         user_id: req.user.id,
         order_id: order._id,
         type: 'order_confirmed',
-        message: `Your order has been placed. You may cancel it within ${env.cancellationWindowMinutes} minutes — after that it is assumed to be in progress and cannot be cancelled.`,
+        message: `Your order has been placed. You can cancel it until we begin processing it, or within ${env.cancellationWindowMinutes} minutes — whichever comes first.`,
     });
 
     apiResponse(res, 201, order, 'Order placed successfully');
@@ -101,8 +101,10 @@ export const updateOrder = asyncHandler(async (req, res) => {
         if (req.body.status !== 'cancelled' || Object.keys(req.body).length > 1) {
             throw new ApiError(403, 'Customers may only cancel their own order');
         }
-        if (order.status === 'cancelled') {
-            throw new ApiError(409, 'Order is already cancelled');
+        if (order.status !== 'placed') {
+            // Covers 'cancelled' (already done), and 'processing'/'ready'/'delivered' —
+            // once a task exists, work has started regardless of the time window.
+            throw new ApiError(409, `Order cannot be cancelled once it is ${order.status}`);
         }
 
         const minutesSincePlaced = (Date.now() - order.createdAt.getTime()) / 60000;
