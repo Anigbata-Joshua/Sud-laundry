@@ -1,7 +1,5 @@
 // Shared foundation.
 // Purpose: verify session token, attach current user to the request.
-// Shared foundation.
-// Purpose: verify session token, attach current user to the request.
 
 import jwt from 'jsonwebtoken';
 import ApiError from '../utils/apiError.js';
@@ -41,7 +39,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     // Attach branch context for staff roles — needed for branch-scoped checks
     if (['employee', 'branch_manager'].includes(user.role)) {
         const employee = await Employee.findOne({ user_id: user._id });
-        if (employee) req.user.branchId = employee.branch_id.toString();
+        if (employee) req.user.branch_id = employee.branch_id.toString();
     }
 
     next();
