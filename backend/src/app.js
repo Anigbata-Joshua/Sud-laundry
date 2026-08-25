@@ -14,6 +14,10 @@ import taskRoutes from './routes/task.routes.js';
 import userRoutes from './routes/user.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import brancheRoutes from './routes/branch.routes.js';
+import serviceRoutes from './routes/service.routes.js';
+import orderRoutes from './routes/order.routes.js';
+import productRoutes from './routes/product.routes.js';
 
 const app = express();
 
@@ -47,6 +51,11 @@ app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/branches', brancheRoutes);
+app.use('/api/v1/services', serviceRoutes);
+app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/products', productRoutes);
+// TODO: mount stockMovementRoutes once stockMovement.routes.js exists
 
 // Global Error Handler
 app.use(errorHandler);
