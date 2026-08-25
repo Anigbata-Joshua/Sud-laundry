@@ -20,8 +20,7 @@ const supplyUsedSchema = new mongoose.Schema(
         quantity_used: { type: Number, required: true },
         employee_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
         used_at: { type: Date, default: Date.now },
-    },
-    { _id: false }
+    }, { _id: false }
 );
 
 const feedbackSchema = new mongoose.Schema(
@@ -29,8 +28,7 @@ const feedbackSchema = new mongoose.Schema(
         rating: { type: Number, min: 1, max: 5 },
         comment: { type: String },
         submitted_at: { type: Date },
-    },
-    { _id: false }
+    }, { _id: false }
 );
 
 const orderSchema = new mongoose.Schema(
@@ -54,7 +52,7 @@ const orderSchema = new mongoose.Schema(
         supplies_used: [supplyUsedSchema],
         feedback: feedbackSchema,
     },
-    { timestamps: true }
+{ timestamps: true }
 );
 
 orderSchema.index({ customer_id: 1 });
