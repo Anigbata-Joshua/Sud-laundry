@@ -34,8 +34,6 @@ export const updateBranch = asyncHandler(async (req, res) => {
     const { name, address, phone } = req.body;
 
     // Branch managers may only update the branch they're assigned to.
-    // (enforceBranchScope only confirms a branch_id exists on the user —
-    // it does not check it matches this specific :id, so that check lives here.)
     if (req.user.role === 'branch_manager' && req.user.branch_id !== req.params.id) {
         throw new ApiError(403, 'Cannot update a branch you are not assigned to');
     }
@@ -49,6 +47,7 @@ export const updateBranch = asyncHandler(async (req, res) => {
         new: true,
         runValidators: true,
     });
+    
     if (!branch) throw new ApiError(404, 'Branch not found');
     apiResponse(res, 200, branch, 'Branch updated successfully');
 });
