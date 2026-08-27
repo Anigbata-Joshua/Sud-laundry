@@ -51,8 +51,14 @@ const orderSchema = new mongoose.Schema(
         items: [orderItemSchema],
         supplies_used: [supplyUsedSchema],
         feedback: feedbackSchema,
+        cancellation_reason: { type: String },
+        cancelled_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        cancelled_at: { type: Date },
+        refund_amount: { type: Number },
+        amount_due: { type: Number, default: 0 },
+        cancelled_on_customer_request: { type: Boolean, default: false },
     },
-{ timestamps: true }
+    { timestamps: true }
 );
 
 orderSchema.index({ customer_id: 1 });

@@ -17,8 +17,7 @@ router.get('/me', orderController.getMyOrders);
 router.post('/', orderController.createOrder);
 
 // Staff/admin — branch-scoped list (admin sees all branches)
-router.get( '/', authorize('admin', 'branch_manager', 'employee'), orderController.getAllOrders
-);
+router.get( '/', authorize('admin', 'branch_manager', 'employee'), orderController.getAllOrders);
 
 // Shared — customer (own order) or staff/admin (branch-scoped), checked inside the controller
 router.get('/:id', orderController.getOrderById);
@@ -26,4 +25,7 @@ router.get('/:id', orderController.getOrderById);
 // Shared — customer cancellation or staff/admin update, both branch/ownership-checked inside the controller
 router.patch('/:id', orderController.updateOrder);
 
-export default router;
+// Staff/admin only — force-cancel an order that's already 'placed' or 'processing'
+router.patch( '/:id/force-cancel', authorize('admin', 'branch_manager'), orderController.forceCancelOrder);
+
+export default router
