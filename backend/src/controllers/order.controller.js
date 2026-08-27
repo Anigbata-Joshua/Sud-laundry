@@ -2,14 +2,17 @@
 // Purpose: Order CRUD — customer placement/history, branch-scoped staff view/update.
 
 import Order from '../models/order.model.js';
+import Service from '../models/service.model.js';
 import ApiError from '../utils/apiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import apiResponse from '../utils/apiResponse.js';
 import createNotification from '../services/notification.service.js';
 import { env } from '../config/env.js';
 
+const DUPLICATE_ORDER_WINDOW_SECONDS = 10;
+const FORCE_CANCEL_FEE_PERCENT = 30; // business keeps this % of total_price when staff force-cancels a paid order
+
 // POST /orders — customer places an order
-// total_price is always server-calculated from items[].subtotal — never trust a client-sent value.
 export const createOrder = asyncHandler(async (req, res) => {
     const { branch_id, items, pickup_time, delivery_time } = req.body;
 
@@ -17,17 +20,49 @@ export const createOrder = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'branch_id and at least one item are required');
     }
 
-    const total_price = items.reduce((sum, item) => {
-        if (typeof item.subtotal !== 'number' || item.subtotal < 0) {
-            throw new ApiError(400, `Invalid subtotal for item: ${item.name || item.service_id}`);
+    // Guard against the same order being submitted twice in quick succession
+    const duplicateRequest = await Order.findOne({
+        customer_id: req.user.id,
+        branch_id,
+        createdAt: { $gte: new Date(Date.now() - DUPLICATE_ORDER_WINDOW_SECONDS * 1000) },
+    }).sort({ createdAt: -1 });
+
+    // Check
+    if (duplicateRequest) {
+        throw new ApiError(
+            409,
+            'A similar order was just submitted — if this is intentional, please wait a few seconds and try again'
+        );
+    }
+
+    let total_price = 0;
+    const resolvedItems = [];
+
+    for (const item of items) {
+        if (!item.service_id || typeof item.quantity !== 'number' || item.quantity <= 0) {
+            throw new ApiError(400, 'Each item requires a valid service_id and a positive quantity');
         }
-        return sum + item.subtotal;
-    }, 0);
+
+        const service = await Service.findById(item.service_id);
+        if (!service) {
+            throw new ApiError(404, `Service not found: ${item.service_id}`);
+        }
+
+        const subtotal = service.price * item.quantity;
+        total_price += subtotal;
+
+        resolvedItems.push({
+            service_id: service._id,
+            name: service.name,
+            quantity: item.quantity,
+            subtotal,
+        });
+    }
 
     const order = await Order.create({
         customer_id: req.user.id,
         branch_id,
-        items,
+        items: resolvedItems,
         total_price,
         pickup_time,
         delivery_time,
@@ -36,7 +71,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     await createNotification({
         user_id: req.user.id,
         order_id: order._id,
-        type: 'order_confirmed',
+        type: 'order_received',
         message: `Your order has been placed. You can cancel it until we begin processing it, or within ${env.cancellationWindowMinutes} minutes — whichever comes first.`,
     });
 
@@ -93,7 +128,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    // --- Customer path: cancellation only, within the window, own order only ---
+    // Customer path: cancellation only, within the window, own order only
     if (req.user.role === 'customer') {
         if (order.customer_id.toString() !== req.user.id) {
             throw new ApiError(403, 'Cannot modify another customer\'s order');
@@ -118,14 +153,14 @@ export const updateOrder = asyncHandler(async (req, res) => {
         await createNotification({
             user_id: req.user.id,
             order_id: order._id,
-            type: 'order_cancelled',
+            type: 'other',
             message: 'Your order has been cancelled.',
         });
 
         return apiResponse(res, 200, order, 'Order cancelled successfully');
     }
 
-    // --- Staff/admin path: branch scoping, everything except status transitions ---
+    // Staff/admin path: branch scoping, everything except status transitions ---
     if (['branch_manager', 'employee'].includes(req.user.role)) {
         if (order.branch_id.toString() !== req.user.branch_id) {
             throw new ApiError(403, 'Cannot update an order outside your branch');
@@ -135,14 +170,20 @@ export const updateOrder = asyncHandler(async (req, res) => {
     const { pickup_time, delivery_time, payment_status, status } = req.body;
 
     if (status !== undefined) {
-        // TODO(Rule 6, blocked on Dev1 conversation): order.status transitions driven by
-        // Task.stage progress are not yet defined — the two enums don't currently map
-        // 1:1 (see order.model.js vs task.model.js). Do not allow arbitrary status writes
-        // here until that mapping is agreed. Rejecting for now rather than guessing.
-        throw new ApiError(
-            501,
-            'Status updates via this endpoint are not yet implemented — pending status/stage mapping agreement with Dev1'
-        );
+        // order.status is system-derived from Task progress (see
+        // services/orderStatusSync.service.js) except for 'delivered', which staff
+        // set manually below. Direct writes to 'placed'/'processing'/'ready' are
+        // rejected so the two never drift out of sync.
+        if (status !== 'delivered') {
+            throw new ApiError(
+                400,
+                'Order status is derived from task progress and cannot be set directly, except marking as delivered'
+            );
+        }
+        if (order.status !== 'ready') {
+            throw new ApiError(409, 'Order must be ready before it can be marked delivered');
+        }
+        order.status = 'delivered';
     }
 
     const updates = {};
@@ -154,4 +195,73 @@ export const updateOrder = asyncHandler(async (req, res) => {
     await order.save();
 
     apiResponse(res, 200, order, 'Order updated successfully');
+});
+
+// PATCH /orders/:id/force-cancel — staff/admin only. Allowed while status is
+// PATCH /orders/:id/force-cancel — staff/admin only. Allowed while status is
+// 'placed' or 'processing' — blocked once 'ready' (work is essentially done),
+// 'delivered', or already 'cancelled'.
+export const forceCancelOrder = asyncHandler(async (req, res) => {
+    if (!['admin', 'branch_manager'].includes(req.user.role)) {
+        throw new ApiError(403, 'Only staff or admin can force-cancel an order');
+    }
+
+    const { reason, on_customer_request } = req.body;
+    if (!reason) {
+        throw new ApiError(400, 'A cancellation reason is required');
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) throw new ApiError(404, 'Order not found');
+
+    if (req.user.role === 'branch_manager' && order.branch_id.toString() !== req.user.branch_id) {
+        throw new ApiError(403, 'Cannot cancel an order outside your branch');
+    }
+
+    if (!['placed', 'processing'].includes(order.status)) {
+        throw new ApiError(409, `Order cannot be force-cancelled once it is ${order.status} — work is too far along`);
+    }
+
+    const fee = (order.total_price * FORCE_CANCEL_FEE_PERCENT) / 100;
+    let refund_amount = 0;
+    let amount_due = 0;
+
+    if (order.payment_status === 'paid') {
+        refund_amount = order.total_price - fee;
+        order.payment_status = 'refunded';
+    } else {
+        // Nothing was collected up front, but the branch already committed
+        // product/labor — the customer still owes the cancellation fee,
+        // settled in person when they come to collect their (unfinished) items.
+        amount_due = fee;
+    }
+
+    order.status = 'cancelled';
+    order.cancellation_reason = reason;
+    order.cancelled_by = req.user.id;
+    order.cancelled_at = new Date();
+    order.cancelled_on_customer_request = !!on_customer_request;
+    order.refund_amount = refund_amount;
+    order.amount_due = amount_due;
+    await order.save();
+
+    const openingLine = on_customer_request
+        ? 'Your order was cancelled per your request.'
+        : `Your order was cancelled by staff (reason: ${reason}).`;
+
+    const moneyLine =
+        refund_amount > 0
+            ? ` A refund of ${refund_amount} is due (${FORCE_CANCEL_FEE_PERCENT}% cancellation fee applied).`
+            : amount_due > 0
+            ? ` A cancellation fee of ${amount_due} is due at pickup.`
+            : '';
+
+    await createNotification({
+        user_id: order.customer_id,
+        order_id: order._id,
+        type: 'other',
+        message: openingLine + moneyLine,
+    });
+
+    apiResponse(res, 200, order, 'Order force-cancelled successfully');
 });
