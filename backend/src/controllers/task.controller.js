@@ -3,13 +3,16 @@
 
 import Task from '../models/task.model.js';
 import Employee from '../models/employee.model.js';
+import Order from '../models/order.model.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { syncOrderStatusFromTasks } from '../services/orderStatusSync.service.js';
 
 
-export const createTask = asyncHandler(async (req, res, next) => {
+// POST /tasks
+// Admin and branch managers can create tasks.
+export const createTask = asyncHandler(async (req, res) => {
     const { employee_id, order_id, stage } = req.body;
     const currentUser = req.user;
 
@@ -18,18 +21,39 @@ export const createTask = asyncHandler(async (req, res, next) => {
         throw new ApiError(403, 'You do not have permission to create tasks');
     }
 
+    if (!employee_id || !order_id || !stage) {
+        throw new ApiError(400, 'employee_id, order_id, and stage are required');
+    }
+
     // Verify employee exists
     const employee = await Employee.findById(employee_id);
+
     if (!employee) {
         throw new ApiError(404, 'Employee not found');
     }
 
-    // Branch managers can only assign to their branch employees
-    if (currentUser.role === 'branch_manager' && currentUser.branch_id !== employee.branch_id.toString()) {
-        throw new ApiError(403, 'You can only assign tasks to employees in your branch');
+    // Verify order exists
+    const order = await Order.findById(order_id);
+
+    if (!order) {
+        throw new ApiError(404, 'Order not found');
     }
 
-    // Create task
+    // Branch managers can only assign to their branch employees
+    if (currentUser.role === 'branch_manager' &&employee.branch_id.toString() !== currentUserbranch_id) {
+     throw new ApiError(403,'You can only assign tasks to employees in your branch');
+    }
+
+    // Ensure employee and order belong to the same branch
+    if (employee.branch_id.toString() !== order.branch_id.toString()) {
+     throw new ApiError(400,'Employee and order must belong to the same branch');
+    }
+
+    // Branch manager cannot create a task for an order outside their branch
+    if (currentUser.role === 'branch_manager' &&order.branch_id.toString() !== currentUserbranch_id) {
+     throw new ApiError(403,'You can only create tasks for orders in your branch');
+    }
+
     const task = await Task.create({
         employee_id,
         order_id,
@@ -37,34 +61,45 @@ export const createTask = asyncHandler(async (req, res, next) => {
         status: 'pending',
     });
 
+    // Synchronize order status after task creation
+    await syncOrderStatusFromTasks(order_id);
+
     await task.populate('employee_id');
     await task.populate('order_id');
-
-    await syncOrderStatusFromTasks(order_id);
 
     return apiResponse(res, 201, task, 'Task created successfully');
 });
 
 
-export const getEmployeeTasks = asyncHandler(async (req, res, next) => {
+// GET /tasks
+// Employees see their own tasks.
+// Branch managers see tasks for their branch.
+// Admins see all tasks.
+export const getEmployeeTasks = asyncHandler(async (req, res) => {
     const currentUser = req.user;
     let query = {};
 
-    // Employees see only their assigned tasks
     if (currentUser.role === 'employee') {
-        const employee = await Employee.findOne({ user_id: currentUser.id });
+        const employee = await Employee.findOne({ user_id: currentUser.id, });
+
         if (!employee) {
             throw new ApiError(404, 'Employee record not found');
         }
+
         query.employee_id = employee._id;
     }
-    // Branch managers and admins can see all tasks in their scope
+
     else if (currentUser.role === 'branch_manager') {
-        const employees = await Employee.find({ branch_id: currentUser.branch_id });
-        const employeeIds = employees.map(e => e._id);
+        const employees = await Employee.find({ branch_id: currentUser.branch_id, }).select('_id');
+
+        const employeeIds = employees.map(employee => employee._id);
+
         query.employee_id = { $in: employeeIds };
     }
-    // Admins see all tasks
+
+    else if (currentUser.role !== 'admin') {
+        throw new ApiError(403, 'You do not have permission to view tasks');
+    }
 
     const tasks = await Task.find(query)
         .populate('employee_id')
@@ -74,7 +109,9 @@ export const getEmployeeTasks = asyncHandler(async (req, res, next) => {
     return apiResponse(res, 200, tasks, 'Tasks retrieved successfully');
 });
 
-export const getTaskById = asyncHandler(async (req, res, next) => {
+
+// GET /tasks/:id
+export const getTaskById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const currentUser = req.user;
 
@@ -86,61 +123,92 @@ export const getTaskById = asyncHandler(async (req, res, next) => {
         throw new ApiError(404, 'Task not found');
     }
 
-    // Employees can only view their own tasks
+    // Employee can only view their own task
     if (currentUser.role === 'employee') {
-        const employee = await Employee.findOne({ user_id: currentUser.id });
-        if (!employee || task.employee_id._id.toString() !== employee._id.toString()) {
-            throw new ApiError(403, 'You can only view your own tasks');
-        }
+        const employee = await Employee.findOne({ user_id: currentUser.id, });
+
+        if (!employee || task.employee_id._id.toString() !== employee._id.toString())
+        { throw new ApiError(403,'You can only view your own tasks');}
     }
-    // Branch managers can only view tasks for their branch
+
+    // Branch manager can only view branch tasks
     else if (currentUser.role === 'branch_manager') {
-        const employee = await Employee.findById(task.employee_id._id);
-        if (employee.branch_id.toString() !== currentUser.branch_id) {
-            throw new ApiError(403, 'You can only view tasks for your branch');
+        if (task.order_id.branch_id.toString() !== currentUser.branch_id) {
+            throw new ApiError(403,'You can only view tasks for your branch');
         }
     }
 
-    return apiResponse(res, 200, task, 'Task retrieved successfully');
+    else if (currentUser.role !== 'admin') {
+        throw new ApiError(403,'You do not have permission to view this task');
+    }
+
+    return apiResponse(res,200, task,'Task retrieved successfully');
 });
 
-export const updateTaskStatus = asyncHandler(async (req, res, next) => {
+
+// PATCH /tasks/:id/status
+export const updateTaskStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
     const currentUser = req.user;
 
-    const task = await Task.findById(id);
-    if (!task) {
-        throw new ApiError(404, 'Task not found');
+    const allowedStatuses = ['pending','in_progress','completed'];
+
+    if (status !== undefined && !allowedStatuses.includes(status)) {
+        throw new ApiError(400, `Invalid task status. Allowed statuses: ${allowedStatuses.join(', ')}`);
     }
 
-    // Employees can only update their own tasks
+    const task = await Task.findById(id);
+
+    if (!task) {throw new ApiError(404, 'Task not found');}
+
+    // Employee authorization
     if (currentUser.role === 'employee') {
-        const employee = await Employee.findOne({ user_id: currentUser.id });
-        if (!employee || task.employee_id.toString() !== employee._id.toString()) {
-            throw new ApiError(403, 'You can only update your own tasks');
+        const employee = await Employee.findOne({user_id: currentUser.id,});
+
+        if (!employee ||task.employee_id.toString() !== employee._id.toString()) {
+            throw new ApiError(403,'You can only update your own tasks');
         }
     }
-    // Branch managers and admins can update any task in their scope
+
+    // Branch manager authorization
     else if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(task.employee_id);
-        if (employee.branch_id.toString() !== currentUser.branch_id) {
-            throw new ApiError(403, 'You can only update tasks for your branch');
+
+        if (!employee) {throw new ApiError(404,'Assigned employee not found');}
+
+        if (employee.branch_id.toString() !==currentUser.branch_id) {
+            throw new ApiError(403,'You can only update tasks for your branch');
         }
     }
 
-    // Update fields
-    if (status) {
-        task.status = status;
-        if (status === 'completed') {
-            task.completed_at = new Date();
-        }
+    // Only admin, manager and employee should reach here
+    else if (currentUser.role !== 'admin') {
+        throw new ApiError(403,'You do not have permission to update tasks');
     }
-    if (notes !== undefined) task.notes = notes;
+
+    // Update status
+    if (status !== undefined) {
+        task.status = status;
+
+        if (status === 'completed') {task.completed_at = new Date();}
+
+        else {task.completed_at = undefined;}
+    }
+
+    // Update notes
+    if (notes !== undefined) {
+        task.notes = notes;
+    }
 
     await task.save();
+
+    // IMPORTANT:
+    // Keep order.status synchronized with task progress.
+    await syncOrderStatusFromTasks(task.order_id);
+
     await task.populate('employee_id');
     await task.populate('order_id');
 
-    return apiResponse(res, 200, task, 'Task updated successfully');
+    return apiResponse(res,200,task,'Task updated successfully');
 });
