@@ -1,6 +1,5 @@
 // Shared foundation.
 // Purpose: server entry point — connects DB then starts listening.
-
 import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
 import app from './app.js';
