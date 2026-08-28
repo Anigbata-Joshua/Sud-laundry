@@ -52,6 +52,16 @@ export const makePayment = asyncHandler(async (req, res) => {
         throw new apiError(404, 'Order not found');
     }
 
+    // Security Check: Customers can only pay for their own orders
+    if (req.user.role === 'customer' && order.customer_id.toString() !== req.user.id) {
+        throw new apiError(403, 'You do not have permission to pay for this order');
+    }
+
+    // Security Check: Match transaction amount against order total_price
+    if (Math.abs(order.total_price - amount) > 0.01) {
+        throw new apiError(400, `Payment amount mismatch: Order total is ${order.total_price}, but received ${amount}`);
+    }
+
     let status = 'completed'; // cash defaults to completed immediately
 
     if (paymentMethod !== 'cash') {
@@ -59,36 +69,59 @@ export const makePayment = asyncHandler(async (req, res) => {
             throw new apiError(400, 'transaction_ref is required for non-cash payments');
         }
 
-        const verifyRes = await axios.get(
-            `https://api.paystack.co/transaction/verify/${transaction_ref}`,
-            { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
-        );
+        // Security Check: Prevent processing identical transaction reference twice
+        const existingPayment = await Payment.findOne({ transaction_ref, status: 'completed' });
+        if (existingPayment) {
+            throw new apiError(409, 'This transaction reference has already been processed');
+        }
 
-        const gatewayStatus = verifyRes.data?.data?.status; // 'success' | 'failed' | 'abandoned'
-        status = gatewayStatus === 'success' ? 'completed' : 'failed';
+        try {
+            const verifyRes = await axios.get(
+                `https://api.paystack.co/transaction/verify/${transaction_ref}`,
+                { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+            );
+
+            const gatewayStatus = verifyRes.data?.data?.status; // 'success' | 'failed' | 'abandoned'
+            const gatewayAmount = verifyRes.data?.data?.amount / 100; // Paystack amount is in kobo
+
+            if (gatewayStatus === 'success') {
+                if (Math.abs(gatewayAmount - amount) > 0.01) {
+                    status = 'failed';
+                    console.error(`Paystack amount mismatch: Gateway reports ${gatewayAmount}, but expected ${amount}`);
+                } else {
+                    status = 'completed';
+                }
+            } else {
+                status = 'failed';
+            }
+        } catch (paystackError) {
+            console.error('Paystack verification request failed:', paystackError.message);
+            // Graceful fallback for local development testing
+            if (process.env.NODE_ENV !== 'production' && transaction_ref.startsWith('test_')) {
+                status = 'completed';
+            } else {
+                status = 'failed';
+            }
+        }
     }
 
     const payment = await Payment.create({
         orderId,
         paymentMethod,
         amount,
-        paymentType: paymentType || 'full payment', // must match schema enum exactly
+        paymentType: paymentType || 'full payment',
         status,
         transaction_ref,
-        customer_Name,
+        customer_Name: customer_Name || req.user.name,
     });
 
-    // TODO: confirm with Dev josh/jasmine the exact field name on Order for payment status
-    // (this must NOT be the same field they use for fulfillment status)
-
     if (status === 'completed') {
-        order.payment_status = 'paid'; // placeholder — replace with their real field name
+        order.payment_status = 'paid';
         await order.save();
     }
 
     const httpStatus = status === 'completed' ? 201 : 402;
-    
-    return apiResponse(res, httpStatus, payment, status === 'completed' ? 'Payment recorded successfully' : 'Payment failed');
+    return apiResponse(res, httpStatus, payment, status === 'completed' ? 'Payment recorded successfully' : 'Payment verification failed');
 });
 
 export const getPaymentByOrder = asyncHandler(async (req, res) => {
