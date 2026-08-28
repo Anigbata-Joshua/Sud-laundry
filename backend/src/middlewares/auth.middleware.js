@@ -36,10 +36,14 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
         email: user.email,
     };
 
-    // Attach branch context for staff roles — needed for branch-scoped checks
+    // Attach branch context for staff roles — read from JWT claims first to avoid database query overhead
     if (['employee', 'branch_manager'].includes(user.role)) {
-        const employee = await Employee.findOne({ user_id: user._id });
-        if (employee) req.user.branch_id = employee.branch_id.toString();
+        if (decoded.branch_id) {
+            req.user.branch_id = decoded.branch_id;
+        } else {
+            const employee = await Employee.findOne({ user_id: user._id });
+            if (employee) req.user.branch_id = employee.branch_id.toString();
+        }
     }
 
     next();

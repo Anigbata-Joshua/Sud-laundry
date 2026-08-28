@@ -4,8 +4,8 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
-const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, env.jwtSecret, {
+const generateToken = (userId, payload = {}) => {
+    return jwt.sign({ id: userId, ...payload }, env.jwtSecret, {
         expiresIn: env.jwtExpiresIn,
     });
 };
