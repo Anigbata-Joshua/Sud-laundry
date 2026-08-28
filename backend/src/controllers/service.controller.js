@@ -4,9 +4,12 @@ import Service from '../models/service.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
+import { withCache, deleteCached } from '../services/cache.service.js';
 
 export const getAllServices = asyncHandler(async (req, res) => {
-    const services = await Service.find().select('name category price turnaround_hours');
+    const services = await withCache('services:all', async () => {
+        return await Service.find().select('name category price turnaround_hours');
+    });
     apiResponse(res, 200, services, 'Service list fetched successfully');
 });
 
@@ -29,6 +32,10 @@ export const createService = asyncHandler(async (req, res) => {
     if (existing) throw new ApiError(409, 'A service with this name already exists at this branch');
 
     const service = await Service.create({ branch_id, name, category, price, turnaround_hours });
+    
+    // Invalidate services cache
+    await deleteCached('services:all');
+
     apiResponse(res, 201, service, 'Service created successfully');
 });
 
@@ -47,11 +54,19 @@ export const updateService = asyncHandler(async (req, res) => {
         runValidators: true,
     });
     if (!service) throw new ApiError(404, 'Service not found');
+
+    // Invalidate services cache
+    await deleteCached('services:all');
+
     apiResponse(res, 200, service, 'Service updated successfully');
 });
 
 export const removeService = asyncHandler(async (req, res) => {
     const service = await Service.findByIdAndDelete(req.params.id);
     if (!service) throw new ApiError(404, 'Service not found');
+
+    // Invalidate services cache
+    await deleteCached('services:all');
+
     apiResponse(res, 200, service, 'Service deleted successfully');
 });

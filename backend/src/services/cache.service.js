@@ -1,13 +1,17 @@
-// Owner: Dev 3 (SHARED — coordinate with Dev 2 on cache keys). See guides/ for the shared-file rule.
-// Purpose: cache-aside helper for Redis, used for dashboard figures and catalog data.
+// Owner: Josh
+// Shared foundation / shared business logic
 
+import redisClient from '../config/redis.js';
 
-import redisClient from '../config/redis.js'; // adjust to whatever the shared config actually exports
+const DEFAULT_TTL_SECONDS = 300; // 5 minutes
 
-const DEFAULT_TTL_SECONDS = 300; // 5 minutes — short enough that stale dashboard numbers aren't a real problem
-
+// Helper to check if Redis is active and ready
+const isRedisReady = () => {
+  return redisClient && redisClient.status === 'ready';
+};
 
 export const getCached = async (key) => {
+  if (!isRedisReady()) return null;
   try {
     const value = await redisClient.get(key);
     return value ? JSON.parse(value) : null;
@@ -17,8 +21,8 @@ export const getCached = async (key) => {
   }
 };
 
-
 export const setCached = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) => {
+  if (!isRedisReady()) return;
   try {
     await redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   } catch (err) {
@@ -26,22 +30,30 @@ export const setCached = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) =>
   }
 };
 
+export const deleteCached = async (key) => {
+  if (!isRedisReady()) return;
+  try {
+    await redisClient.del(key);
+  } catch (err) {
+    console.error(`Cache delete failed for key "${key}":`, err.message);
+  }
+};
+
 /**
- * Wraps a function so its result is cached automatically. Pass a function
- * that performs the actual (expensive) work — this handles the
- * check-cache-first / compute-and-store-on-miss pattern for you.
- *
- * Example:
- *   const data = await withCache(
- *     `report:revenue:${branch_id || 'all'}:${startDate}:${endDate}`,
- *     () => getRevenue({ branch_id, startDate, endDate })
- *   );
+ * Wraps a function so its result is cached automatically.
  */
-
 export const withCache = async (key, computeFn, ttlSeconds = DEFAULT_TTL_SECONDS) => {
-  const cached = await getCached(key);
-  if (cached !== null) return cached;
+  if (!isRedisReady()) {
+    return await computeFn(); // Bypass caching completely
+  }
 
+  const cached = await getCached(key);
+  if (cached !== null) {
+    console.log(`[Cache Hit] Key: ${key}`);
+    return cached;
+  }
+
+  console.log(`[Cache Miss] Key: ${key}. Computing fresh value...`);
   const fresh = await computeFn();
   await setCached(key, fresh, ttlSeconds);
   return fresh;
