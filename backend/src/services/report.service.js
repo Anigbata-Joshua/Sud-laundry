@@ -7,6 +7,7 @@
 // #SERIES!!! read the notes again after everyone has finished their parts so you can change plachodler names and ID
 
 
+import mongoose from 'mongoose';
 import Order from '../models/order.model.js';
 import Payment from '../models/payment.model.js';
 
@@ -43,13 +44,32 @@ export const getRevenue = async ({ branch_id, startDate, endDate } = {}) => {
     validateDateRange(startDate, endDate);
 
     const match = { status: 'completed', ...buildDateMatch(startDate, endDate) };
-    if (branch_id) match.branch_id = branch_id;
+    const pipeline = [{ $match: match }];
 
-    const result = await Payment.aggregate([
-        { $match: match },
-        { $group: { _id: null, totalRevenue: { $sum: '$amount' }, count: { $sum: 1 } } },
-    ]);
+    if (branch_id) {
+        pipeline.push(
+            {
+                $lookup: {
+                    from: 'orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: { 'order.branch_id': new mongoose.Types.ObjectId(branch_id) } }
+        );
+    }
 
+    pipeline.push({
+        $group: {
+            _id: null,
+            totalRevenue: { $sum: '$amount' },
+            count: { $sum: 1 }
+        }
+    });
+
+    const result = await Payment.aggregate(pipeline);
     const { totalRevenue = 0, count = 0 } = result[0] || {};
     const averageOrderValue = count > 0 ? totalRevenue / count : 0;
 
@@ -62,15 +82,29 @@ export const getPaymentMethodBreakdown = async ({ branch_id, startDate, endDate 
     validateDateRange(startDate, endDate);
 
     const match = { status: 'completed', ...buildDateMatch(startDate, endDate) };
-    if (branch_id) match.branch_id = branch_id;
+    const pipeline = [{ $match: match }];
 
-    const result = await Payment.aggregate([
-        { $match: match },
+    if (branch_id) {
+        pipeline.push(
+            {
+                $lookup: {
+                    from: 'orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: { 'order.branch_id': new mongoose.Types.ObjectId(branch_id) } }
+        );
+    }
+
+    pipeline.push(
         { $group: { _id: '$paymentMethod', revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
-        { $sort: { revenue: -1 } },
-    ]);
+        { $sort: { revenue: -1 } }
+    );
 
-    return result; // e.g. [{ _id: 'card', revenue: 32000, count: 40 }, { _id: 'cash', revenue: 12000, count: 15 }]
+    return await Payment.aggregate(pipeline);
 };
 
 // ---- 3. period-over-period comparison ----
@@ -103,10 +137,24 @@ export const getRevenueOverTime = async ({ branch_id, startDate, endDate } = {})
     validateDateRange(startDate, endDate);
 
     const match = { status: 'completed', ...buildDateMatch(startDate, endDate) };
-    if (branch_id) match.branch_id = branch_id;
+    const pipeline = [{ $match: match }];
 
-    const result = await Payment.aggregate([
-        { $match: match },
+    if (branch_id) {
+        pipeline.push(
+            {
+                $lookup: {
+                    from: 'orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: { 'order.branch_id': new mongoose.Types.ObjectId(branch_id) } }
+        );
+    }
+
+    pipeline.push(
         {
             $group: {
                 _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -114,10 +162,10 @@ export const getRevenueOverTime = async ({ branch_id, startDate, endDate } = {})
                 orders: { $sum: 1 },
             },
         },
-        { $sort: { _id: 1 } }, // chronological order, oldest first — good for charting
-    ]);
+        { $sort: { _id: 1 } }
+    );
 
-    return result; // e.g. [{ _id: '2026-08-01', revenue: 4500, orders: 6 }, { _id: '2026-08-02', revenue: 3200, orders: 4 }]
+    return await Payment.aggregate(pipeline);
 };
 
 // ---- 7. top customers by spend ----
@@ -126,21 +174,57 @@ export const getTopCustomers = async ({ branch_id, startDate, endDate, limit = 5
     validateDateRange(startDate, endDate);
 
     const match = { status: 'completed', ...buildDateMatch(startDate, endDate) };
-    if (branch_id) match.branch_id = branch_id;
+    const pipeline = [{ $match: match }];
 
-    const result = await Payment.aggregate([
-        { $match: match },
-        { $group: { _id: '$customer_Name', totalSpent: { $sum: '$amount' }, orders: { $sum: 1 } } },
+    pipeline.push(
+        {
+            $lookup: {
+                from: 'orders',
+                localField: 'orderId',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        { $unwind: '$order' }
+    );
+
+    if (branch_id) {
+        pipeline.push({
+            $match: { 'order.branch_id': new mongoose.Types.ObjectId(branch_id) }
+        });
+    }
+
+    pipeline.push(
+        {
+            $group: {
+                _id: '$order.customer_id',
+                totalSpent: { $sum: '$amount' },
+                orders: { $sum: 1 }
+            }
+        },
+        {
+            $lookup: {
+                from: 'users',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'customer'
+            }
+        },
+        { $unwind: '$customer' },
+        {
+            $project: {
+                _id: 1,
+                totalSpent: 1,
+                orders: 1,
+                customerName: '$customer.name',
+                customerEmail: '$customer.email'
+            }
+        },
         { $sort: { totalSpent: -1 } },
-        { $limit: limit },
-    ]);
+        { $limit: limit }
+    );
 
-    return result;
-    // NOTE: grouping by customer_Name (a free-text string on Payment) means two
-    // customers who typed their name slightly differently won't merge correctly,
-    // and it can't join back to a real user record. If Payment/Order has a proper
-    // user_id or customer_id reference, group by that instead and $lookup the
-    // name — worth checking with Dev 1/2 what's actually available.
+    return await Payment.aggregate(pipeline);
 };
 
 // ---- 6 & 9 (order volume / top services — unchanged from before) ----
@@ -148,7 +232,7 @@ export const getTopCustomers = async ({ branch_id, startDate, endDate, limit = 5
 export const getOrderVolume = async ({ branch_id, startDate, endDate } = {}) => {
     validateDateRange(startDate, endDate);
     const match = buildDateMatch(startDate, endDate);
-    if (branch_id) match.branch_id = branch_id;
+    if (branch_id) match.branch_id = new mongoose.Types.ObjectId(branch_id);
 
     const result = await Order.aggregate([
         { $match: match },
@@ -162,13 +246,21 @@ export const getOrderVolume = async ({ branch_id, startDate, endDate } = {}) => 
 export const getTopServices = async ({ branch_id, startDate, endDate, limit = 5 } = {}) => {
     validateDateRange(startDate, endDate);
     const match = buildDateMatch(startDate, endDate);
-    if (branch_id) match.branch_id = branch_id;
+    if (branch_id) match.branch_id = new mongoose.Types.ObjectId(branch_id);
 
     const result = await Order.aggregate([
         { $match: match },
-        { $group: { _id: '$service_type', count: { $sum: 1 } } }, // adjust field name to match Order schema
+        { $unwind: '$items' },
+        {
+            $group: {
+                _id: '$items.service_id',
+                name: { $first: '$items.name' },
+                count: { $sum: '$items.quantity' },
+                revenue: { $sum: '$items.subtotal' }
+            }
+        },
         { $sort: { count: -1 } },
-        { $limit: limit },
+        { $limit: limit }
     ]);
 
     return result;
