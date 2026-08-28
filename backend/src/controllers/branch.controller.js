@@ -1,12 +1,17 @@
 // Owner: Josh
 // Purpose: public branch listing (minimal fields) plus admin-only create/edit.
 import Branch from '../models/branch.model.js';
+import Order from '../models/order.model.js';
+import Employee from '../models/employee.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
+import { withCache, deleteCached } from '../services/cache.service.js';
 
 export const getAllBranches = asyncHandler(async (req, res) => {
-    const branches = await Branch.find().select('name address phone');
+    const branches = await withCache('branches:all', async () => {
+        return await Branch.find().select('name address phone');
+    });
     apiResponse(res, 200, branches, 'Branches retrieved successfully');
 });
 
@@ -26,6 +31,10 @@ export const createBranch = asyncHandler(async (req, res) => {
     if (existing) throw new ApiError(409, 'A branch with this name already exists');
 
     const branch = await Branch.create({ name, address, phone });
+    
+    // Invalidate branches cache
+    await deleteCached('branches:all');
+
     apiResponse(res, 201, branch, 'Branch created successfully');
 });
 
@@ -49,13 +58,33 @@ export const updateBranch = asyncHandler(async (req, res) => {
     });
     
     if (!branch) throw new ApiError(404, 'Branch not found');
+
+    // Invalidate branches cache
+    await deleteCached('branches:all');
+
     apiResponse(res, 200, branch, 'Branch updated successfully');
 });
 
 export const deleteBranch = asyncHandler(async (req, res) => {
-    // TODO: block deletion if this branch has any orders or employees.
-    const branch = await Branch.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
 
+    // Block deletion if this branch has any employees
+    const employeeCount = await Employee.countDocuments({ branch_id: id });
+    if (employeeCount > 0) {
+        throw new ApiError(409, 'Cannot delete branch with active registered employees');
+    }
+
+    // Block deletion if this branch has any orders
+    const orderCount = await Order.countDocuments({ branch_id: id });
+    if (orderCount > 0) {
+        throw new ApiError(409, 'Cannot delete branch with active order records');
+    }
+
+    const branch = await Branch.findByIdAndDelete(id);
     if (!branch) throw new ApiError(404, 'Branch not found');
+
+    // Invalidate branches cache
+    await deleteCached('branches:all');
+
     apiResponse(res, 200, branch, 'Branch deleted successfully');
 });
