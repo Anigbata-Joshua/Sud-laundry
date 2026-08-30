@@ -47,6 +47,11 @@ const orderSchema = new mongoose.Schema(
         },
         pickup_time: { type: Date },
         delivery_time: { type: Date },
+
+        // Actual fulfillment timestamps
+        picked_up_at: { type: Date },
+        delivered_at: { type: Date },
+
         total_price: { type: Number, required: true },
         express_surcharge: { type: Number, default: 0, min: 0 },
         payment_status: {
