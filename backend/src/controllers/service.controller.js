@@ -58,9 +58,6 @@ export const createService = asyncHandler(async (req, res) => {
     if (typeof name !== 'string' || !name.trim()) {
         throw new ApiError(400, 'Service name must be a valid non-empty string');
     }
-    if (!['service', 'add-on'].includes(type)) {
-        throw new ApiError(400, 'Type must be either service or add-on');
-    }
 
     // Validate price
     if (typeof price !== 'number' || price < 0) {
@@ -102,9 +99,10 @@ export const createService = asyncHandler(async (req, res) => {
     const service = await Service.create({
         branch_id: serviceBranchId,
         name: name.trim(),
+        type,
         category: category?.trim() || 'general',
         price,
-        turnaround_hours,
+        turnaround_hours: type === 'service' ? turnaround_hours : undefined,
     });
 
     await deleteCached('services:all');
@@ -115,13 +113,13 @@ export const createService = asyncHandler(async (req, res) => {
 
 // PATCH /services/:id
 export const updateService = asyncHandler(async (req, res) => {
-    const { name, category, price, turnaround_hours, } = req.body;
+    const { name, category, price, type, turnaround_hours, } = req.body;
 
     const currentUser = req.user;
 
     // Permission check
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403, 'You do not have permission to update services');
+        throw new ApiError( 403,'You do not have permission to update services');
     }
 
     const service = await Service.findById(req.params.id);
@@ -130,29 +128,36 @@ export const updateService = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Service not found');
     }
 
-    // Branch manager can only update own branch service
-    if (currentUser.role === 'branch_manager' && service.branch_id.toString() !== currentUser.branch_id) {
-        throw new ApiError(403, 'You can only update services in your branch');
+    // Branch manager can only update services in their own branch
+    if (currentUser.role === 'branch_manager' && service.branch_id.toString() !== currentUser.branch_id.toString()) {
+        throw new ApiError( 403,'You can only update services in your branch');
     }
 
-    // Validate price
-    if (price !== undefined && (typeof price !== 'number' || price < 0)) {
-        throw new ApiError(400, 'Price must be a valid non-negative number');
+    // Determine the type after the update
+    const updatedType = type ?? service.type;
+
+    // Validate type
+    if (!['service', 'add-on'].includes(updatedType)) {
+        throw new ApiError(  400,'Type must be either service or add-on');
     }
 
     // Validate name
     if (name !== undefined) {
         if (typeof name !== 'string' || !name.trim()) {
-            throw new ApiError(400, 'Service name must be a valid non-empty string');
+            throw new ApiError( 400,'Service name must be a valid non-empty string');
         }
 
         const trimmedName = name.trim();
 
-        // Prevent duplicate names
-        const existing = await Service.findOne({ branch_id: service.branch_id, name: trimmedName, _id: { $ne: service._id } });
+        // Prevent duplicate names within the same branch
+        const existing = await Service.findOne({
+            branch_id: service.branch_id,
+            name: trimmedName,
+            _id: { $ne: service._id },
+        });
 
         if (existing) {
-            throw new ApiError(409, 'A service with this name already exists at this branch');
+            throw new ApiError(409,'A service with this name already exists at this branch');
         }
 
         service.name = trimmedName;
@@ -161,7 +166,7 @@ export const updateService = asyncHandler(async (req, res) => {
     // Validate category
     if (category !== undefined) {
         if (typeof category !== 'string' || !category.trim()) {
-            throw new ApiError(400, 'Category must be a valid non-empty string');
+            throw new ApiError(  400,'Category must be a valid non-empty string');
         }
 
         service.category = category.trim();
@@ -170,22 +175,30 @@ export const updateService = asyncHandler(async (req, res) => {
     // Validate price
     if (price !== undefined) {
         if (typeof price !== 'number' || price < 0) {
-            throw new ApiError(400, 'Price must be a valid non-negative number');
+            throw new ApiError(  400,'Price must be a valid non-negative number');
         }
 
         service.price = price;
     }
 
-    // Validate turnaround
-    if (turnaround_hours !== undefined) {
-        if (typeof turnaround_hours !== 'number' || turnaround_hours <= 0) {
-            throw new ApiError(400, 'Turnaround hours must be greater than zero');
+    // Validate turnaround based on the resulting type
+    if (updatedType === 'service') {
+        const finalTurnaround = turnaround_hours !== undefined ? turnaround_hours : service.turnaround_hours;
+
+        if (typeof finalTurnaround !== 'number' || finalTurnaround < 1) {
+            throw new ApiError(  400,'Turnaround hours are required for regular services');
         }
 
-        service.turnaround_hours = turnaround_hours;
+        service.turnaround_hours = finalTurnaround;
+    } else {
+        service.turnaround_hours = undefined; // Add-ons do not have a turnaround time
     }
+
+    service.type = updatedType; // Save the new type
+
     await service.save();
 
+    // Invalidate service cache
     await deleteCached('services:all');
 
     return apiResponse(res, 200, service, 'Service updated successfully');
