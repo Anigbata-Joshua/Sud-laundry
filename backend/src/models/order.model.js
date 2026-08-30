@@ -7,8 +7,9 @@ const orderItemSchema = new mongoose.Schema(
     {
         service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
         name: { type: String, required: true },
-        quantity: { type: Number, required: true },
-        subtotal: { type: Number, required: true },
+        quantity: { type: Number, min: 0.001, required: true },
+        unit_price: { type: Number, min: 0, required: true },
+        subtotal: { type: Number, min: 0, required: true },
     },
     { _id: false }
 );
@@ -40,9 +41,14 @@ const orderSchema = new mongoose.Schema(
             enum: ['placed', 'processing', 'ready', 'delivered', 'cancelled'],
             default: 'placed',
         },
+        fulfillment: {
+            priority: { type: String, enum: ['normal', 'express'], default: 'normal', },
+            turnaround_hours: { type: Number, },
+        },
         pickup_time: { type: Date },
         delivery_time: { type: Date },
         total_price: { type: Number, required: true },
+        express_surcharge: { type: Number, default: 0, min: 0 },
         payment_status: {
             type: String,
             enum: ['unpaid', 'paid', 'refunded'],
@@ -64,7 +70,7 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ customer_id: 1 });
 orderSchema.index({ branch_id: 1, status: 1 });
 
-// keep this bellow your schema (i need it and its good for our project) just after the scema definition, so we can index the collection for faster queries
+// Keep this below schema 
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ branch_id: 1, createdAt: -1 });
 
