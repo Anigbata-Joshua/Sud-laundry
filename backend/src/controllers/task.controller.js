@@ -152,7 +152,7 @@ export const updateTaskStatus = asyncHandler(async (req, res) => {
     const { status, notes } = req.body;
     const currentUser = req.user;
 
-    const allowedStatuses = ['pending','in_progress','completed'];
+    const allowedStatuses = ['pending','in_progress','completed', 'on_hold'];
 
     if (status !== undefined && !allowedStatuses.includes(status)) {
         throw new ApiError(400, `Invalid task status. Allowed statuses: ${allowedStatuses.join(', ')}`);

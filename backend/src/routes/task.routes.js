@@ -14,9 +14,9 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/create', createTask);
-router.get('/get/all', getEmployeeTasks);
-router.get('/:id/get/one', getTaskById);
-router.put('/:id/update', updateTaskStatus);
+router.post('/', createTask);
+router.get('/', getEmployeeTasks);
+router.get('/:id', getTaskById);
+router.patch('/:id', updateTaskStatus);
 
 export default router;
