@@ -18,10 +18,15 @@ const FORCE_CANCEL_FEE_PERCENT = 30;
 // POST /orders
 // Customer places an order
 export const createOrder = asyncHandler(async (req, res) => {
-    const { branch_id, items, pickup_time, delivery_time, } = req.body;
+    const { branch_id, items, pickup_time, delivery_time, priority = 'normal', } = req.body;
 
     if (!branch_id || !Array.isArray(items) || !items.length) {
         throw new ApiError(400, 'branch_id and at least one item are required');
+    }
+
+    // Validate priority
+    if (!['normal', 'express'].includes(priority)) {
+        throw new ApiError(400, 'Priority must be either normal or express');
     }
 
     // Prevent duplicate submissions
@@ -36,6 +41,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     }
 
     let total_price = 0;
+    let longestTurnaroundHours = 0;
     const resolvedItems = [];
 
     for (const item of items) {
@@ -55,6 +61,16 @@ export const createOrder = asyncHandler(async (req, res) => {
             throw new ApiError(400, `Service "${service.name}" is not available at the selected branch`);
         }
 
+        // Track the longest normal turnaround for the order
+        if (typeof service.turnaround_hours !== 'number' || service.turnaround_hours <= 0 ) {
+            throw new ApiError(400, `Service "${service.name}" does not have a valid turnaround time`);
+        }
+
+        longestTurnaroundHours = Math.max(
+            longestTurnaroundHours,
+            service.turnaround_hours
+        );
+
         const subtotal = service.price * item.quantity;
 
         total_price += subtotal;
@@ -63,17 +79,36 @@ export const createOrder = asyncHandler(async (req, res) => {
             service_id: service._id,
             name: service.name,
             quantity: item.quantity,
+            unit_price: service.price,
             subtotal,
         });
     }
+
+
+
+     // Normal = longest service turnaround
+    // Express = fixed 24-hour turnaround
+    const turnaround_hours = priority === 'express' ? 24 : longestTurnaroundHours;
+
+    // Express orders receive the configured surcharge
+    const express_surcharge = priority === 'express' ? total_price * (env.expressSurchargePercent / 100) : 0;
+
+    const amount_due = total_price + express_surcharge;
 
     const order = await Order.create({
         customer_id: req.user.id,
         branch_id,
         items: resolvedItems,
         total_price,
+        express_surcharge,
+        amount_due,
         pickup_time,
         delivery_time,
+
+        fulfillment: {
+            priority,
+            turnaround_hours,
+        },
     });
 
     await createNotification({
@@ -150,7 +185,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
     // Staff are branch scoped
     if (['branch_manager', 'employee'].includes(req.user.role) && order.branch_id.toString() !== req.user.branch_id) {
-        throw new ApiError(403,'Cannot view an order outside your branch');
+        throw new ApiError(403, 'Cannot view an order outside your branch');
     }
 
     return apiResponse(res, 200, order, 'Order fetched successfully');
@@ -159,31 +194,31 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
 // PATCH /orders/:id
 export const updateOrder = asyncHandler(async (req, res) => {
-    const order = await Order.findById(  req.params.id  );
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
-        throw new ApiError(404,'Order not found');
+        throw new ApiError(404, 'Order not found');
     }
 
     // CUSTOMER PATH
     if (req.user.role === 'customer') {
-        if (order.customer_id.toString() !== req.user.id ) {
-            throw new ApiError(403,'Cannot modify another customer\'s order');
+        if (order.customer_id.toString() !== req.user.id) {
+            throw new ApiError(403, 'Cannot modify another customer\'s order');
         }
 
         // Customer can ONLY cancel
         if (req.body.status !== 'cancelled' || Object.keys(req.body).length !== 1) {
-            throw new ApiError(403,'Customers may only cancel their own order');
+            throw new ApiError(403, 'Customers may only cancel their own order');
         }
 
         if (order.status !== 'placed') {
-            throw new ApiError(409,`Order cannot be cancelled once it is ${order.status}`);
+            throw new ApiError(409, `Order cannot be cancelled once it is ${order.status}`);
         }
 
-        const minutesSincePlaced =(Date.now() -order.createdAt.getTime()) /60000;
+        const minutesSincePlaced = (Date.now() - order.createdAt.getTime()) / 60000;
 
-        if (minutesSincePlaced > env.cancellationWindowMinutes ) {
-            throw new ApiError(400,'Cancellation window has passed — order is already in progress');
+        if (minutesSincePlaced > env.cancellationWindowMinutes) {
+            throw new ApiError(400, 'Cancellation window has passed — order is already in progress');
         }
 
         order.status = 'cancelled';
@@ -194,7 +229,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
             user_id: req.user.id,
             order_id: order._id,
             type: 'other',
-            message:'Your order has been cancelled.',
+            message: 'Your order has been cancelled.',
         });
 
         return apiResponse(res, 200, order, 'Order cancelled successfully');
@@ -203,28 +238,28 @@ export const updateOrder = asyncHandler(async (req, res) => {
     // STAFF / ADMIN PATH
 
     if (!['admin', 'branch_manager', 'employee'].includes(req.user.role)) {
-        throw new ApiError(403,'You do not have permission to update orders');
+        throw new ApiError(403, 'You do not have permission to update orders');
     }
 
     // Branch restriction
     if (['branch_manager', 'employee'].includes(req.user.role) &&
-        order.branch_id.toString() !==req.user.branch_id ) {
-        throw new ApiError(403,'Cannot update an order outside your branch');
+        order.branch_id.toString() !== req.user.branch_id) {
+        throw new ApiError(403, 'Cannot update an order outside your branch');
     }
 
-    const { pickup_time, delivery_time, payment_status, status,} = req.body;
+    const { pickup_time, delivery_time, payment_status, status, } = req.body;
 
     // STATUS
 
     if (status !== undefined) {
         // Only delivered can be manually set
         if (status !== 'delivered') {
-            throw new ApiError(400,'Order status is derived from task progress and cannot be set directly, except marking as delivered');
+            throw new ApiError(400, 'Order status is derived from task progress and cannot be set directly, except marking as delivered');
         }
 
         // Must be ready
         if (order.status !== 'ready') {
-            throw new ApiError(409,'Order must be ready before it can be marked delivered');
+            throw new ApiError(409, 'Order must be ready before it can be marked delivered');
         }
 
         order.status = 'delivered';
@@ -245,8 +280,8 @@ export const updateOrder = asyncHandler(async (req, res) => {
     // by payment controller.
     // Keeping this restricted to admin for safety.
     if (payment_status !== undefined) {
-        if (req.user.role !== 'admin') { 
-            throw new ApiError(403,'Only admins can manually update payment status');
+        if (req.user.role !== 'admin') {
+            throw new ApiError(403, 'Only admins can manually update payment status');
         }
 
         order.payment_status = payment_status;
@@ -254,36 +289,36 @@ export const updateOrder = asyncHandler(async (req, res) => {
 
     await order.save();
 
-    return apiResponse(res,200,order,'Order updated successfully');
+    return apiResponse(res, 200, order, 'Order updated successfully');
 });
 
 
 // PATCH /orders/:id/force-cancel
 export const forceCancelOrder = asyncHandler(async (req, res) => {
     if (!['admin', 'branch_manager'].includes(req.user.role)) {
-        throw new ApiError(403,'Only staff or admin can force-cancel an order');
+        throw new ApiError(403, 'Only staff or admin can force-cancel an order');
     }
 
-    const { reason,on_customer_request,} = req.body;
+    const { reason, on_customer_request, } = req.body;
 
     if (!reason) {
-        throw new ApiError(400,'A cancellation reason is required');
+        throw new ApiError(400, 'A cancellation reason is required');
     }
 
     const order = await Order.findById(req.params.id);
 
     if (!order) {
-        throw new ApiError(404,'Order not found');
+        throw new ApiError(404, 'Order not found');
     }
 
     // Branch manager scope
-    if (req.user.role === 'branch_manager' && order.branch_id.toString() !==req.user.branch_id) {
-        throw new ApiError(403,'Cannot cancel an order outside your branch');
+    if (req.user.role === 'branch_manager' && order.branch_id.toString() !== req.user.branch_id) {
+        throw new ApiError(403, 'Cannot cancel an order outside your branch');
     }
 
     // Only placed or processing orders can be force cancelled
     if (!['placed', 'processing'].includes(order.status)) {
-        throw new ApiError(409,`Order cannot be force-cancelled once it is ${order.status} — work is too far along`);
+        throw new ApiError(409, `Order cannot be force-cancelled once it is ${order.status} — work is too far along`);
     }
 
     const fee = (order.total_price * FORCE_CANCEL_FEE_PERCENT) / 100;
@@ -312,14 +347,14 @@ export const forceCancelOrder = asyncHandler(async (req, res) => {
     await order.save();
 
     const openingLine = on_customer_request
-            ? 'Your order was cancelled per your request.'
-            : `Your order was cancelled by staff (reason: ${reason}).`;
+        ? 'Your order was cancelled per your request.'
+        : `Your order was cancelled by staff (reason: ${reason}).`;
 
     const moneyLine = refund_amount > 0
-            ? ` A refund of ${refund_amount} is due (${FORCE_CANCEL_FEE_PERCENT}% cancellation fee applied).`
-            : amount_due > 0
-                ? ` A cancellation fee of ${amount_due} is due at pickup.`
-                : '';
+        ? ` A refund of ${refund_amount} is due (${FORCE_CANCEL_FEE_PERCENT}% cancellation fee applied).`
+        : amount_due > 0
+            ? ` A cancellation fee of ${amount_due} is due at pickup.`
+            : '';
 
     await createNotification({
         user_id: order.customer_id,

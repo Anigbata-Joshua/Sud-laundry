@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node --no-deprecation src/server.js",
-    "dev": "nodemon --no-deprecation src/server.js"
+    "dev": "nodemon --no-deprecation src/server.js",
+    "seed:services": "node --no-deprecation src/seeders/service.seeder.js"
   },
   "keywords": [],
   "author": "",
