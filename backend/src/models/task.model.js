@@ -17,7 +17,7 @@ const taskSchema = new Schema(
         },
         stage: {
             type: String,
-            enum: ['intake', 'processing', 'quality_check', 'packaging', 'delivery_ready'],
+            enum: ['intake', 'washing', 'processing', 'quality_check', 'packaging', 'delivery_ready'],
             required: [true, 'Stage is required'],
         },
         status: {

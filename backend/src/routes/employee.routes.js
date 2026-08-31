@@ -16,9 +16,9 @@ const router = Router();
 router.use(authenticate);
 router.use(enforceBranchScope);
 
-router.post('/create', createEmployee);
-router.get('/get/all', getEmployees);
-router.get('/:id/get/one', getEmployeeById);
-router.put('/:id/update', updateEmployee);
+router.post('/', createEmployee);
+router.get('/', getEmployees);
+router.get('/:id', getEmployeeById);
+router.patch('/:id', updateEmployee);
 
 export default router;
