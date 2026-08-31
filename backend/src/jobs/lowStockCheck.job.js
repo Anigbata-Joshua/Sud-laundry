@@ -1,60 +1,149 @@
 // Owner: Josh
-// Purpose: scheduled job — daily low-stock check, notifies branch managers.
+// Purpose:
+// Scheduled daily low-stock check.
+//
+// Rules:
+// - Only active products are checked.
+// - Products are considered low-stock when quantity <= reorder_point.
+// - Products with reorder_point = 0 are ignored.
+// - Branch managers receive alerts for products in their branch.
+// - Low-stock checks run once daily at Nigeria local midnight.
+// - This job does not modify inventory.
 
 import cron from 'node-cron';
 import Product from '../models/product.model.js';
-import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from '../services/notification.service.js';
 
-// Run once a day at midnight: '0 0 * * *'
-// For testing/development, we can trigger it programmatically or via cron schedule
+
+// Run once every day at midnight in Nigeria.
+const LOW_STOCK_CRON = '0 0 * * *';
+
+
+// Check all branches for low-stock products.
 export const checkLowStock = async () => {
     try {
         console.log('🔄 Running daily low-stock inventory check...');
-        
-        // Find all products that are at or below their reorder point
-        // and have a positive reorder point defined (to avoid checking disabled items)
+
+        // Find active products that have a configured reorder point
+        // and are at or below that point.
         const lowStockProducts = await Product.find({
-            $expr: { $lte: ['$quantity', '$reorder_point'] },
-            reorder_point: { $gt: 0 }
-        });
+            is_active: true,
+            reorder_point: { $gt: 0 },
+            $expr: {
+                $lte: ['$quantity', '$reorder_point'],
+            },
+        }).select(
+            'branch_id name quantity reorder_point unit'
+        );
 
         if (lowStockProducts.length === 0) {
-            console.log('✅ No low stock items found.');
+            console.log('✅ No low-stock products found.');
             return;
         }
 
-        console.log(`⚠️ Found ${lowStockProducts.length} low-stock items. Dispatching alerts...`);
+        console.log(
+            `⚠️ Found ${lowStockProducts.length} low-stock product(s).`
+        );
 
+
+        // Get the unique branches affected by low-stock products.
+        const branchIds = [
+            ...new Set(
+                lowStockProducts.map(product =>
+                    product.branch_id.toString()
+                )
+            ),
+        ];
+
+
+        // Find active branch managers directly through User.branch_id.
+        //
+        // This is better than looking through Employee because a
+        // branch manager's authorization/assignment belongs to User.
+        const managers = await User.find({
+            role: 'branch_manager',
+            branch_id: { $in: branchIds },
+            is_active: true,
+        }).select('_id branch_id');
+
+
+        if (managers.length === 0) {
+            console.log(
+                '⚠️ Low-stock products found, but no active branch managers were found.'
+            );
+
+            return;
+        }
+
+
+        // Group managers by branch.
+        const managersByBranch = new Map();
+
+        for (const manager of managers) {
+            const branchId = manager.branch_id.toString();
+
+            if (!managersByBranch.has(branchId)) {
+                managersByBranch.set(branchId, []);
+            }
+
+            managersByBranch.get(branchId).push(manager);
+        }
+
+
+        // Send each branch manager the alerts for their branch.
         for (const product of lowStockProducts) {
-            // Find all employees assigned to the product's branch
-            const employees = await Employee.find({ branch_id: product.branch_id });
-            const employeeUserIds = employees.map(emp => emp.user_id);
+            const branchId = product.branch_id.toString();
 
-            // Find users who are branch_managers or admins for this branch
-            const managers = await User.find({
-                _id: { $in: employeeUserIds },
-                role: 'branch_manager',
-                is_active: true
-            });
+            const branchManagers =
+                managersByBranch.get(branchId) || [];
 
-            const alertMessage = `Low stock alert: Product "${product.name}" has only ${product.quantity} units left (Reorder point: ${product.reorder_point}).`;
+            if (branchManagers.length === 0) {
+                console.log(
+                    `⚠️ No active manager found for branch ${branchId} — ${product.name}`
+                );
 
-            // Notify each manager
-            for (const manager of managers) {
+                continue;
+            }
+
+
+            const alertMessage =
+                `Low stock alert: "${product.name}" has ` +
+                `${product.quantity} ${product.unit} remaining. ` +
+                `Reorder point: ${product.reorder_point} ${product.unit}.`;
+
+
+            for (const manager of branchManagers) {
                 await createNotification({
                     user_id: manager._id,
                     type: 'other',
-                    message: alertMessage
+                    message: alertMessage,
                 });
             }
         }
-        console.log('✅ Low stock checks and notifications complete.');
+
+
+        console.log(
+            '✅ Low-stock checks and notifications completed.'
+        );
+
     } catch (error) {
-        console.error('❌ Error during low stock check job:', error.message);
+        console.error(
+            '❌ Error during low-stock check:',
+            error.message
+        );
     }
 };
 
-// Daily cron task
-cron.schedule('0 0 * * *', checkLowStock);
+
+// Schedule the daily job.
+//
+// Africa/Lagos ensures midnight means Nigerian midnight,
+// regardless of the server's timezone.
+cron.schedule(
+    LOW_STOCK_CRON,
+    checkLowStock,
+    {
+        timezone: 'Africa/Lagos',
+    }
+);

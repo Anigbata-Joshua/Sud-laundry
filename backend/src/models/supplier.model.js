@@ -1,6 +1,13 @@
 // Owner: Series
-// Purpose: Supplier schema — reference record only, no login/portal.
-
+//
+// Purpose:
+// Supplier reference record.
+// Suppliers are shared company records and are not branch-scoped.
+//
+// Important:
+// Supplier does not own inventory or product quantities.
+// Products supplied by a supplier are recorded through purchase/stock
+// movement records.
 
 import mongoose from 'mongoose';
 
@@ -11,35 +18,49 @@ const supplierSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
     contact: {
       phone: {
         type: String,
         required: true,
         trim: true,
       },
+
       email: {
         type: String,
         trim: true,
         lowercase: true,
+        default: null,
       },
+
       address: {
         type: String,
         trim: true,
+        default: null,
       },
     },
-    items_supplied: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
+
     is_active: {
       type: Boolean,
-      default: true, // lets admin "deactivate" a supplier without deleting history
+      default: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
+// Supplier names should be unique.
+supplierSchema.index(
+  { name: 1 },
+  { unique: true }
+);
+
+// Useful when filtering active suppliers.
+supplierSchema.index({
+  is_active: 1,
+});
+
 const Supplier = mongoose.model('Supplier', supplierSchema);
+
 export default Supplier;
