@@ -71,6 +71,10 @@ export const createOrder = asyncHandler(async (req, res) => {
             throw new ApiError(404, `Service not found: ${item.service_id}`);
         }
 
+        if (!service.is_active) {
+            throw new ApiError(400, `Service "${service.name}" is no longer active`);
+        }
+
         // IMPORTANT:
         // Service must belong to selected branch
         if (service.branch_id.toString() !== branch_id.toString()) {
