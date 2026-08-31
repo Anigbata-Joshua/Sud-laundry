@@ -33,13 +33,13 @@ export const getAllServices = asyncHandler(async (req, res) => {
 // GET /services/:id
 export const getServiceById = asyncHandler(async (req, res) => {
     const service = await Service.findById(req.params.id).select(
-            'branch_id name type category price turnaround_hours is_active');
+        'branch_id name type category price turnaround_hours is_active');
 
     if (!service) {
         throw new ApiError(404, 'Service not found');
     }
 
-    return apiResponse( res, 200, service, 'Service detail retrieved successfully');
+    return apiResponse(res, 200, service, 'Service detail retrieved successfully');
 });
 
 
@@ -47,13 +47,13 @@ export const getServiceById = asyncHandler(async (req, res) => {
 // Admin can create for any branch.
 // Branch manager can create only for their own branch.
 export const createService = asyncHandler(async (req, res) => {
-    const {branch_id,name,category,price,type = 'service',turnaround_hours,} = req.body;
+    const { branch_id, name, category, price, type = 'service', turnaround_hours, } = req.body;
 
     const currentUser = req.user;
 
     // Permission check
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'Only admins and branch managers can create services');
+        throw new ApiError(403, 'Only admins and branch managers can create services');
     }
 
     // Required fields
@@ -63,25 +63,25 @@ export const createService = asyncHandler(async (req, res) => {
 
     // Validate name
     if (typeof name !== 'string' || !name.trim()) {
-        throw new ApiError(400,'Service name must be a valid non-empty string');
+        throw new ApiError(400, 'Service name must be a valid non-empty string');
     }
 
     const trimmedName = name.trim();
 
     // Validate type
     if (!['service', 'add-on'].includes(type)) {
-        throw new ApiError(400,'Type must be either service or add-on');
+        throw new ApiError(400, 'Type must be either service or add-on');
     }
 
     // Validate price
-    if (typeof price !== 'number' ||!Number.isFinite(price) ||price < 0 ) {
-        throw new ApiError(400,'Price must be a valid non-negative number');
+    if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
+        throw new ApiError(400, 'Price must be a valid non-negative number');
     }
 
     // Regular services require turnaround time.
     if (type === 'service') {
-        if (typeof turnaround_hours !== 'number' ||!Number.isFinite(turnaround_hours) ||turnaround_hours < 1 ) {
-            throw new ApiError(400,'Turnaround hours are required for regular services');
+        if (typeof turnaround_hours !== 'number' || !Number.isFinite(turnaround_hours) || turnaround_hours < 1) {
+            throw new ApiError(400, 'Turnaround hours are required for regular services');
         }
     }
 
@@ -90,7 +90,7 @@ export const createService = asyncHandler(async (req, res) => {
 
     if (currentUser.role === 'branch_manager') {
         if (!currentUser.branch_id) {
-            throw new ApiError(403,'You are not assigned to any branch');
+            throw new ApiError(403, 'You are not assigned to any branch');
         }
 
         serviceBranchId = currentUser.branch_id;
@@ -110,7 +110,7 @@ export const createService = asyncHandler(async (req, res) => {
     });
 
     if (existing) {
-        throw new ApiError(409,'A service with this name already exists at this branch');
+        throw new ApiError(409, 'A service with this name already exists at this branch');
     }
 
     const service = await Service.create({
@@ -125,7 +125,7 @@ export const createService = asyncHandler(async (req, res) => {
 
     await deleteCached('services:all');
 
-    return apiResponse(res, 201, service,'Service created successfully');
+    return apiResponse(res, 201, service, 'Service created successfully');
 });
 
 
@@ -137,7 +137,7 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Permission check
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'You do not have permission to update services');
+        throw new ApiError(403, 'You do not have permission to update services');
     }
 
     const service = await Service.findById(req.params.id);
@@ -150,7 +150,7 @@ export const updateService = asyncHandler(async (req, res) => {
     if (currentUser.role === 'branch_manager' &&
         service.branch_id.toString() !== currentUser.branch_id.toString()
     ) {
-        throw new ApiError(403,'You can only update services in your branch');
+        throw new ApiError(403, 'You can only update services in your branch');
     }
 
     // branch_id is intentionally not accepted here.
@@ -160,13 +160,13 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Validate type.
     if (!['service', 'add-on'].includes(updatedType)) {
-        throw new ApiError(400,'Type must be either service or add-on');
+        throw new ApiError(400, 'Type must be either service or add-on');
     }
 
     // Validate name.
     if (name !== undefined) {
         if (typeof name !== 'string' || !name.trim()) {
-            throw new ApiError(400,'Service name must be a valid non-empty string');
+            throw new ApiError(400, 'Service name must be a valid non-empty string');
         }
 
         const trimmedName = name.trim();
@@ -178,7 +178,7 @@ export const updateService = asyncHandler(async (req, res) => {
         });
 
         if (duplicate) {
-            throw new ApiError(409,'A service with this name already exists at this branch');
+            throw new ApiError(409, 'A service with this name already exists at this branch');
         }
 
         service.name = trimmedName;
@@ -186,8 +186,8 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Validate category.
     if (category !== undefined) {
-        if (typeof category !== 'string' ||!category.trim()) {
-            throw new ApiError(400,'Category must be a valid non-empty string');
+        if (typeof category !== 'string' || !category.trim()) {
+            throw new ApiError(400, 'Category must be a valid non-empty string');
         }
 
         service.category = category.trim();
@@ -195,8 +195,12 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Validate price.
     if (price !== undefined) {
-        if (typeof price !== 'number' ||!Number.isFinite(price) ||price < 0 ) {
-            throw new ApiError(400,'Price must be a valid non-negative number');
+        if (currentUser.role !== 'admin') {
+            throw new ApiError(403, 'Only admins can edit service pricing');
+        }
+
+        if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
+            throw new ApiError(400, 'Price must be a valid non-negative number');
         }
 
         service.price = price;
@@ -204,10 +208,10 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Validate turnaround.
     if (updatedType === 'service') {
-        const finalTurnaround =turnaround_hours !== undefined ? turnaround_hours : service.turnaround_hours;
+        const finalTurnaround = turnaround_hours !== undefined ? turnaround_hours : service.turnaround_hours;
 
-        if (typeof finalTurnaround !== 'number' ||!Number.isFinite(finalTurnaround) ||finalTurnaround < 1 ) {
-            throw new ApiError(400,'Turnaround hours are required for regular services');
+        if (typeof finalTurnaround !== 'number' || !Number.isFinite(finalTurnaround) || finalTurnaround < 1) {
+            throw new ApiError(400, 'Turnaround hours are required for regular services');
         }
 
         service.turnaround_hours = finalTurnaround;
@@ -221,7 +225,7 @@ export const updateService = asyncHandler(async (req, res) => {
     // Allow activation/deactivation.
     if (is_active !== undefined) {
         if (typeof is_active !== 'boolean') {
-            throw new ApiError(400,'is_active must be a boolean');
+            throw new ApiError(400, 'is_active must be a boolean');
         }
 
         service.is_active = is_active;
@@ -231,7 +235,7 @@ export const updateService = asyncHandler(async (req, res) => {
 
     await deleteCached('services:all');
 
-    return apiResponse(res,200,service,'Service updated successfully');
+    return apiResponse(res, 200, service, 'Service updated successfully');
 });
 
 
@@ -243,7 +247,7 @@ export const removeService = asyncHandler(async (req, res) => {
 
     // Permission check.
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'You do not have permission to delete services');
+        throw new ApiError(403, 'You do not have permission to delete services');
     }
 
     const service = await Service.findById(req.params.id);
@@ -256,7 +260,7 @@ export const removeService = asyncHandler(async (req, res) => {
     if (currentUser.role === 'branch_manager' &&
         service.branch_id.toString() !== currentUser.branch_id.toString()
     ) {
-        throw new ApiError(403,'You can only delete services in your branch');
+        throw new ApiError(403, 'You can only delete services in your branch');
     }
 
     // Do not physically delete services because existing
@@ -267,5 +271,5 @@ export const removeService = asyncHandler(async (req, res) => {
 
     await deleteCached('services:all');
 
-    return apiResponse(res,200,null,'Service deactivated successfully');
+    return apiResponse(res, 200, null, 'Service deactivated successfully');
 });
