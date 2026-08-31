@@ -48,7 +48,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
         'https://api.paystack.co/transaction/initialize',
         {
             email,
-            amount: Math.round(order.total_price * 100),
+            amount: Math.round(order.amount_due * 100),
             reference: transaction_ref,
         },
         {
@@ -87,7 +87,7 @@ export const makePayment = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'You do not have permission to pay for this order');
     }
 
-    const amount = Number(order.total_price);
+    const amount = Number(order.amount_due);
 
     if (!Number.isFinite(amount) || amount <= 0) {
         throw new ApiError(400, 'Invalid order total');

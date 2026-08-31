@@ -40,7 +40,7 @@ export const createTask = asyncHandler(async (req, res) => {
     }
 
     // Branch managers can only assign to their branch employees
-    if (currentUser.role === 'branch_manager' &&employee.branch_id.toString() !== currentUserbranch_id) {
+    if (currentUser.role === 'branch_manager' && employee.branch_id.toString() !== employee.branch_id.toString()) {
      throw new ApiError(403,'You can only assign tasks to employees in your branch');
     }
 
@@ -50,7 +50,7 @@ export const createTask = asyncHandler(async (req, res) => {
     }
 
     // Branch manager cannot create a task for an order outside their branch
-    if (currentUser.role === 'branch_manager' &&order.branch_id.toString() !== currentUserbranch_id) {
+    if (currentUser.role === 'branch_manager' &&order.branch_id.toString() !== employee.branch_id.toString()) {
      throw new ApiError(403,'You can only create tasks for orders in your branch');
     }
 
