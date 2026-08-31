@@ -39,8 +39,15 @@ export const createTask = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Order not found');
     }
 
+    if (order.status === 'cancelled') {
+        throw new ApiError(400, 'Cannot create a task for a cancelled order');
+    }
+
     // Branch managers can only assign to their branch employees
-    if (currentUser.role === 'branch_manager' && employee.branch_id.toString() !== employee.branch_id.toString()) {
+    if (
+        currentUser.role === 'branch_manager' &&
+        employee.branch_id.toString() !== currentUser.branch_id.toString()
+    ) {
      throw new ApiError(403,'You can only assign tasks to employees in your branch');
     }
 
