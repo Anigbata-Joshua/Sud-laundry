@@ -10,14 +10,17 @@ import Employee from '../models/employee.model.js';
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
     let token;
+
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         token = req.headers.authorization.split(' ')[1];
     }
+
     if (!token) {
         throw new ApiError(401, 'Not authorized, token missing');
     }
 
     let decoded;
+
     try {
         decoded = jwt.verify(token, env.jwtSecret);
     } catch (error) {
@@ -25,8 +28,13 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.id).select('-password_hash');
+
     if (!user) {
         throw new ApiError(401, 'User no longer exists');
+    }
+
+    if (!user.is_active) {
+        throw new ApiError(403, 'Account is deactivated');
     }
 
     req.user = {
@@ -36,14 +44,15 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
         email: user.email,
     };
 
-    // Attach branch context for staff roles — read from JWT claims first to avoid database query overhead
+    // Attach branch context for staff roles
     if (['employee', 'branch_manager'].includes(user.role)) {
-        if (decoded.branch_id) {
-            req.user.branch_id = decoded.branch_id;
-        } else {
-            const employee = await Employee.findOne({ user_id: user._id });
-            if (employee) req.user.branch_id = employee.branch_id.toString();
+        const employee = await Employee.findOne({ user_id: user._id });
+
+        if (!employee || !employee.branch_id) {
+        throw new ApiError(403, 'Staff account is not associated with any branch');
         }
+
+        req.user.branch_id = employee.branch_id.toString();
     }
 
     next();
