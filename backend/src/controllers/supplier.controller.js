@@ -16,42 +16,53 @@ export const createSupplier = asyncHandler(async (req, res) => {
     const { name, contact, items_supplied } = req.body;
 
     if (!name || !contact || !items_supplied) {
-        throw new ApiError( 400, 'name, contact, and items_supplied are required');
+        throw new ApiError(400, 'name, contact, and items_supplied are required');
     }
 
-    const existingSupplier = await Supplier.findOne({ name: name.trim(), });
+    let contactObj;
+    if (typeof contact === 'string') {
+        if (!contact.trim()) {
+            throw new ApiError(400, 'Supplier contact phone cannot be empty');
+        }
+        contactObj = { phone: contact.trim() };
+    } else if (typeof contact === 'object' && contact !== null) {
+        if (!contact.phone || !contact.phone.trim()) {
+            throw new ApiError(400, 'Supplier contact phone is required');
+        }
+        contactObj = {
+            phone: contact.phone.trim(),
+            email: contact.email?.trim() || undefined,
+            address: contact.address?.trim() || undefined,
+        };
+    } else {
+        throw new ApiError(400, 'Invalid contact format');
+    }
+
+    const existingSupplier = await Supplier.findOne({ name: name.trim() });
 
     if (existingSupplier) {
-        throw new ApiError(409,'A supplier with this name already exists');
+        throw new ApiError(409, 'A supplier with this name already exists');
     }
 
     const supplier = await Supplier.create({
         name: name.trim(),
-        contact: contact.trim(),
-        items_supplied,
+        contact: contactObj,
+        items_supplied: Array.isArray(items_supplied) ? items_supplied : [items_supplied],
     });
 
-    return apiResponse(res,  201, supplier, 'Supplier created successfully');
+    return apiResponse(res, 201, supplier, 'Supplier created successfully');
 });
 
 
 /**
  * GET /suppliers
  * Get suppliers with pagination, filtering, and search.
- *
- * Supports:
- * ?page=1
- * ?limit=20
- * ?is_active=true
- * ?q=search
  */
 export const getSuppliers = asyncHandler(async (req, res) => {
-    let { page = 1, limit = 20, is_active, q, } = req.query;
+    let { page = 1, limit = 20, is_active, q } = req.query;
 
     page = Math.max(parseInt(page, 10) || 1, 1);
-
-    // Prevent excessively large database queries.
-    limit = Math.min( Math.max(parseInt(limit, 10) || 20, 1), 100);
+    limit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
 
     const filter = {};
 
@@ -67,9 +78,11 @@ export const getSuppliers = asyncHandler(async (req, res) => {
         const search = q.trim();
 
         filter.$or = [
-            { name: { $regex: search, $options: 'i', }, },
-            { contact: { $regex: search, $options: 'i' }, },
-            { items_supplied: { $regex: search, $options: 'i', }, },
+            { name: { $regex: search, $options: 'i' } },
+            { 'contact.phone': { $regex: search, $options: 'i' } },
+            { 'contact.email': { $regex: search, $options: 'i' } },
+            { 'contact.address': { $regex: search, $options: 'i' } },
+            { items_supplied: { $regex: search, $options: 'i' } },
         ];
     }
 
@@ -80,9 +93,9 @@ export const getSuppliers = asyncHandler(async (req, res) => {
         .skip((page - 1) * limit)
         .limit(limit);
 
-    const meta = { total, page, limit, totalPages: Math.ceil(total / limit), };
+    const meta = { total, page, limit, totalPages: Math.ceil(total / limit) };
 
-    return apiResponse(res, 200, { items: suppliers, meta, }, 'Suppliers retrieved successfully');
+    return apiResponse(res, 200, { items: suppliers, meta }, 'Suppliers retrieved successfully');
 });
 
 
@@ -106,7 +119,7 @@ export const getSupplierById = asyncHandler(async (req, res) => {
  * Update supplier information.
  */
 export const updateSupplier = asyncHandler(async (req, res) => {
-    const { name, contact, items_supplied, is_active, } = req.body;
+    const { name, contact, items_supplied, is_active } = req.body;
 
     const supplier = await Supplier.findById(req.params.id);
 
@@ -116,50 +129,53 @@ export const updateSupplier = asyncHandler(async (req, res) => {
 
     const updates = {};
 
-    // Only update fields actually supplied by the client.
     if (name !== undefined) {
         if (!name.trim()) {
             throw new ApiError(400, 'Supplier name cannot be empty');
         }
-
         updates.name = name.trim();
     }
 
     if (contact !== undefined) {
-        if (!contact.trim()) {
-            throw new ApiError(400, 'Supplier contact cannot be empty');
+        if (typeof contact === 'string') {
+            if (!contact.trim()) {
+                throw new ApiError(400, 'Supplier contact phone cannot be empty');
+            }
+            updates.contact = {
+                ...supplier.contact.toObject(),
+                phone: contact.trim(),
+            };
+        } else if (typeof contact === 'object' && contact !== null) {
+            updates.contact = {
+                phone: contact.phone ? contact.phone.trim() : supplier.contact.phone,
+                email: contact.email !== undefined ? contact.email?.trim() : supplier.contact.email,
+                address: contact.address !== undefined ? contact.address?.trim() : supplier.contact.address,
+            };
         }
-
-        updates.contact = contact.trim();
     }
 
     if (items_supplied !== undefined) {
         if (!items_supplied) {
             throw new ApiError(400, 'items_supplied cannot be empty');
         }
-
-        updates.items_supplied = items_supplied;
+        updates.items_supplied = Array.isArray(items_supplied) ? items_supplied : [items_supplied];
     }
 
     if (is_active !== undefined) {
         if (typeof is_active !== 'boolean') {
             throw new ApiError(400, 'is_active must be a boolean');
         }
-
         updates.is_active = is_active;
     }
 
-    // Prevent duplicate supplier names.
     if (updates.name) {
         const duplicate = await Supplier.findOne({ name: updates.name, _id: { $ne: req.params.id } });
-
         if (duplicate) {
             throw new ApiError(409, 'A supplier with this name already exists');
         }
     }
 
     Object.assign(supplier, updates);
-
     await supplier.save();
 
     return apiResponse(res, 200, supplier, 'Supplier updated successfully');
@@ -168,7 +184,7 @@ export const updateSupplier = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /suppliers/:id
- * Delete a supplier.
+ * Soft delete / deactivate a supplier to preserve inventory ledger history.
  */
 export const deleteSupplier = asyncHandler(async (req, res) => {
     const supplier = await Supplier.findById(req.params.id);
@@ -177,7 +193,8 @@ export const deleteSupplier = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Supplier not found');
     }
 
-    await supplier.deleteOne();
+    supplier.is_active = false;
+    await supplier.save();
 
-    return apiResponse(res, 200, null, 'Supplier deleted successfully');
+    return apiResponse(res, 200, null, 'Supplier deactivated successfully');
 });

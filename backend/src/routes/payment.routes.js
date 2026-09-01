@@ -16,6 +16,6 @@ const router = express.Router();
 router.post('/initialize', authenticate, initializePayment);
 router.post('/', authenticate, makePayment);
 router.get('/order/:orderId', authenticate, getPaymentByOrder);
-router.get('/', authenticate, authorize('admin', 'branch_manager'), listPayments);
+router.get('/', authenticate, listPayments);
 
 export default router;
