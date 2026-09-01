@@ -22,6 +22,9 @@ const stockMovementSchema = new mongoose.Schema(
         
         // Order associated with usage.
         order_id: {type: mongoose.Schema.Types.ObjectId,ref: 'Order',},
+
+        // Audit notes
+        notes: { type: String, trim: true, default: null },
     },
     {
         timestamps: {createdAt: 'created_at',updatedAt: false,},

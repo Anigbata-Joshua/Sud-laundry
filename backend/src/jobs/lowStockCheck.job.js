@@ -12,6 +12,7 @@
 
 import cron from 'node-cron';
 import Product from '../models/product.model.js';
+import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from '../services/notification.service.js';
 
@@ -57,37 +58,50 @@ export const checkLowStock = async () => {
         ];
 
 
-        // Find active branch managers directly through User.branch_id.
-        //
-        // This is better than looking through Employee because a
-        // branch manager's authorization/assignment belongs to User.
-        const managers = await User.find({
-            role: 'branch_manager',
+        // Find active employees in these branches
+        const employees = await Employee.find({
             branch_id: { $in: branchIds },
             is_active: true,
-        }).select('_id branch_id');
+        }).select('user_id branch_id');
 
+        if (employees.length === 0) {
+            console.log(
+                '⚠️ Low-stock products found, but no employees assigned to branches.'
+            );
+            return;
+        }
+
+        const employeeUserIds = employees.map(e => e.user_id);
+
+        // Find active users who are branch managers
+        const managers = await User.find({
+            _id: { $in: employeeUserIds },
+            role: 'branch_manager',
+            is_active: true,
+        }).select('_id');
 
         if (managers.length === 0) {
             console.log(
                 '⚠️ Low-stock products found, but no active branch managers were found.'
             );
-
             return;
         }
 
+        const managerIdSet = new Set(managers.map(m => m._id.toString()));
 
         // Group managers by branch.
         const managersByBranch = new Map();
 
-        for (const manager of managers) {
-            const branchId = manager.branch_id.toString();
+        for (const emp of employees) {
+            if (managerIdSet.has(emp.user_id.toString())) {
+                const branchId = emp.branch_id.toString();
 
-            if (!managersByBranch.has(branchId)) {
-                managersByBranch.set(branchId, []);
+                if (!managersByBranch.has(branchId)) {
+                    managersByBranch.set(branchId, []);
+                }
+
+                managersByBranch.get(branchId).push({ _id: emp.user_id });
             }
-
-            managersByBranch.get(branchId).push(manager);
         }
 
 
