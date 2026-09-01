@@ -103,6 +103,9 @@ export const approveLeaveRequest = asyncHandler(async (req, res, next) => {
     // Branch managers can only approve for their branch
     if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(leaveRequest.employee_id);
+        if (!employee) {
+            throw new ApiError(404, 'Assigned employee not found');
+        }
         if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only approve leave requests for your branch');
         }
@@ -137,6 +140,9 @@ export const rejectLeaveRequest = asyncHandler(async (req, res, next) => {
     // Branch managers can only reject for their branch
     if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(leaveRequest.employee_id);
+        if (!employee) {
+            throw new ApiError(404, 'Assigned employee not found');
+        }
         if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only reject leave requests for your branch');
         }
