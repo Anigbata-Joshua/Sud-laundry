@@ -27,11 +27,13 @@ export const initializePayment = asyncHandler(async (req, res) => {
     }
 
     // Customers can only initialize payment for their own order.
-    if (
-        req.user.role === 'customer' &&
-        order.customer_id.toString() !== getUserId(req).toString()
-    ) {
+    if (req.user.role === 'customer' && order.customer_id.toString() !== getUserId(req).toString()) {
         throw new ApiError(403, 'You do not have permission to pay for this order');
+    }
+
+    // Branch manager and employee can initialize payment for their branch orders
+    if (['branch_manager', 'employee'].includes(req.user.role) && order.branch_id.toString() !== req.user.branch_id) {
+        throw new ApiError(403, 'You do not have permission to initialize payment for this order');
     }
 
     if (!order.total_price || order.total_price <= 0) {
@@ -84,6 +86,11 @@ export const makePayment = asyncHandler(async (req, res) => {
 
     // Customers can only pay for their own orders.
     if (req.user.role === 'customer' && order.customer_id.toString() !== getUserId(req).toString()) {
+        throw new ApiError(403, 'You do not have permission to pay for this order');
+    }
+
+    // Branch manager and employee can only pay for their branch orders
+    if (['branch_manager', 'employee'].includes(req.user.role) && order.branch_id.toString() !== req.user.branch_id) {
         throw new ApiError(403, 'You do not have permission to pay for this order');
     }
 
