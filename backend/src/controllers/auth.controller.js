@@ -101,12 +101,12 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-        throw new ApiError(404, 'Email not found');
+        throw new ApiError(404, 'Invalid email address or password provided');
     }
 
     // Generate cryptographically secure token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    
+
     // Hash token and store with 1-hour expiry
     user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
     user.passwordResetExpires = Date.now() + 3600000; // 1 hour
@@ -114,9 +114,9 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
     await user.save();
 
     // Call mock email service to output URL to console for testing
-    const resetUrl = `${env.frontendURI}/api/v1/auth/reset-password?token=${resetToken}`;
+    const resetUrl = `${env.frontendURI}/reset-password?token=${resetToken}`;
     const emailMessage = `You requested a password reset. Please perform a POST/PATCH request or use this URL: ${resetUrl}`;
-    
+
     await sendMail({
         to: user.email,
         subject: 'Laundry App - Password Reset Request',

@@ -7,6 +7,7 @@ import User from '../models/user.model.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import Branch from '../models/branch.model.js';
 
 
 // POST /employees
@@ -29,6 +30,12 @@ export const createEmployee = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'You can only create employees at your own branch');
     }
 
+    //check branch exists
+    const branch = await Branch.findById(branch_id);
+    if (!branch) {
+        throw new ApiError(404, 'Branch not found');
+    }
+
     // Verify user
     const user = await User.findById(user_id);
 
@@ -38,21 +45,21 @@ export const createEmployee = asyncHandler(async (req, res) => {
 
     // Prevent customer account from being assigned as employee
     if (user.role === 'customer') {
-        throw new ApiError(400,'Customer accounts cannot be assigned as employees');
+        throw new ApiError(400, 'Customer accounts cannot be assigned as employees');
     }
 
     // Check existing employee record
     const existingEmployee = await Employee.findOne({ user_id, });
 
     if (existingEmployee) {
-        throw new ApiError(400,'Employee record already exists for this user');
+        throw new ApiError(400, 'Employee record already exists for this user');
     }
 
     const employee = await Employee.create({ user_id, branch_id, job_title, hired_at, });
 
-    await employee.populate('user_id','name email phone role');
+    await employee.populate('user_id', 'name email phone role');
 
-    await employee.populate('branch_id','name');
+    await employee.populate('branch_id', 'name');
 
     return apiResponse(res, 201, employee, 'Employee created successfully');
 });
@@ -63,7 +70,7 @@ export const getEmployees = asyncHandler(async (req, res) => {
     const currentUser = req.user;
 
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'You do not have permission to view employees');
+        throw new ApiError(403, 'You do not have permission to view employees');
     }
 
     const query = {};
@@ -73,11 +80,11 @@ export const getEmployees = asyncHandler(async (req, res) => {
     }
 
     const employees = await Employee.find(query)
-    .populate('user_id','name email phone role is_active')
-    .populate('branch_id','name')
-    .sort({ createdAt: -1 });
+        .populate('user_id', 'name email phone role is_active')
+        .populate('branch_id', 'name')
+        .sort({ createdAt: -1 });
 
-    return apiResponse(res, 200, employees,'Employees retrieved successfully');
+    return apiResponse(res, 200, employees, 'Employees retrieved successfully');
 });
 
 
@@ -88,23 +95,23 @@ export const getEmployeeById = asyncHandler(async (req, res) => {
     const currentUser = req.user;
 
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'You do not have permission to view employees');
+        throw new ApiError(403, 'You do not have permission to view employees');
     }
 
     const employee = await Employee.findById(id)
-    .populate('user_id','name email phone role is_active')
-    .populate('branch_id','name');
+        .populate('user_id', 'name email phone role is_active')
+        .populate('branch_id', 'name');
 
     if (!employee) {
-        throw new ApiError(404,'Employee not found');
+        throw new ApiError(404, 'Employee not found');
     }
 
     if (currentUser.role === 'branch_manager' &&
         employee.branch_id._id.toString() !== currentUser.branch_id) {
-        throw new ApiError(403,'You can only view employees from your own branch');
+        throw new ApiError(403, 'You can only view employees from your own branch');
     }
 
-    return apiResponse(res,200,employee,'Employee retrieved successfully');
+    return apiResponse(res, 200, employee, 'Employee retrieved successfully');
 });
 
 
@@ -116,20 +123,20 @@ export const updateEmployee = asyncHandler(async (req, res) => {
     const currentUser = req.user;
 
     if (!['admin', 'branch_manager'].includes(currentUser.role)) {
-        throw new ApiError(403,'You do not have permission to update employees');
+        throw new ApiError(403, 'You do not have permission to update employees');
     }
 
     const employee = await Employee.findById(id);
 
     if (!employee) {
-        throw new ApiError(404,'Employee not found');
+        throw new ApiError(404, 'Employee not found');
     }
 
     // Branch manager can only update employees
     // in their own branch
     if (currentUser.role === 'branch_manager' &&
         employee.branch_id.toString() !== currentUser.branch_id) {
-        throw new ApiError(403,'You can only update employees from your own branch');
+        throw new ApiError(403, 'You can only update employees from your own branch');
     }
 
     if (job_title !== undefined) {
@@ -142,9 +149,9 @@ export const updateEmployee = asyncHandler(async (req, res) => {
 
     await employee.save();
 
-    await employee.populate('user_id','name email phone role is_active');
+    await employee.populate('user_id', 'name email phone role is_active');
 
-    await employee.populate('branch_id','name');
+    await employee.populate('branch_id', 'name');
 
-    return apiResponse(res,200,employee,'Employee updated successfully');
+    return apiResponse(res, 200, employee, 'Employee updated successfully');
 });
