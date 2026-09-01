@@ -16,9 +16,9 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize('admin'));
 
-router.get('/create', getAllUsers);
-router.get('/:id/get/one', getUserById);
-router.put('/:id/deactivate', deactivateUser);
-router.put('/:id/reactivate', reactivateUser);
+router.get('/', getAllUsers);
+router.get('/:id', getUserById);
+router.patch('/:id/deactivate', deactivateUser);
+router.patch('/:id/reactivate', reactivateUser);
 
 export default router;

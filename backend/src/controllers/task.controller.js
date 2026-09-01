@@ -8,6 +8,7 @@ import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { syncOrderStatusFromTasks } from '../services/orderStatusSync.service.js';
+import { deductSuppliesForStage } from '../services/inventoryConsumption.service.js';
 
 
 // POST /tasks
@@ -195,12 +196,16 @@ export const updateTaskStatus = asyncHandler(async (req, res) => {
     }
 
     // Update status
+    const isNowCompleted = status === 'completed' && task.status !== 'completed';
+
     if (status !== undefined) {
         task.status = status;
 
-        if (status === 'completed') {task.completed_at = new Date();}
-
-        else {task.completed_at = undefined;}
+        if (status === 'completed') {
+            task.completed_at = new Date();
+        } else {
+            task.completed_at = undefined;
+        }
     }
 
     // Update notes
@@ -209,6 +214,19 @@ export const updateTaskStatus = asyncHandler(async (req, res) => {
     }
 
     await task.save();
+
+    // Trigger real-time supply deduction when task stage is completed
+    if (isNowCompleted) {
+        const order = await Order.findById(task.order_id);
+        if (order) {
+            await deductSuppliesForStage({
+                order_id: order._id,
+                stage: task.stage,
+                employee_id: task.employee_id,
+                branch_id: order.branch_id,
+            });
+        }
+    }
 
     // IMPORTANT:
     // Keep order.status synchronized with task progress.

@@ -20,8 +20,8 @@ export const createEmployee = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'Only admins and branch managers can create employees');
     }
 
-    if (!user_id || !branch_id) {
-        throw new ApiError(400, 'user_id and branch_id are required');
+    if (!user_id || !branch_id || !job_title || !hired_at) {
+        throw new ApiError(400, 'user_id, branch_id, job_title, and hired_at are required');
     }
 
     // Branch manager must use their own branch
