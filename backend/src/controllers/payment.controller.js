@@ -151,6 +151,7 @@ export const makePayment = asyncHandler(async (req, res) => {
 
     const payment = await Payment.create({
         orderId,
+        branch_id: order.branch_id,
         paymentMethod,
         amount,
         paymentType: paymentType || 'full payment',
@@ -188,8 +189,12 @@ export const getPaymentByOrder = asyncHandler(async (req, res) => {
 
     // Customers can only view payments belonging to their own order.
     if (req.user.role === 'customer' && order.customer_id.toString() !== getUserId(req).toString()) {
-        throw new ApiError(403, 'You do not have permission to view this payment'
-        );
+        throw new ApiError(403, 'You do not have permission to view this payment');
+    }
+
+    // Branch managers can only view payments for their branch
+    if (req.user.role === 'branch_manager' && order.branch_id.toString() !== req.user.branch_id) {
+        throw new ApiError(403, 'You do not have permission to view this payment');
     }
 
     const payment = await Payment.findOne({ orderId });
@@ -220,9 +225,13 @@ export const listPayments = asyncHandler(async (req, res) => {
 
     // Customers should only see their own payments.
     if (req.user.role === 'customer') {
-        const customerOrders = await Order.find({customer_id: getUserId(req),}).select('_id');
-
-        filter.orderId = { $in: customerOrders.map((order) => order._id), };
+        const customerOrders = await Order.find({ customer_id: getUserId(req) }).select('_id');
+        filter.orderId = { $in: customerOrders.map((order) => order._id) };
+    }
+    // Branch managers are scoped to their branch
+    else if (req.user.role === 'branch_manager') {
+        const branchOrders = await Order.find({ branch_id: req.user.branch_id }).select('_id');
+        filter.orderId = { $in: branchOrders.map((order) => order._id) };
     }
 
     const total = await Payment.countDocuments(filter);

@@ -11,6 +11,10 @@ const paymentSchema = new mongoose.Schema(
             ref: 'Order',
             required: true
         },
+        branch_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Branch',
+        },
         amount: {
             type: Number,
             required: true

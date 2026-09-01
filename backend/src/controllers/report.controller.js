@@ -1,17 +1,22 @@
-// Owner: Series
-// Purpose: initialize, verify, and record payments.
-// Payment amounts are always validated against the order total on the server.
+import mongoose from 'mongoose';
 import Order from '../models/order.model.js';
 import Payment from '../models/payment.model.js';
 import ApiError from '../utils/apiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import apiResponse from '../utils/apiResponse.js';
+
 const getBranchFilter = (req) => {
     if (req.user.role === 'branch_manager') {
         if (!req.user.branch_id) {
             throw new ApiError(403, 'Branch manager is not assigned to a branch');
         }
-        return { branch_id: req.user.branch_id };
+        return { branch_id: new mongoose.Types.ObjectId(req.user.branch_id) };
+    }
+
+    if (req.user.role === 'admin' && req.query.branch_id) {
+        if (mongoose.Types.ObjectId.isValid(req.query.branch_id)) {
+            return { branch_id: new mongoose.Types.ObjectId(req.query.branch_id) };
+        }
     }
 
     return {};
