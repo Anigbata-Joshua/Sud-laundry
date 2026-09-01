@@ -1,8 +1,7 @@
-// Shared foundation.
-// Purpose: server entry point — connects DB then starts listening.
 import { env } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/db.js';
 import app from './app.js';
+import './jobs/lowStockCheck.job.js';
 
 // Global Uncaught Error Listeners
 const handleFatalError = async (err, type) => {
