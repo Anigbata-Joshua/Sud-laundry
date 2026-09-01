@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:prod": "node scripts/run_production_tests.js",
     "start": "node --no-deprecation src/server.js",
     "dev": "nodemon --no-deprecation src/server.js",
     "seed:services": "node --no-deprecation src/seeders/service.seeder.js"
