@@ -1,2 +1,5 @@
-// Shared display helpers: keep currency, dates, weights, and statuses consistent across screens.
-export const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
+export const formatNaira = new Intl.NumberFormat('en-NG', {
+  style: 'currency',
+  currency: 'NGN',
+  maximumFractionDigits: 0,
+}).format
