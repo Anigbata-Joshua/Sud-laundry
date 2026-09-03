@@ -7,8 +7,9 @@ const orderItemSchema = new mongoose.Schema(
   {
     service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
     name: { type: String, required: true },
-    quantity: { type: Number, required: true },
-    subtotal: { type: Number, required: true },
+    quantity: { type: Number, min: 0.001, required: true },
+    unit_price: { type: Number, min: 0, required: true },
+    subtotal: { type: Number, min: 0, required: true },
   },
   { _id: false },
 )
@@ -50,51 +51,60 @@ const orderSchema = new mongoose.Schema(
       ],
       default: 'placed',
     },
-    received_time: { type: Date, default: null },
-    delivered_time: { type: Date, default: null },
-    turnaround_hours: { type: Number, min: 0, default: null },
+    fulfillment: {
+      priority: { type: String, enum: ['normal', 'express'], default: 'normal' },
+      turnaround_hours: { type: Number },
+    },
+    pickup_time: { type: Date },
+    delivery_time: { type: Date },
+
+    // Actual fulfillment timestamps
+    picked_up_at: { type: Date },
+    received_at: { type: Date },
+    delivered_at: { type: Date },
+    actual_turnaround_hours: { type: Number, min: 0 },
+
     total_price: { type: Number, required: true },
+    express_surcharge: { type: Number, default: 0, min: 0 },
     payment_status: {
       type: String,
-      enum: ['unpaid', 'paid','part_payment', 'refunded'],
+      enum: ['unpaid', 'part_payment', 'paid', 'refunded'],
       default: 'unpaid',
     },
     items: [orderItemSchema],
     supplies_used: [supplyUsedSchema],
     feedback: feedbackSchema,
+    cancellation_reason: { type: String },
+    cancelled_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    cancelled_at: { type: Date },
+    refund_amount: { type: Number },
+    amount_due: { type: Number, default: 0 },
+    cancelled_on_customer_request: { type: Boolean, default: false },
   },
   { timestamps: true },
 )
 
-orderSchema.pre('validate', function updateFulfilmentTimes() {
-  if (this.isModified('status') && this.status === 'received' && !this.received_time) {
-    this.received_time = new Date()
+orderSchema.pre('validate', function updateActualFulfillmentTimes() {
+  if (this.isModified('status') && this.status === 'received' && !this.received_at) {
+    this.received_at = new Date()
   }
-  if (this.isModified('status') && this.status === 'delivered' && !this.delivered_time) {
-    if (!this.received_time) {
+  if (this.isModified('status') && this.status === 'delivered' && !this.delivered_at) {
+    if (!this.received_at) {
       this.invalidate('status', 'An order must be received before it can be delivered')
       return
     }
-    this.delivered_time = new Date()
+    this.delivered_at = new Date()
   }
-
-  if (!this.received_time || !this.delivered_time) {
-    this.turnaround_hours = null
-    return
+  if (this.received_at && this.delivered_at) {
+    const milliseconds = this.delivered_at.getTime() - this.received_at.getTime()
+    this.actual_turnaround_hours = Math.round((milliseconds / 3600000) * 100) / 100
   }
-
-  const durationMs = this.delivered_time.getTime() - this.received_time.getTime()
-  if (durationMs <= 0) {
-    this.invalidate('delivered_time', 'Delivered time must be later than received time')
-    return
-  }
-  this.turnaround_hours = Math.round((durationMs / 3600000) * 100) / 100
 })
 
 orderSchema.index({ customer_id: 1 })
 orderSchema.index({ branch_id: 1, status: 1 })
 
-// keep this bellow your schema (i need it and its good for our project) just after the scema definition, so we can index the collection for faster queries
+// Keep this below schema
 orderSchema.index({ status: 1, createdAt: -1 })
 orderSchema.index({ branch_id: 1, createdAt: -1 })
 

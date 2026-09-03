@@ -1,104 +1,133 @@
-// Owner: Series
-// Purpose: reporting endpoints, branch-scoped for managers, company-wide for admin.
-
-
-import { Parser } from 'json2csv';
+import mongoose from 'mongoose';
+import Order from '../models/order.model.js';
+import Payment from '../models/payment.model.js';
+import ApiError from '../utils/apiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import apiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
-import {
-    getRevenue,
-    getPaymentMethodBreakdown,
-    getRevenueComparison,
-    getRevenueOverTime,
-    getTopCustomers,
-    getOrderVolume,
-    getTopServices,
-} from '../services/report.service.js';
 
-
-
-const exportRevenueCSV = asyncHandler(async (req, res) => {
-    const data = await getRevenueOverTime({ /* branch scoping applied here */ });
-    const csv = new Parser().parse(data);
-    res.header('Content-Type', 'text/csv');
-    res.attachment('revenue-report.csv');
-    res.send(csv);
-});
-
-
-
-export const resolveBranchScope = (req) => {
-    if (req.user.role === 'admin') {
-        return req.query.branch_id || undefined;
-    }
+const getBranchFilter = (req) => {
     if (req.user.role === 'branch_manager') {
-        // Always their own branch — ignore any branch_id they might try to pass in query
-        return req.user.branch_id;
+        if (!req.user.branch_id) {
+            throw new ApiError(403, 'Branch manager is not assigned to a branch');
+        }
+        return { branch_id: new mongoose.Types.ObjectId(req.user.branch_id) };
     }
-    throw new apiError(403, 'You do not have permission to view reports');
+
+    if (req.user.role === 'admin' && req.query.branch_id) {
+        if (mongoose.Types.ObjectId.isValid(req.query.branch_id)) {
+            return { branch_id: new mongoose.Types.ObjectId(req.query.branch_id) };
+        }
+    }
+
+    return {};
 };
 
+
+// Revenue
 export const getRevenueReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate } = req.query;
+    const filter = getBranchFilter(req);
+    const result = await Order.aggregate([
+        { $match: { ...filter, payment_status: 'paid', }, },
+        { $group: { _id: 0, totalRevenue: { $sum: '$amount_due' }, totalOrders: { $sum: 1 }, }, },
+        { $project: { _id: 0, totalRevenue: 1, totalOrders: 1, }, },
+    ]);
 
-    const data = await getRevenue({ branch_id, startDate, endDate });
-    apiResponse(res, 200, data, 'Revenue report retrieved successfully');
+    const report = result[0] || { totalRevenue: 0, totalOrders: 0 };
+    return apiResponse(res, 200, report, 'Revenue report retrieved successfully');
 });
 
+
+// Payment methods
 export const getPaymentMethodsReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate } = req.query;
+    const branchFilter = getBranchFilter(req);
 
-    const data = await getPaymentMethodBreakdown({ branch_id, startDate, endDate });
-    apiResponse(res, 200, data, 'Payment method breakdown retrieved successfully');
+    const orders = await Order.find(branchFilter).select('_id');
+
+    const orderIds = orders.map(order => order._id);
+
+    const result = await Payment.aggregate([
+        { $match: { orderId: { $in: orderIds }, status: 'completed', }, },
+        { $group: { _id: '$paymentMethod', totalAmount: { $sum: '$amount' }, transactionCount: { $sum: 1 }, }, },
+        { $sort: { totalAmount: -1 }, },
+    ]);
+
+    return apiResponse(res, 200, result, 'Payment methods report retrieved successfully');
 });
 
+
+// Revenue comparison
 export const getRevenueComparisonReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { currentStart, currentEnd, previousStart, previousEnd } = req.query;
+    const branchFilter = getBranchFilter(req);
 
-    if (!currentStart || !currentEnd || !previousStart || !previousEnd) {
-        throw new apiError(400, 'currentStart, currentEnd, previousStart, previousEnd are all required');
-    }
+    const result = await Order.aggregate([
+        { $match: { ...branchFilter, payment_status: 'paid', }, },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, }, revenue: { $sum: '$amount_due' }, orders: { $sum: 1 }, }, },
+        { $sort: { '_id.year': 1, '_id.month': 1, }, },
+    ]);
 
-    const data = await getRevenueComparison({
-        branch_id,
-        currentRange: { startDate: currentStart, endDate: currentEnd },
-        previousRange: { startDate: previousStart, endDate: previousEnd },
-    });
-    apiResponse(res, 200, data, 'Revenue comparison retrieved successfully');
+    return apiResponse(res, 200, result, 'Revenue comparison report retrieved successfully');
 });
 
+
+// Revenue trend
 export const getRevenueTrendReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate } = req.query;
+    const branchFilter = getBranchFilter(req);
 
-    const data = await getRevenueOverTime({ branch_id, startDate, endDate });
-    apiResponse(res, 200, data, 'Revenue trend retrieved successfully');
+    const result = await Order.aggregate([
+        { $match: { ...branchFilter, payment_status: 'paid', }, },
+        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, day: { $dayOfMonth: '$createdAt' }, }, revenue: { $sum: '$amount_due' }, orders: { $sum: 1 }, }, },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, }, },
+    ]);
+
+    return apiResponse(res, 200, result, 'Revenue trend report retrieved successfully');
 });
 
+
+// Top customers
 export const getTopCustomersReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate, limit } = req.query;
+    const branchFilter = getBranchFilter(req);
 
-    const data = await getTopCustomers({ branch_id, startDate, endDate, limit: limit ? Number(limit) : undefined });
-    apiResponse(res, 200, data, 'Top customers retrieved successfully');
+    const result = await Order.aggregate([
+        { $match: { ...branchFilter, payment_status: 'paid', }, },
+        { $group: { _id: '$customer_id', totalSpent: { $sum: '$amount_due' }, orderCount: { $sum: 1 }, }, },
+        { $sort: { totalSpent: -1, } },
+        { $limit: 10, },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'customer', }, },
+        { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true, }, },
+        { $project: { _id: 1, name: '$customer.name', email: '$customer.email', totalSpent: 1, orderCount: 1, }, },
+    ]);
+
+    return apiResponse(res, 200, result, 'Top customers report retrieved successfully');
 });
 
+
+// Order volume
 export const getOrderVolumeReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate } = req.query;
+    const branchFilter = getBranchFilter(req);
 
-    const data = await getOrderVolume({ branch_id, startDate, endDate });
-    apiResponse(res, 200, data, 'Order volume retrieved successfully');
+    const result = await Order.aggregate([
+        { $match: branchFilter, },
+        { $group: { _id: '$status', count: { $sum: 1 }, }, },
+        { $sort: { count: -1, }, },
+    ]);
+
+    return apiResponse(res, 200, result, 'Order volume report retrieved successfully');
 });
 
-export const getTopServicesReport = asyncHandler(async (req, res) => {
-    const branch_id = resolveBranchScope(req);
-    const { startDate, endDate, limit } = req.query;
 
-    const data = await getTopServices({ branch_id, startDate, endDate, limit: limit ? Number(limit) : undefined });
-    apiResponse(res, 200, data, 'Top services retrieved successfully');
+// Top services
+export const getTopServicesReport = asyncHandler(async (req, res) => {
+    const branchFilter = getBranchFilter(req);
+
+    const result = await Order.aggregate([
+        { $match: branchFilter, },
+        { $unwind: '$items', },
+        { $group: { _id: '$items.service_id', name: { $first: '$items.name' }, quantity: { $sum: '$items.quantity' }, revenue: { $sum: '$items.subtotal' }, }, },
+        { $sort: { quantity: -1, }, },
+        { $limit: 10, },
+    ]);
+
+    return apiResponse(res, 200, result,
+        'Top services report retrieved successfully'
+    );
 });

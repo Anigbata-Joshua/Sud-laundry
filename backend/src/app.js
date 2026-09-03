@@ -18,7 +18,9 @@ import brancheRoutes from './routes/branch.routes.js'
 import serviceRoutes from './routes/service.routes.js'
 import orderRoutes from './routes/order.routes.js'
 import productRoutes from './routes/product.routes.js'
-import reports from './routes/report.routes.js'
+import stockMovementRoutes from './routes/stockMovement.routes.js'
+import reportRoutes from './routes/report.routes.js'
+import supplierRoutes from './routes/supplier.routes.js'
 import processingWorkflowRoutes from './routes/processingWorkflow.routes.js'
 
 const app = express()
@@ -59,9 +61,11 @@ app.use('/api/v1/branches', brancheRoutes)
 app.use('/api/v1/services', serviceRoutes)
 app.use('/api/v1/orders', orderRoutes)
 app.use('/api/v1/products', productRoutes)
-app.use('/api/v1/reports', reports)
+app.use('/api/v1/stock-movements', stockMovementRoutes)
+app.use('/api/v1/reports', reportRoutes)
+app.use('/api/v1/suppliers', supplierRoutes)
+app.use('/api/v1/supliers', supplierRoutes) // Alias for backwards compatibility
 app.use('/api/v1/processing-workflows', processingWorkflowRoutes)
-// TODO: mount stockMovementRoutes once stockMovement.routes.js exists
 
 // Global Error Handler
 app.use(errorHandler)

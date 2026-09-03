@@ -143,18 +143,18 @@ export default function OrderDetailsPage() {
             />
             <Detail
               icon={CalendarDays}
-              value={`Received ${formatTime(order.received_time, 'Not received yet')}`}
+              value={`Received ${formatTime(order.received_at, 'Not received yet')}`}
             />
             <Detail
               icon={CalendarDays}
-              value={`Delivered ${formatTime(order.delivered_time, 'Not delivered yet')}`}
+              value={`Delivered ${formatTime(order.delivered_at, 'Not delivered yet')}`}
             />
             <Detail
               icon={CalendarDays}
               value={
-                order.turnaround_hours == null
+                order.actual_turnaround_hours == null
                   ? 'Turnaround unavailable'
-                  : `${order.turnaround_hours} hour turnaround`
+                  : `${order.actual_turnaround_hours} hour turnaround`
               }
             />
           </Panel>

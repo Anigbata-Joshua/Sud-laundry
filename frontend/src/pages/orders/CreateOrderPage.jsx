@@ -26,6 +26,8 @@ export default function CreateOrderPage() {
   const [form, setForm] = useState({
     customer_id: '',
     branch_id: '',
+    pickup_time: '',
+    priority: 'normal',
   })
   const [items, setItems] = useState([{ ...emptyItem }])
   const [message, setMessage] = useState('')
@@ -101,7 +103,7 @@ export default function CreateOrderPage() {
       <PageHeading
         eyebrow="Operations"
         title="New order"
-        subtitle="Add services. Fulfilment times are recorded from status changes."
+        subtitle="Choose services and a pickup time. Delivery is calculated automatically."
       >
         <Button onClick={() => navigate(-1)}>
           <ArrowLeft className="size-4" /> Back
@@ -128,6 +130,21 @@ export default function CreateOrderPage() {
                     {branch.name}
                   </option>
                 ))}
+              </select>
+            </Field>
+            <Field label="Pickup time">
+              <input
+                required
+                type="datetime-local"
+                name="pickup_time"
+                value={form.pickup_time}
+                onChange={updateForm}
+              />
+            </Field>
+            <Field label="Priority">
+              <select name="priority" value={form.priority} onChange={updateForm}>
+                <option value="normal">Normal</option>
+                <option value="express">Express (24 hours)</option>
               </select>
             </Field>
           </div>

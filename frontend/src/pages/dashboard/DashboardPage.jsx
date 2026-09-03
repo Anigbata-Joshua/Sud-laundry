@@ -127,6 +127,13 @@ export default function DashboardPage() {
     )
     const pendingLeave = overview.leaveRequests.filter((request) => request.status === 'pending')
     const revenueDays = buildRevenueDays(overview.revenueTrend)
+    const rawRevenueChange = overview.revenueComparison?.percentChange
+    const revenueChange =
+      rawRevenueChange !== null &&
+      rawRevenueChange !== undefined &&
+      Number.isFinite(Number(rawRevenueChange))
+        ? Number(rawRevenueChange)
+        : null
 
     return {
       ordersToday: overview.todayOrderVolume.reduce((total, item) => total + item.count, 0),
@@ -138,7 +145,7 @@ export default function DashboardPage() {
       recentOrders: formatOrders(overview.orders.slice(0, 4)),
       revenueDays,
       revenueTotal: revenueDays.reduce((total, day) => total + day.revenue, 0),
-      revenueChange: overview.revenueComparison.percentChange,
+      revenueChange,
     }
   }, [overview])
 

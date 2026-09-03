@@ -27,6 +27,7 @@ export const env = {
     generalRateLimitMax: parseInt(process.env.GENERAL_RATE_LIMIT_MAX || process.env.RATE_LIMIT_MAX, 10) || 100,
     rateLimitMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 20, // strict limiter max
     cancellationWindowMinutes: parseInt(process.env.CANCELLATION_WINDOW_MINUTES, 10) || 30,
+    expressSurchargePercent: Number(process.env.EXPRESS_SURCHARGE_PERCENT) || 30,
 };
 
 export default env;

@@ -9,8 +9,8 @@ const router = express.Router();
 
 router.get('/', serviceController.getAllServices);
 router.get('/:id', serviceController.getServiceById);
-router.post('/', authenticate, authorize('admin'), serviceController.createService);
-router.put('/:id', authenticate, authorize('admin'), serviceController.updateService);
-router.delete('/:id', authenticate, authorize('admin'), serviceController.removeService);
+router.post('/', authenticate, authorize('admin', 'branch_manager'), serviceController.createService);
+router.patch('/:id', authenticate, authorize('admin', 'branch_manager'), serviceController.updateService);
+router.delete('/:id', authenticate, authorize('admin', 'branch_manager'), serviceController.removeService);
 
 export default router;

@@ -8,7 +8,8 @@ import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const submitLeaveRequest = asyncHandler(async (req, res, next) => {
-    const { employee_id, start_date, end_date, reason } = req.body;
+    const { start_date, end_date, reason } = req.body;
+    let { employee_id } = req.body;
     const currentUser = req.user;
 
     // Only employees can submit leave requests
@@ -16,18 +17,39 @@ export const submitLeaveRequest = asyncHandler(async (req, res, next) => {
         throw new ApiError(403, 'Only employees can submit leave requests');
     }
 
-    // Verify employee exists
-    const employee = await Employee.findById(employee_id);
-    if (!employee) {
-        throw new ApiError(404, 'Employee not found');
+    if (!start_date || !end_date || !reason) {
+        throw new ApiError(400, 'start_date, end_date, and reason are required');
     }
+
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new ApiError(400, 'Invalid date format for start_date or end_date');
+    }
+
+    if (startDate > endDate) {
+        throw new ApiError(400, 'start_date must be before or equal to end_date');
+    }
+
+    // Always ensure the employee submitting owns this record
+    const employee = await Employee.findOne({ user_id: currentUser.id });
+    if (!employee) {
+        throw new ApiError(404, 'Employee record not found for this user');
+    }
+
+    if (employee_id && employee._id.toString() !== employee_id.toString()) {
+        throw new ApiError(403, 'You can only submit leave requests for yourself');
+    }
+
+    employee_id = employee._id;
 
     // Create leave request
     const leaveRequest = await LeaveRequest.create({
         employee_id,
-        start_date,
-        end_date,
-        reason,
+        start_date: startDate,
+        end_date: endDate,
+        reason: reason.trim(),
         status: 'pending',
     });
 
@@ -81,6 +103,9 @@ export const approveLeaveRequest = asyncHandler(async (req, res, next) => {
     // Branch managers can only approve for their branch
     if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(leaveRequest.employee_id);
+        if (!employee) {
+            throw new ApiError(404, 'Assigned employee not found');
+        }
         if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only approve leave requests for your branch');
         }
@@ -115,6 +140,9 @@ export const rejectLeaveRequest = asyncHandler(async (req, res, next) => {
     // Branch managers can only reject for their branch
     if (currentUser.role === 'branch_manager') {
         const employee = await Employee.findById(leaveRequest.employee_id);
+        if (!employee) {
+            throw new ApiError(404, 'Assigned employee not found');
+        }
         if (employee.branch_id.toString() !== currentUser.branch_id) {
             throw new ApiError(403, 'You can only reject leave requests for your branch');
         }

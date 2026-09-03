@@ -228,7 +228,8 @@ export default function PaymentsPage() {
                 {orders.map((order) => (
                   <option key={order._id} value={order._id}>
                     ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
-                    {order.customer_id?.name ?? 'Customer'} · {formatNaira(order.total_price)}
+                    {order.customer_id?.name ?? 'Customer'} ·{' '}
+                    {formatNaira(order.amount_due ?? order.total_price)}
                   </option>
                 ))}
               </select>
