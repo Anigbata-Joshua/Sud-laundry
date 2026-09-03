@@ -1,70 +1,167 @@
-import { Building2, ChevronRight, Plus, Shirt } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building2, Edit3, Plus, Trash2, X } from 'lucide-react'
+import { createBranch, deleteBranch, getBranches, updateBranch } from '../../api/branches.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
-import Panel, { PanelTitle } from '../../components/common/Panel'
+import Panel from '../../components/common/Panel'
+import SearchInput from '../../components/common/SearchInput'
 
-const branches = [
-  ['Lekki', '14 Admiralty Way', '18 orders'],
-  ['Ikeja', '22 Allen Avenue', '12 orders'],
-  ['Yaba', '8 Herbert Macaulay', '8 orders'],
-]
-const services = [
-  ['Wash & fold', '24 hrs turnaround', '₦3,500/kg'],
-  ['Dry cleaning', '48 hrs turnaround', 'From ₦4,500'],
-  ['Express wash', '6 hrs turnaround', '₦6,000/kg'],
-  ['Premium care', '72 hrs turnaround', 'From ₦8,000'],
-]
-
-function CatalogRow({ icon: Icon, title, subtitle, value }) {
-  return (
-    <div className="flex items-center gap-3 border-b border-gray-100 py-3">
-      <span className="grid size-8 place-items-center rounded-lg bg-violet-50 text-brand">
-        <Icon className="size-4" />
-      </span>
-      <div className="grid flex-1">
-        <strong className="text-[11px]">{title}</strong>
-        <small className="text-[9px] text-gray-400">{subtitle}</small>
-      </div>
-      <b className="text-[10px]">{value}</b>
-      <ChevronRight className="size-3.5 text-gray-400" />
-    </div>
-  )
-}
+const emptyForm = { name: '', address: '', phone: '' }
 
 export default function BranchesPage() {
+  const [branches, setBranches] = useState([])
+  const [query, setQuery] = useState('')
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState('')
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+
+  function load() {
+    getBranches()
+      .then((response) => setBranches(response.data.data))
+      .catch(() => setMessage('Unable to load branches.'))
+  }
+
+  useEffect(() => {
+    getBranches()
+      .then((response) => setBranches(response.data.data))
+      .catch(() => setMessage('Unable to load branches.'))
+  }, [])
+
+  function beginEdit(branch) {
+    setEditingId(branch._id)
+    setForm({ name: branch.name, address: branch.address, phone: branch.phone ?? '' })
+    setOpen(true)
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    try {
+      if (editingId) await updateBranch(editingId, form)
+      else await createBranch(form)
+      setOpen(false)
+      setEditingId('')
+      setForm(emptyForm)
+      setMessage('')
+      load()
+    } catch (error) {
+      setMessage(error.response?.data?.message ?? 'Unable to save branch.')
+    }
+  }
+
+  async function remove(branch) {
+    if (!window.confirm(`Delete ${branch.name}?`)) return
+    try {
+      await deleteBranch(branch._id)
+      load()
+    } catch (error) {
+      setMessage(error.response?.data?.message ?? 'Unable to delete branch.')
+    }
+  }
+
+  const visible = branches.filter((branch) =>
+    `${branch.name} ${branch.address}`.toLowerCase().includes(query.toLowerCase()),
+  )
   return (
     <>
       <PageHeading
         eyebrow="Business setup"
-        title="Branches & services"
-        subtitle="Configure where you operate and what customers can order."
+        title="Branches"
+        subtitle="Create and manage every operating location."
       >
-        <Button primary>
-          <Plus className="size-4" /> Add service
+        <Button
+          primary
+          onClick={() => {
+            setEditingId('')
+            setForm(emptyForm)
+            setOpen(true)
+          }}
+        >
+          <Plus className="size-4" /> New branch
         </Button>
       </PageHeading>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel className="p-5">
-          <PanelTitle eyebrow="Locations" title="Branches">
-            <Plus className="size-4" />
-          </PanelTitle>
-          {branches.map((row) => (
-            <CatalogRow
-              key={row[0]}
-              icon={Building2}
-              title={row[0]}
-              subtitle={row[1]}
-              value={row[2]}
-            />
+      <Panel className="overflow-hidden">
+        <div className="border-b border-line p-4">
+          <SearchInput
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search branches…"
+            className="max-w-sm"
+          />
+        </div>
+        {message && <p className="m-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+          {visible.map((branch) => (
+            <article key={branch._id} className="rounded-xl border border-line p-4">
+              <span className="grid size-9 place-items-center rounded-lg bg-violet-50 text-brand">
+                <Building2 className="size-4" />
+              </span>
+              <h2 className="mt-3 text-sm font-extrabold">{branch.name}</h2>
+              <p className="mt-1 text-[11px] text-gray-500">{branch.address}</p>
+              <p className="mt-1 text-[10px] text-gray-400">
+                {branch.phone || 'No phone provided'}
+              </p>
+              <div className="mt-4 flex gap-2">
+                <Button onClick={() => beginEdit(branch)}>
+                  <Edit3 className="size-3.5" /> Edit
+                </Button>
+                <Button onClick={() => remove(branch)}>
+                  <Trash2 className="size-3.5" /> Delete
+                </Button>
+              </div>
+            </article>
           ))}
-        </Panel>
-        <Panel className="p-5">
-          <PanelTitle eyebrow="Catalogue" title="Popular services" />
-          {services.map((row) => (
-            <CatalogRow key={row[0]} icon={Shirt} title={row[0]} subtitle={row[1]} value={row[2]} />
-          ))}
-        </Panel>
-      </div>
+        </div>
+      </Panel>
+      {open && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <Panel className="w-full max-w-lg p-6">
+            <div className="flex justify-between">
+              <h2 className="text-lg font-extrabold">{editingId ? 'Edit branch' : 'New branch'}</h2>
+              <button onClick={() => setOpen(false)}>
+                <X className="size-5" />
+              </button>
+            </div>
+            <form className="mt-5 grid gap-4" onSubmit={submit}>
+              <Field
+                label="Branch name"
+                name="name"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                required
+              />
+              <Field
+                label="Address"
+                name="address"
+                value={form.address}
+                onChange={(event) => setForm({ ...form, address: event.target.value })}
+                required
+              />
+              <Field
+                label="Phone"
+                name="phone"
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+              />
+              <Button primary type="submit">
+                {editingId ? 'Save changes' : 'Create branch'}
+              </Button>
+            </form>
+          </Panel>
+        </div>
+      )}
     </>
+  )
+}
+
+function Field({ label, ...props }) {
+  return (
+    <label className="grid gap-2 text-xs font-bold">
+      {label}
+      <input
+        {...props}
+        className="rounded-xl border border-line p-3 font-normal outline-none focus:border-brand"
+      />
+    </label>
   )
 }

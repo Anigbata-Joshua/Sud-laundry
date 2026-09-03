@@ -3,7 +3,7 @@
 
 // please read my comments before changing anything, jasmine im looking at you>>> thank you.
 
-import mongoose from 'mongoose';
+import mongoose from 'mongoose'
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -19,7 +19,22 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-    enum: ['order_received', 'inspecting', 'processing', 'payment_failed', 'payment_successful', 'order_ready', 'order_delivered', 'welcome', 'other'],
+      enum: [
+        'order_received',
+        'order_confirmed',
+        'order_cancelled',
+        'inspecting',
+        'processing',
+        'payment_failed',
+        'payment_successful',
+        'payment_overpaid',
+        'payment_refunded',
+        'order_ready',
+        'order_delivered',
+        'task_assigned',
+        'welcome',
+        'other',
+      ],
       required: true,
     },
     message: {
@@ -29,15 +44,15 @@ const notificationSchema = new mongoose.Schema(
     },
     is_read: {
       type: Boolean,
-      default: false, 
+      default: false,
     },
     sent_at: {
       type: Date,
       default: Date.now,
     },
   },
-  { timestamps: true }
-);
+  { timestamps: true },
+)
 
-const Notification = mongoose.model('Notification', notificationSchema);
-export default Notification;
+const Notification = mongoose.model('Notification', notificationSchema)
+export default Notification

@@ -12,7 +12,7 @@ import apiResponse from '../utils/apiResponse.js';
 
 //  logged-in user's own feed
 export const getMyNotifications = asyncHandler(async (req, res) => {
-  const userId = req.user._id; // adjust to however your auth middleware attaches the logged-in user
+  const userId = req.user.id;
 
   // pagination and query support
   let { page = 1, limit = 20, is_read, type, q } = req.query;
@@ -40,7 +40,7 @@ export const getMyNotifications = asyncHandler(async (req, res) => {
 
 // read — mark a single notification as read
 export const markAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
+  const userId = req.user.id;
   const { id } = req.params;
 
   const notification = await Notification.findOne({ _id: id, user_id: userId });
@@ -56,7 +56,7 @@ export const markAsRead = asyncHandler(async (req, res) => {
 
 // read-all — mark everything as read (nice to have)
 export const markAllAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
+  const userId = req.user.id;
 
   await Notification.updateMany(
     { user_id: userId, is_read: false },

@@ -20,14 +20,14 @@ export const register = asyncHandler(async (req, res, next) => {
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Public registration always creates customer accounts.
     const user = await User.create({
         name,
         email,
         password_hash,
         phone,
         address,
-        role: 'customer', // Default role for registration
+        role,
     });
 
     // Generate token
@@ -67,7 +67,7 @@ export const login = asyncHandler(async (req, res, next) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.role);
 
     // Return response
     const userResponse = {

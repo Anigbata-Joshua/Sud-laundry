@@ -4,6 +4,7 @@
   "description": "Backend API for the Laundry & Dry-Cleaning ERP System",
   "main": "src/server.js",
   "scripts": {
+    "seed:admin": "node --no-deprecation scripts/seedAdmin.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node --no-deprecation src/server.js",
     "dev": "nodemon --no-deprecation src/server.js"

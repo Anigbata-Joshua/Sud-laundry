@@ -119,3 +119,20 @@ export const updateEmployee = asyncHandler(async (req, res, next) => {
 
     return apiResponse(res, 200, employee, 'Employee updated successfully');
 });
+
+export const deleteEmployee = asyncHandler(async (req, res) => {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) throw new ApiError(404, 'Employee not found');
+    if (
+        req.user.role === 'branch_manager' &&
+        employee.branch_id.toString() !== req.user.branch_id
+    ) {
+        throw new ApiError(403, 'You can only delete employees from your own branch');
+    }
+    if (!['admin', 'branch_manager'].includes(req.user.role)) {
+        throw new ApiError(403, 'You do not have permission to delete employees');
+    }
+    await employee.deleteOne();
+    await User.findByIdAndUpdate(employee.user_id, { role: 'customer' });
+    return apiResponse(res, 200, null, 'Employee deleted successfully');
+});

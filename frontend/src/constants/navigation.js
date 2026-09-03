@@ -16,14 +16,25 @@ export const navigationGroups = [
       ['Overview', '/', LayoutDashboard],
       ['Orders', '/orders', Shirt, 14],
       ['Workflow', '/workflow', ClipboardList],
+      ['Processing', '/processing', ClipboardList],
     ],
   },
   {
     label: 'Operations',
     items: [
       ['Inventory', '/inventory', Boxes, 3],
-      ['People', '/people', Users],
-      ['Branches & services', '/catalog', Building2],
+      ['Branches', '/branches', Building2],
+      ['Services', '/services', Shirt],
+      [
+        'People',
+        '/people?view=employees',
+        Users,
+        null,
+        [
+          ['Employees', '/people?view=employees'],
+          ['Clients', '/people?view=clients'],
+        ],
+      ],
     ],
   },
   {
@@ -39,9 +50,13 @@ export const pageTitles = {
   '/': 'Overview',
   '/orders': 'Orders',
   '/workflow': 'Workflow',
+  '/processing': 'Processing',
   '/inventory': 'Inventory',
   '/people': 'People',
-  '/catalog': 'Branches & services',
+  '/branches': 'Branches',
+  '/services': 'Services',
   '/payments': 'Payments',
   '/reports': 'Reports',
+  '/notifications': 'Notifications',
+  '/profile': 'My profile',
 }

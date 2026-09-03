@@ -1,4 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { formatNaira } from '../../utils/formatters'
 import Avatar from '../common/Avatar'
 import StatusBadge from '../tables/StatusBadge'
@@ -6,6 +7,8 @@ import StatusBadge from '../tables/StatusBadge'
 const headings = ['Order', 'Customer', 'Service', 'Branch', 'Status', 'Payment', 'Total']
 
 export default function OrderTable({ rows, showActions = false }) {
+  const navigate = useNavigate()
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full whitespace-nowrap text-left">
@@ -24,9 +27,21 @@ export default function OrderTable({ rows, showActions = false }) {
         </thead>
         <tbody>
           {rows.map((order) => (
-            <tr key={order.id} className="text-[11px] text-gray-600">
+            <tr
+              key={order.id}
+              tabIndex="0"
+              role="link"
+              onClick={() => navigate(`/orders/${order.dbId}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  navigate(`/orders/${order.dbId}`)
+                }
+              }}
+              className="cursor-pointer text-[11px] text-gray-600 hover:bg-gray-50 focus:bg-violet-50 focus:outline-none"
+            >
               <td className="border-b border-gray-100 px-3 py-3">
-                <strong className="block text-gray-800">{order.id}</strong>
+                <span className="block font-bold text-brand">{order.id}</span>
                 <small className="text-[9px] text-gray-400">{order.pieces} pieces</small>
               </td>
               <td className="border-b border-gray-100 px-3 py-3">

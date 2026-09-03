@@ -6,6 +6,7 @@ import {
     createEmployee,
     getEmployees,
     getEmployeeById,
+    deleteEmployee,
     updateEmployee,
 } from '../controllers/employee.controller.js';
 import authenticate from '../middlewares/auth.middleware.js';
@@ -21,4 +22,5 @@ router.get('/get/all', getEmployees);
 router.get('/:id/get/one', getEmployeeById);
 router.put('/:id/update', updateEmployee);
 
+router.delete('/:id', deleteEmployee);
 export default router;
