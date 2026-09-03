@@ -45,15 +45,15 @@ export const getAllProducts = asyncHandler(async (req, res) => {
         filter.is_active = true;
     }
 
+    // Search by name (case-insensitive partial match).
+    if (req.query.q) {
+        filter.name = { $regex: req.query.q, $options: 'i' };
+    }
+
     const products = await Product.find(filter)
         .sort({ name: 1 });
 
-    return apiResponse(
-        res,
-        200,
-        products,
-        'Products fetched successfully'
-    );
+    return apiResponse(res, 200, products, 'Products fetched successfully');
 });
 
 
