@@ -40,7 +40,7 @@ function formatOrder(order, index) {
     branch: order.branch_id?.name ?? 'Branch',
     status: order.status,
     payment: order.payment_status,
-    total: order.amount_due ?? order.total_price,
+    total: Number(order.amount_due) > 0 ? order.amount_due : order.total_price,
     tone: tones[index % tones.length],
   }
 }

@@ -156,6 +156,28 @@ export const updateStep = asyncHandler(async (req, res) => {
     const order = await Order.findById(workflow.order_id)
     order.status = 'quality_check'
     await order.save()
+
+    const managers = await Employee.find({
+      branch_id: order.branch_id,
+      is_active: true,
+    }).populate({
+      path: 'user_id',
+      match: { role: 'branch_manager', is_active: true },
+      select: '_id',
+    })
+    const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`
+    await Promise.all(
+      managers
+        .filter((manager) => manager.user_id)
+        .map((manager) =>
+          createNotification({
+            user_id: manager.user_id._id,
+            order_id: order._id,
+            type: 'inspecting',
+            message: `${reference} has completed processing and is ready for quality check.`,
+          }),
+        ),
+    )
   }
   await workflow.save()
   await workflow.populate(workflowPopulate)

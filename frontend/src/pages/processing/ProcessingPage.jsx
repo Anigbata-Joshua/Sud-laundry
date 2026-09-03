@@ -29,6 +29,9 @@ export default function ProcessingPage() {
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
+  const [view, setView] = useState('active')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [historyDate, setHistoryDate] = useState('')
   const canManage = ['admin', 'branch_manager'].includes(user.role)
 
   function load() {
@@ -64,6 +67,18 @@ export default function ProcessingPage() {
 
   const hasActiveWorkflow = workflows.some((workflow) => workflow.status === 'active')
   const canCreate = order && ['received', 'processing'].includes(order.status) && !hasActiveWorkflow
+  const visibleWorkflows = useMemo(() => {
+    return workflows.filter((workflow) => {
+      const isHistory = ['completed', 'qc_failed'].includes(workflow.status)
+      if ((view === 'history') !== isHistory) return false
+      const customer = workflow.order_id?.customer_id?.name ?? ''
+      if (!customer.toLowerCase().includes(customerQuery.toLowerCase())) return false
+      if (historyDate && new Date(workflow.createdAt).toISOString().slice(0, 10) !== historyDate) {
+        return false
+      }
+      return true
+    })
+  }, [customerQuery, historyDate, view, workflows])
 
   function updateStep(index, field, value) {
     setSteps((current) =>
@@ -147,6 +162,36 @@ export default function ProcessingPage() {
       </PageHeading>
 
       {message && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
+      <Panel className="mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <div className="flex rounded-lg bg-gray-50 p-1">
+          {['active', 'history'].map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setView(item)}
+              className={`rounded-md px-3 py-2 text-xs font-bold capitalize ${view === item ? 'bg-white text-brand shadow-sm' : 'text-gray-500'}`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        {view === 'history' && (
+          <>
+            <input
+              className="rounded-lg border border-line p-2 text-xs"
+              type="date"
+              value={historyDate}
+              onChange={(event) => setHistoryDate(event.target.value)}
+            />
+            <input
+              className="rounded-lg border border-line p-2 text-xs sm:w-64"
+              placeholder="Filter by customer name"
+              value={customerQuery}
+              onChange={(event) => setCustomerQuery(event.target.value)}
+            />
+          </>
+        )}
+      </Panel>
       {orderId && order && (
         <Panel className="mb-4 flex items-center gap-3 p-4 text-xs">
           <StatusBadge status={order.status} />
@@ -160,7 +205,7 @@ export default function ProcessingPage() {
       )}
 
       <div className="grid gap-4">
-        {workflows.map((workflow) => (
+        {visibleWorkflows.map((workflow) => (
           <WorkflowCard
             key={workflow._id}
             workflow={workflow}
@@ -172,9 +217,11 @@ export default function ProcessingPage() {
             onReview={review}
           />
         ))}
-        {workflows.length === 0 && (
+        {visibleWorkflows.length === 0 && (
           <Panel className="p-12 text-center text-xs text-gray-400">
-            No processing workflows yet.
+            {view === 'history'
+              ? 'No completed workflows match these filters.'
+              : 'No active processing workflows.'}
           </Panel>
         )}
       </div>

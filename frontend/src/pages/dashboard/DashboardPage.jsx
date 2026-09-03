@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import {
-  AlertTriangle,
-  ArrowRight,
-  CircleDollarSign,
-  Clock3,
-  Package,
-  Plus,
-  Shirt,
-} from 'lucide-react'
+import { AlertTriangle, ArrowRight, CircleDollarSign, Package, Plus, Shirt } from 'lucide-react'
 import { getDashboardOverview } from '../../api/dashboard.api'
 import Button from '../../components/common/Button'
 import ExportMenu from '../../components/common/ExportMenu'
@@ -41,20 +33,32 @@ function formatOrders(orders) {
       branch: order.branch_id?.name ?? 'Branch',
       status: order.status,
       payment: order.payment_status,
-      total: order.total_price,
+      total: Number(order.amount_due) > 0 ? order.amount_due : order.total_price,
       tone: avatarTones[index % avatarTones.length],
     }
   })
 }
 
 function buildRevenueDays(entries) {
-  const revenueByDate = new Map(entries.map((entry) => [entry._id, entry.revenue]))
+  const revenueByDate = new Map(
+    entries.map((entry) => {
+      const key =
+        typeof entry._id === 'string'
+          ? entry._id
+          : `${entry._id.year}-${String(entry._id.month).padStart(2, '0')}-${String(entry._id.day).padStart(2, '0')}`
+      return [key, Number(entry.revenue ?? 0)]
+    }),
+  )
 
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date()
     date.setHours(0, 0, 0, 0)
     date.setDate(date.getDate() - 6 + index)
-    const key = date.toISOString().slice(0, 10)
+    const key = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-')
 
     return {
       label: date.toLocaleDateString('en-NG', { weekday: 'short' }),
@@ -137,7 +141,7 @@ export default function DashboardPage() {
 
     return {
       ordersToday: overview.todayOrderVolume.reduce((total, item) => total + item.count, 0),
-      revenueToday: overview.todayRevenue.totalRevenue,
+      revenueToday: Number(overview.todayRevenue?.totalRevenue ?? 0),
       readyForPickup: overview.allOrderVolume.find((item) => item._id === 'ready')?.count ?? 0,
       overdueOrders,
       lowStockItems,
@@ -175,7 +179,6 @@ export default function DashboardPage() {
     { metric: 'Orders today', value: dashboard.ordersToday },
     { metric: 'Revenue today', value: formatNaira(dashboard.revenueToday) },
     { metric: 'Ready for pickup', value: dashboard.readyForPickup },
-    { metric: 'At risk', value: dashboard.overdueOrders.length },
   ]
 
   return (
@@ -203,7 +206,7 @@ export default function DashboardPage() {
         </Button>
       </PageHeading>
 
-      <section className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <MetricCard
           icon={Shirt}
           tone="violet"
@@ -224,13 +227,6 @@ export default function DashboardPage() {
           label="Ready for pickup"
           value={dashboard.readyForPickup}
           note="Across all branches"
-        />
-        <MetricCard
-          icon={Clock3}
-          tone="coral"
-          label="At risk"
-          value={dashboard.overdueOrders.length}
-          note="Past delivery time"
         />
       </section>
 

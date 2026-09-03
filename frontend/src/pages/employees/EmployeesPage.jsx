@@ -15,6 +15,7 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import StatusBadge from '../../components/tables/StatusBadge'
+import { useAuth } from '../../hooks/useAuth'
 
 const emptyForm = {
   name: '',
@@ -25,10 +26,12 @@ const emptyForm = {
   branch_id: '',
   job_title: '',
   hired_at: '',
+  role: 'employee',
 }
 
 export default function EmployeesPage() {
   const navigate = useNavigate()
+  const { user: currentUser } = useAuth()
   const [params, setParams] = useSearchParams()
   const view = params.get('view') === 'clients' ? 'clients' : 'employees'
   const [data, setData] = useState({ employees: [], users: [], branches: [] })
@@ -83,7 +86,7 @@ export default function EmployeesPage() {
     try {
       const userResponse = await createUser({
         ...form,
-        role: view === 'employees' ? 'employee' : 'customer',
+        role: view === 'employees' ? form.role : 'customer',
       })
       if (view === 'employees')
         await createEmployee({
@@ -91,6 +94,7 @@ export default function EmployeesPage() {
           branch_id: form.branch_id,
           job_title: form.job_title,
           hired_at: form.hired_at,
+          role: form.role,
         })
       setOpen(false)
       setForm(emptyForm)
@@ -171,7 +175,7 @@ export default function EmployeesPage() {
             <thead>
               <tr>
                 {(view === 'employees'
-                  ? ['Name', 'Job title', 'Branch', 'Status', 'Actions']
+                  ? ['Name', 'Role', 'Job title', 'Branch', 'Status', 'Actions']
                   : ['Client', 'Email', 'Phone', 'Status', 'Actions']
                 ).map((title) => (
                   <th
@@ -191,6 +195,9 @@ export default function EmployeesPage() {
                     <td className="border-b border-gray-100 px-4 py-3 font-bold">{user?.name}</td>
                     {view === 'employees' ? (
                       <>
+                        <td className="border-b border-gray-100 px-4 py-3 capitalize">
+                          {user.role.replaceAll('_', ' ')}
+                        </td>
                         <td className="border-b border-gray-100 px-4 py-3">{item.job_title}</td>
                         <td className="border-b border-gray-100 px-4 py-3">
                           {item.branch_id?.name}
@@ -268,6 +275,21 @@ export default function EmployeesPage() {
               ))}
               {view === 'employees' && (
                 <>
+                  {currentUser.role === 'admin' && (
+                    <label className="grid gap-2 text-xs font-bold">
+                      Access role
+                      <select
+                        required
+                        value={form.role}
+                        onChange={(event) => setForm({ ...form, role: event.target.value })}
+                        className="rounded-xl border border-line p-3 font-normal"
+                      >
+                        <option value="employee">Employee</option>
+                        <option value="branch_manager">Branch manager</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </label>
+                  )}
                   <label className="grid gap-2 text-xs font-bold">
                     Branch
                     <select

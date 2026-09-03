@@ -2,9 +2,11 @@ import {
   BarChart3,
   Boxes,
   Building2,
+  CalendarDays,
   ClipboardList,
   LayoutDashboard,
   Shirt,
+  Truck,
   Users,
   WalletCards,
 } from 'lucide-react'
@@ -17,12 +19,15 @@ export const navigationGroups = [
       ['Orders', '/orders', Shirt, 14],
       ['Workflow', '/workflow', ClipboardList],
       ['Processing', '/processing', ClipboardList],
+      ['Tasks', '/tasks', ClipboardList],
     ],
   },
   {
     label: 'Operations',
     items: [
       ['Inventory', '/inventory', Boxes, 3],
+      ['Stock history', '/stock-movements', Boxes],
+      ['Suppliers', '/suppliers', Truck],
       ['Branches', '/branches', Building2],
       ['Services', '/services', Shirt],
       [
@@ -35,6 +40,7 @@ export const navigationGroups = [
           ['Clients', '/people?view=clients'],
         ],
       ],
+      ['Leave requests', '/leave-requests', CalendarDays],
     ],
   },
   {
@@ -59,4 +65,8 @@ export const pageTitles = {
   '/reports': 'Reports',
   '/notifications': 'Notifications',
   '/profile': 'My profile',
+  '/tasks': 'Tasks',
+  '/stock-movements': 'Stock movements',
+  '/suppliers': 'Suppliers',
+  '/leave-requests': 'Leave requests',
 }

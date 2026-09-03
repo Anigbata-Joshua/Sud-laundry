@@ -11,10 +11,19 @@ export default function Sidebar({ open, onClose }) {
       ? [
           {
             label: 'Workspace',
-            items: navigationGroups[0].items.filter(([label]) => label === 'Processing'),
+            items: navigationGroups[0].items.filter(([label]) =>
+              ['Processing', 'Tasks'].includes(label),
+            ),
+          },
+          {
+            label: 'People',
+            items: navigationGroups[1].items.filter(([label]) => label === 'Leave requests'),
           },
         ]
-      : navigationGroups
+      : navigationGroups.map((group) => ({
+          ...group,
+          items: group.items.filter(([label]) => label !== 'Suppliers' || user.role === 'admin'),
+        }))
   const initials = user.name
     .split(' ')
     .map((part) => part[0])

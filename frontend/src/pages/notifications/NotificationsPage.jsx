@@ -44,11 +44,13 @@ export default function NotificationsPage() {
     setItems((current) =>
       current.map((entry) => (entry._id === item._id ? { ...entry, is_read: true } : entry)),
     )
+    window.dispatchEvent(new Event('notifications:changed'))
   }
 
   async function readAll() {
     await markAllNotificationsRead()
     setItems((current) => current.map((item) => ({ ...item, is_read: true })))
+    window.dispatchEvent(new Event('notifications:changed'))
   }
 
   return (

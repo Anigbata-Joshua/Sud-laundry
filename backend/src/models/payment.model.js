@@ -55,5 +55,12 @@ const paymentSchema = new mongoose.Schema(
 )
 paymentSchema.index({ status: 1, createdAt: -1 })
 paymentSchema.index({ branch_id: 1, createdAt: -1 })
+paymentSchema.index(
+  { refunded_payment_id: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { transaction_type: 'refund' },
+  },
+)
 const Payment = mongoose.model('Payment', paymentSchema)
 export default Payment

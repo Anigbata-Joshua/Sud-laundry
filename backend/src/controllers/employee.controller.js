@@ -9,9 +9,11 @@ import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import Branch from '../models/branch.model.js'
 
+const staffRoles = ['employee', 'branch_manager', 'admin']
+
 // POST /employees
 export const createEmployee = asyncHandler(async (req, res) => {
-  const { user_id, branch_id, job_title, hired_at } = req.body
+  const { user_id, branch_id, job_title, hired_at, role } = req.body
 
   const currentUser = req.user
 
@@ -42,9 +44,13 @@ export const createEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User not found')
   }
 
-  // Prevent customer account from being assigned as employee
-  if (user.role === 'customer') {
-    throw new ApiError(400, 'Customer accounts cannot be assigned as employees')
+  if (role !== undefined && currentUser.role !== 'admin') {
+    throw new ApiError(403, 'Only admins can assign employee roles')
+  }
+
+  const assignedRole = role ?? user.role
+  if (!staffRoles.includes(assignedRole)) {
+    throw new ApiError(400, `Employee role must be one of: ${staffRoles.join(', ')}`)
   }
 
   // Check existing employee record
@@ -55,6 +61,11 @@ export const createEmployee = asyncHandler(async (req, res) => {
   }
 
   const employee = await Employee.create({ user_id, branch_id, job_title, hired_at })
+
+  if (user.role !== assignedRole) {
+    user.role = assignedRole
+    await user.save()
+  }
 
   await employee.populate('user_id', 'name email phone role')
 
@@ -115,7 +126,7 @@ export const getEmployeeById = asyncHandler(async (req, res) => {
 // PATCH /employees/:id
 export const updateEmployee = asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { job_title, hired_at } = req.body
+  const { job_title, hired_at, role } = req.body
 
   const currentUser = req.user
 
@@ -144,6 +155,16 @@ export const updateEmployee = asyncHandler(async (req, res) => {
 
   if (hired_at !== undefined) {
     employee.hired_at = hired_at
+  }
+
+  if (role !== undefined) {
+    if (currentUser.role !== 'admin') {
+      throw new ApiError(403, 'Only admins can change employee roles')
+    }
+    if (!staffRoles.includes(role)) {
+      throw new ApiError(400, `Employee role must be one of: ${staffRoles.join(', ')}`)
+    }
+    await User.findByIdAndUpdate(employee.user_id, { role }, { runValidators: true })
   }
 
   await employee.save()

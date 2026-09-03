@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Building2, CalendarDays, Mail, MapPin, Phone, UserRound } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getOrder, updateOrder } from '../../api/orders.api'
+import { forceCancelOrder, getOrder, updateOrder } from '../../api/orders.api'
+import { getOrderPayments } from '../../api/payments.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
@@ -20,6 +21,7 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [payments, setPayments] = useState([])
 
   useEffect(() => {
     let active = true
@@ -27,6 +29,11 @@ export default function OrderDetailsPage() {
       .then((response) => {
         if (active) setOrder(response.data.data)
       })
+    getOrderPayments(id)
+      .then((response) => {
+        if (active) setPayments(response.data.data?.payments ?? response.data.data?.items ?? [])
+      })
+      .catch(() => {})
       .catch((requestError) => {
         if (active) setError(requestError.response?.data?.message ?? 'Unable to load order.')
       })
@@ -46,6 +53,19 @@ export default function OrderDetailsPage() {
     } catch (requestError) {
       setOrder((current) => ({ ...current, status: previousStatus }))
       setError(requestError.response?.data?.message ?? 'Unable to update order status.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function cancelOrder() {
+    if (!window.confirm('Force-cancel this order?')) return
+    setSaving(true)
+    try {
+      const response = await forceCancelOrder(id)
+      setOrder((current) => ({ ...current, ...response.data.data }))
+    } catch (requestError) {
+      setError(requestError.response?.data?.message ?? 'Unable to cancel order.')
     } finally {
       setSaving(false)
     }
@@ -107,6 +127,23 @@ export default function OrderDetailsPage() {
                 Mark order delivered
               </Button>
             )}
+            {['admin', 'branch_manager'].includes(user.role) &&
+              !['delivered', 'cancelled'].includes(order.status) && (
+                <Button className="mt-4 ml-2" disabled={saving} onClick={cancelOrder}>
+                  Force cancel
+                </Button>
+              )}
+          </Panel>
+          <Panel className="overflow-hidden">
+            <h2 className="border-b border-line p-5 text-sm font-extrabold">Payments</h2>
+            {payments.map((payment) => (
+              <div key={payment._id} className="flex items-center gap-4 border-b border-line px-5 py-4 text-xs">
+                <span className="flex-1 capitalize">{payment.transaction_type ?? 'payment'} · {payment.paymentMethod}</span>
+                <StatusBadge status={payment.status} />
+                <strong>{formatNaira(payment.amount)}</strong>
+              </div>
+            ))}
+            {payments.length === 0 && <p className="p-5 text-xs text-gray-400">No payments recorded.</p>}
           </Panel>
           <Panel className="overflow-hidden">
             <h2 className="border-b border-line p-5 text-sm font-extrabold">Order items</h2>

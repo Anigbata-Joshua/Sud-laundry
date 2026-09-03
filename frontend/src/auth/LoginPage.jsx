@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles } from 'lucide-react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import { useAuth } from '../hooks/useAuth'
 
@@ -115,6 +115,7 @@ export default function LoginPage() {
               </span>
             </label>
 
+
             <label className="grid gap-2 text-xs font-bold text-gray-700">
               Password
               <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-violet-100">
@@ -141,6 +142,10 @@ export default function LoginPage() {
               </span>
             </label>
 
+            <Link className="justify-self-end text-xs font-bold text-brand" to="/forgot-password">
+              Forgot password?
+            </Link>
+            
             {error && (
               <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
                 {error}
@@ -157,7 +162,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-8 text-center text-[11px] text-gray-400">
-            Having trouble signing in? Contact your system administrator.
+            Need an account? <Link className="font-bold text-brand" to="/register">Register</Link>
           </p>
         </div>
       </section>

@@ -6,13 +6,15 @@ import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function EmployeeDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user: currentUser } = useAuth()
   const [employee, setEmployee] = useState(null)
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({ job_title: '', hired_at: '' })
+  const [form, setForm] = useState({ job_title: '', hired_at: '', role: 'employee' })
   const [error, setError] = useState('')
   useEffect(() => {
     let active = true
@@ -23,6 +25,7 @@ export default function EmployeeDetailsPage() {
           setForm({
             job_title: response.data.data.job_title,
             hired_at: response.data.data.hired_at?.slice(0, 10),
+            role: response.data.data.user_id?.role ?? 'employee',
           })
         }
       })
@@ -36,7 +39,9 @@ export default function EmployeeDetailsPage() {
   async function save(event) {
     event.preventDefault()
     try {
-      const response = await updateEmployee(id, form)
+      const payload =
+        currentUser.role === 'admin' ? form : { job_title: form.job_title, hired_at: form.hired_at }
+      const response = await updateEmployee(id, payload)
       setEmployee(response.data.data)
       setEditing(false)
     } catch (requestError) {
@@ -68,6 +73,10 @@ export default function EmployeeDetailsPage() {
             <Info label="Email" value={employee.user_id?.email} />
             <Info label="Phone" value={employee.user_id?.phone || 'Not provided'} />
             <Info
+              label="Access role"
+              value={employee.user_id?.role?.replaceAll('_', ' ') ?? 'Employee'}
+            />
+            <Info
               label="Status"
               value={<StatusBadge status={employee.is_active ? 'Active' : 'Inactive'} />}
             />
@@ -88,6 +97,20 @@ export default function EmployeeDetailsPage() {
                 value={form.hired_at}
                 onChange={(event) => setForm({ ...form, hired_at: event.target.value })}
               />
+              {currentUser.role === 'admin' && (
+                <label className="grid gap-2 text-xs font-bold">
+                  Access role
+                  <select
+                    className="rounded-xl border border-line p-3 font-normal"
+                    value={form.role}
+                    onChange={(event) => setForm({ ...form, role: event.target.value })}
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="branch_manager">Branch manager</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </label>
+              )}
               <Button primary type="submit">
                 Save changes
               </Button>

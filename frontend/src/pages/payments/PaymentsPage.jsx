@@ -40,6 +40,11 @@ export default function PaymentsPage() {
   useEffect(load, [])
 
   const completed = payments.filter((payment) => payment.status === 'completed')
+  const refundedPaymentIds = new Set(
+    completed
+      .filter((payment) => payment.transaction_type === 'refund')
+      .map((payment) => payment.refunded_payment_id?._id ?? payment.refunded_payment_id),
+  )
   const netRevenue = completed.reduce(
     (sum, payment) =>
       sum +
@@ -202,11 +207,15 @@ export default function PaymentsPage() {
                       {new Date(payment.createdAt).toLocaleDateString('en-NG')}
                     </td>
                     <td className="px-4 py-3">
-                      {!isRefund && payment.status === 'completed' && (
-                        <Button onClick={() => setRefundForm({ payment, amount: '', reason: '' })}>
-                          <RotateCcw className="size-3.5" /> Refund
-                        </Button>
-                      )}
+                      {!isRefund &&
+                        payment.status === 'completed' &&
+                        !refundedPaymentIds.has(payment._id) && (
+                          <Button
+                            onClick={() => setRefundForm({ payment, amount: '', reason: '' })}
+                          >
+                            <RotateCcw className="size-3.5" /> Refund
+                          </Button>
+                        )}
                     </td>
                   </tr>
                 )
@@ -225,13 +234,15 @@ export default function PaymentsPage() {
             <Field label="Order">
               <select required name="orderId" value={paymentForm.orderId} onChange={updatePayment}>
                 <option value="">Select any order</option>
-                {orders.map((order) => (
-                  <option key={order._id} value={order._id}>
-                    ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
-                    {order.customer_id?.name ?? 'Customer'} ·{' '}
-                    {formatNaira(order.amount_due ?? order.total_price)}
-                  </option>
-                ))}
+                {orders
+                  .filter((order) => !['paid', 'refunded'].includes(order.payment_status))
+                  .map((order) => (
+                    <option key={order._id} value={order._id}>
+                      ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
+                      {order.customer_id?.name ?? 'Customer'} ·{' '}
+                      {formatNaira(order.amount_due ?? order.total_price)}
+                    </option>
+                  ))}
               </select>
             </Field>
             <Field label="Amount">

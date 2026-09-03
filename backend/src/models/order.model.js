@@ -7,7 +7,7 @@ const orderItemSchema = new mongoose.Schema(
   {
     service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
     name: { type: String, required: true },
-    quantity: { type: Number, min: 0.001, required: true },
+    quantity: { type: Number, min: 1, required: true },
     unit_price: { type: Number, min: 0, required: true },
     subtotal: { type: Number, min: 0, required: true },
   },

@@ -314,6 +314,9 @@ export const refundPayment = asyncHandler(async (req, res) => {
     },
     { $group: { _id: null, amount: { $sum: '$amount' } } },
   ])
+  if ((refunded?.amount || 0) > 0) {
+    throw new ApiError(409, 'This payment has already been refunded')
+  }
   if (amount > original.amount - (refunded?.amount || 0)) {
     throw new ApiError(409, 'Refund amount exceeds the refundable payment balance')
   }
