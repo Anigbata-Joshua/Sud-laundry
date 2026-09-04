@@ -181,7 +181,7 @@ export const makePayment = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You do not have permission to pay for this order')
   }
 
-  const amount = Number(requestedAmount)
+  const amount = Number(requestedAmount ?? order.total_price)
 
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new ApiError(400, 'A positive payment amount is required')

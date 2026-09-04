@@ -241,14 +241,20 @@ export const getOrderById = asyncHandler(async (req, res) => {
   }
 
   // Customer can only see own order
-if (req.user.role === 'customer' && order.customer_id.toString() !== req.user.id) {
+  const customerId = order.customer_id?._id
+    ? order.customer_id._id.toString()
+    : order.customer_id?.toString()
+  if (req.user.role === 'customer' && customerId !== req.user.id) {
     throw new ApiError(403, "Cannot view another customer's order")
   }
 
   // Staff are branch scoped
+  const branchId = order.branch_id?._id
+    ? order.branch_id._id.toString()
+    : order.branch_id?.toString()
   if (
     ['branch_manager', 'employee'].includes(req.user.role) &&
-    order.branch_id.toString() !== req.user.branch_id
+    branchId !== req.user.branch_id
   ) {
     throw new ApiError(403, 'Cannot view an order outside your branch')
   }

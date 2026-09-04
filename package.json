@@ -1,4 +1,6 @@
 {
+  "name": "laundry-app-root",
+  "private": true,
   "dependencies": {
     "axios": "^1.19.0",
     "lucide-react": "^1.34.0",

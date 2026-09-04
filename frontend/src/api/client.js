@@ -6,7 +6,7 @@ import { storage } from '../utils/storage'
 const SESSION_KEY = 'suds.admin.session'
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3573/api/v1',
   withCredentials: true,
 })
 

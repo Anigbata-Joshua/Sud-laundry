@@ -59,10 +59,11 @@ export default function OrderDetailsPage() {
   }
 
   async function cancelOrder() {
-    if (!window.confirm('Force-cancel this order?')) return
+    const reason = window.prompt('Enter reason for force-cancellation:')
+    if (!reason || !reason.trim()) return
     setSaving(true)
     try {
-      const response = await forceCancelOrder(id)
+      const response = await forceCancelOrder(id, { reason: reason.trim() })
       setOrder((current) => ({ ...current, ...response.data.data }))
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to cancel order.')

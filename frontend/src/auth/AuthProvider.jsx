@@ -35,7 +35,7 @@ export default function AuthProvider({ children }) {
         const response = await getCurrentUser()
         const user = response.data.data
 
-        if (!['admin', 'branch_manager', 'employee'].includes(user.role)) {
+        if (!['admin', 'branch_manager', 'employee', 'customer'].includes(user.role)) {
           logout()
           return
         }
@@ -59,9 +59,9 @@ export default function AuthProvider({ children }) {
     const response = await loginRequest(credentials)
     const nextSession = response.data.data
 
-    if (!['admin', 'branch_manager', 'employee'].includes(nextSession.user.role)) {
-      const error = new Error('This portal is restricted to staff accounts.')
-      error.code = 'STAFF_ONLY'
+    if (!['admin', 'branch_manager', 'employee', 'customer'].includes(nextSession.user.role)) {
+      const error = new Error('Invalid user role.')
+      error.code = 'INVALID_ROLE'
       throw error
     }
 
