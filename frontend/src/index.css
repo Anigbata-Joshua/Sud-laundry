@@ -1,16 +1,35 @@
-/* Global foundation: keep reset, typography, and document-level defaults here. */
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
 
-:root {
-  font-family: 'Manrope', sans-serif;
-  color: #263331;
-  background: #f5f7f4;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+@theme {
+  --font-sans: 'Manrope', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --color-brand: #6656d9;
+  --color-ink: #262934;
+  --color-muted: #858995;
+  --color-line: #e7e8ee;
+  --color-canvas: #f6f7fb;
+  --color-sidebar: #191b28;
 }
 
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
-button, a { font: inherit; }
-a { color: inherit; text-decoration: none; }
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    min-width: 320px;
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  select {
+    cursor: pointer;
+  }
+}

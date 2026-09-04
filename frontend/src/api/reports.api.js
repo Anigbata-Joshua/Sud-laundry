@@ -1,4 +1,16 @@
-// Report API template: keep report filters, exports, and summary requests here.
 import apiClient from './client'
 
-export const getReports = (params) => apiClient.get('/reports', { params })
+export const getRevenueSummary = (params) => apiClient.get('/reports/revenue', { params })
+
+export const getRevenueTrend = (params) => apiClient.get('/reports/revenue-trend', { params })
+
+export const getRevenueComparison = (params) =>
+  apiClient.get('/reports/revenue-comparison', { params })
+
+export const getPaymentMethods = (params) => apiClient.get('/reports/payment-methods', { params })
+
+export const getOrderVolume = (params) => apiClient.get('/reports/order-volume', { params })
+
+export const getTopCustomers = (params) => apiClient.get('/reports/top-customers', { params })
+
+export const getTopServices = (params) => apiClient.get('/reports/top-services', { params })

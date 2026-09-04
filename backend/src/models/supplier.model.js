@@ -40,6 +40,12 @@ const supplierSchema = new mongoose.Schema(
       },
     },
 
+    items_supplied: {
+      type: [String],
+      required: true,
+      default: [],
+    },
+
     is_active: {
       type: Boolean,
       default: true,

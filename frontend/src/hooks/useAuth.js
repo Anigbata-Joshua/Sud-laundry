@@ -1,4 +1,12 @@
-// Auth hook template: read the provider contract and expose session actions to screens.
+import { useContext } from 'react'
+import AuthContext from '../auth/auth.context'
+
 export function useAuth() {
-  return { user: null, isAuthenticated: false }
+  const context = useContext(AuthContext)
+
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+
+  return context
 }
