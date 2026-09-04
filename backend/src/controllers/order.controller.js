@@ -241,7 +241,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
   }
 
   // Customer can only see own order
-  if (req.user.role === 'customer' && order.customer_id.toString() !== req.user.id) {
+if (req.user.role === 'customer' && order.customer_id.toString() !== req.user.id) {
     throw new ApiError(403, "Cannot view another customer's order")
   }
 
