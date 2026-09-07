@@ -1,29 +1,27 @@
 import { ChevronDown, LogOut, Sparkles, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { navigationGroups } from '../../constants/navigation'
+import { navigationGroups, ALL_STAFF_ROLES } from '../../constants/navigation'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../common/Avatar'
 
 export default function Sidebar({ open, onClose }) {
   const { logout, user } = useAuth()
-  const visibleGroups =
-    user.role === 'employee'
-      ? [
-          {
-            label: 'Workspace',
-            items: navigationGroups[0].items.filter(([label]) =>
-              ['Processing', 'Tasks'].includes(label),
-            ),
-          },
-          {
-            label: 'People',
-            items: navigationGroups[1].items.filter(([label]) => label === 'Leave requests'),
-          },
-        ]
-      : navigationGroups.map((group) => ({
-          ...group,
-          items: group.items.filter(([label]) => label !== 'Suppliers' || user.role === 'admin'),
-        }))
+
+  const visibleGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter(([, , , , , roles = ALL_STAFF_ROLES]) => roles.includes(user.role))
+        .map(([label, path, Icon, count, children, roles = ALL_STAFF_ROLES]) => [
+          label,
+          path,
+          Icon,
+          count,
+          children?.filter(([, , childRoles = roles]) => childRoles.includes(user.role)),
+        ]),
+    }))
+    .filter((group) => group.items.length > 0)
+
   const initials = user.name
     .split(' ')
     .map((part) => part[0])
@@ -64,7 +62,7 @@ export default function Sidebar({ open, onClose }) {
                 >
                   <Icon className="size-[17px]" />
                   <span className="flex-1">{label}</span>
-                  {children && (
+                  {children && children.length > 0 && (
                     <ChevronDown className="size-3 transition group-hover/people:rotate-180" />
                   )}
                   {count && (
@@ -73,7 +71,7 @@ export default function Sidebar({ open, onClose }) {
                     </b>
                   )}
                 </NavLink>
-                {children && (
+                {children && children.length > 0 && (
                   <div className="grid max-h-0 gap-0.5 overflow-hidden pl-10 opacity-0 transition-all group-hover/people:max-h-20 group-hover/people:py-1 group-hover/people:opacity-100 group-focus-within/people:max-h-20 group-focus-within/people:py-1 group-focus-within/people:opacity-100">
                     {children.map(([childLabel, childPath]) => (
                       <NavLink

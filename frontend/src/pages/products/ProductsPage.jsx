@@ -31,7 +31,6 @@ export default function ProductsPage() {
     try {
       const [productResponse, branchResponse] = await Promise.all([
         getProducts(branchId ? { branch_id: branchId } : undefined),
-        getBranches(),
       ])
       setProducts(productResponse.data.data ?? [])
       setBranches(branchResponse.data.data ?? [])

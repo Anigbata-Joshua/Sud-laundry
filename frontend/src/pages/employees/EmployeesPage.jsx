@@ -42,27 +42,21 @@ export default function EmployeesPage() {
   const [message, setMessage] = useState('')
 
   function load() {
-    Promise.all([getEmployees(), getUsers(), getBranches()])
+    const isAdmin = currentUser.role === 'admin'
+    Promise.all([
+      getEmployees(),
+      isAdmin ? getUsers() : Promise.resolve({ data: { data: [] } }),
+      getBranches(),
+    ])
       .then(([employees, users, branches]) =>
-        setData({
-          employees: employees.data.data,
-          users: users.data.data,
-          branches: branches.data.data,
-        }),
+        setData({ employees: employees.data.data, users: users.data.data, branches: branches.data.data }),
       )
       .catch(() => setMessage('Unable to load people.'))
   }
-  useEffect(() => {
-    Promise.all([getEmployees(), getUsers(), getBranches()])
-      .then(([employees, users, branches]) =>
-        setData({
-          employees: employees.data.data,
-          users: users.data.data,
-          branches: branches.data.data,
-        }),
-      )
-      .catch(() => setMessage('Unable to load people.'))
+  useEffect(() =>{
+    load()
   }, [])
+
 
   const rows = useMemo(() => {
     if (view === 'clients')
@@ -134,27 +128,38 @@ export default function EmployeesPage() {
         title="People"
         subtitle="Manage employees separately from client accounts."
       >
-        <Button primary onClick={() => setOpen(true)}>
+        <Button
+          primary
+          onClick={() => {
+            setForm({
+              ...emptyForm,
+              branch_id: currentUser.role === 'admin' ? '' : currentUser.branch_id,
+            })
+            setOpen(true)
+          }}
+        >
           <Plus className="size-4" /> Add {view === 'employees' ? 'employee' : 'client'}
         </Button>
       </PageHeading>
       <Panel className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-line p-3 md:flex-row md:items-center">
-          <select
-            value={view}
-            onChange={(event) => setParams({ view: event.target.value })}
-            className="rounded-lg border border-line bg-white p-2 text-xs font-bold"
-          >
-            <option value="employees">Employees</option>
-            <option value="clients">Clients</option>
-          </select>
+          {currentUser.role === 'admin' && (
+            <select
+              value={view}
+              onChange={(event) => setParams({ view: event.target.value })}
+              className="rounded-lg border border-line bg-white p-2 text-xs font-bold"
+            >
+              <option value="employees">Employees</option>
+              <option value="clients">Clients</option>
+            </select>
+          )}
           <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by name…"
             className="md:w-56"
           />
-          {view === 'employees' && (
+          {view === 'employees' && currentUser.role === 'admin' && (
             <select
               value={branch}
               onChange={(event) => setBranch(event.target.value)}
@@ -292,19 +297,30 @@ export default function EmployeesPage() {
                   )}
                   <label className="grid gap-2 text-xs font-bold">
                     Branch
-                    <select
-                      required
-                      value={form.branch_id}
-                      onChange={(event) => setForm({ ...form, branch_id: event.target.value })}
-                      className="rounded-xl border border-line p-3 font-normal"
-                    >
-                      <option value="">Select branch</option>
-                      {data.branches.map((item) => (
-                        <option key={item._id} value={item._id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                    {currentUser.role === 'admin' ? (
+                      <select
+                        required
+                        value={form.branch_id}
+                        onChange={(event) => setForm({ ...form, branch_id: event.target.value })}
+                        className="rounded-xl border border-line p-3 font-normal"
+                      >
+                        <option value="">Select branch</option>
+                        {data.branches.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        disabled
+                        value={
+                          data.branches.find((item) => item._id === currentUser.branch_id)
+                            ?.name ?? 'Your branch'
+                        }
+                        className="rounded-xl border border-line bg-gray-50 p-3 font-normal text-gray-500"
+                      />
+                    )}
                   </label>
                   <Field
                     name="job_title"

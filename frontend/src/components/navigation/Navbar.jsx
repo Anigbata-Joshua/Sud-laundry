@@ -16,10 +16,11 @@ export default function Navbar({ branchId, onBranchChange, onMenuClick }) {
   const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
+    if (user.role !== 'admin') return
     getBranches()
       .then((response) => setBranches(response.data.data))
       .catch(() => setBranches([]))
-  }, [])
+  }, [user.role])
 
   useEffect(() => {
     let active = true
@@ -32,7 +33,7 @@ export default function Navbar({ branchId, onBranchChange, onMenuClick }) {
       }
     }
     loadUnread()
-    const interval = window.setInterval(loadUnread, 15000)
+    const interval = window.setInterval(loadUnread, 45000)
     window.addEventListener('notifications:changed', loadUnread)
     window.addEventListener('focus', loadUnread)
     return () => {
@@ -72,21 +73,23 @@ export default function Navbar({ branchId, onBranchChange, onMenuClick }) {
           />
           <kbd className="rounded border border-line bg-white px-1 text-[9px]">Enter</kbd>
         </form>
-        <label className="hidden items-center gap-1.5 rounded-lg border border-line bg-gray-50/70 px-2 py-2 sm:flex">
-          <Building2 className="size-3.5 text-gray-500" />
-          <select
-            value={branchId}
-            onChange={(event) => onBranchChange(event.target.value)}
-            className="bg-transparent text-[10px] text-gray-600 outline-none"
-          >
-            <option value="">All branches</option>
-            {branches.map((branch) => (
-              <option key={branch._id} value={branch._id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {user.role === 'admin' && (
+          <label className="hidden items-center gap-1.5 rounded-lg border border-line bg-gray-50/70 px-2 py-2 sm:flex">
+            <Building2 className="size-3.5 text-gray-500" />
+            <select
+              value={branchId}
+              onChange={(event) => onBranchChange(event.target.value)}
+              className="bg-transparent text-[10px] text-gray-600 outline-none"
+            >
+              <option value="">All branches</option>
+              {branches.map((branch) => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           aria-label="View notifications"

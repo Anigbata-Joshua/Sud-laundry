@@ -90,6 +90,7 @@ export const login = asyncHandler(async (req, res, next) => {
         role: user.role,
         phone: user.phone,
         address: user.address,
+        branch_id: branch_id ?? null,
     };
 
     return apiResponse(res, 200, { user: userResponse, token }, 'Login successful');

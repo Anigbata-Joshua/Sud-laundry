@@ -6,6 +6,7 @@ import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
+import { useAuth } from '../../hooks/useAuth'
 import { formatNaira } from '../../utils/formatters'
 
 const emptyForm = {
@@ -18,10 +19,12 @@ const emptyForm = {
 }
 
 export default function ServicesPage() {
+  const { user } = useAuth()
+  const isAdmin = user.role === 'admin'
   const [services, setServices] = useState([])
   const [branches, setBranches] = useState([])
   const [query, setQuery] = useState('')
-  const [branchId, setBranchId] = useState('')
+  const [branchId, setBranchId] = useState(isAdmin ? '' : user.branch_id)
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState('')
   const [open, setOpen] = useState(false)
@@ -35,10 +38,14 @@ export default function ServicesPage() {
   }
 
   useEffect(() => {
-    getBranches()
-      .then((response) => setBranches(response.data.data))
-      .catch(() => setMessage('Unable to load branches.'))
+    if (isAdmin) {
+      getBranches()
+        .then((response) => setBranches(response.data.data))
+        .catch(() => setMessage('Unable to load branches.'))
+    }
     loadServices()
+    // isAdmin can't change during a session — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const branchName = (id) => branches.find((branch) => branch._id === id)?.name ?? 'Branch'
@@ -57,7 +64,7 @@ export default function ServicesPage() {
 
   function openCreate() {
     setEditingId('')
-    setForm({ ...emptyForm, branch_id: branchId })
+    setForm({ ...emptyForm, branch_id: isAdmin ? branchId : user.branch_id })
     setMessage('')
     setOpen(true)
   }
@@ -138,18 +145,20 @@ export default function ServicesPage() {
             placeholder="Search services…"
             className="flex-1 sm:max-w-sm"
           />
-          <select
-            value={branchId}
-            onChange={(event) => setBranchId(event.target.value)}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-xs"
-          >
-            <option value="">All branches</option>
-            {branches.map((branch) => (
-              <option key={branch._id} value={branch._id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
+          {isAdmin && (
+            <select
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-xs"
+            >
+              <option value="">All branches</option>
+              {branches.map((branch) => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         {message && !open && (
           <p className="m-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>
@@ -165,8 +174,8 @@ export default function ServicesPage() {
               </div>
               <h2 className="mt-3 text-sm font-extrabold">{service.name}</h2>
               <p className="mt-1 text-[10px] capitalize text-gray-400">
-                {service.type} · {service.category || 'General'} ·{' '}
-                {branchName(service.branch_id?._id ?? service.branch_id)}
+                {service.type} · {service.category || 'General'}
+                {isAdmin && ` · ${branchName(service.branch_id?._id ?? service.branch_id)}`}
               </p>
               <p className="mt-3 flex items-center gap-1 text-[10px] text-gray-500">
                 <Clock3 className="size-3.5" />
@@ -204,21 +213,29 @@ export default function ServicesPage() {
             <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={submit}>
               <label className="grid gap-2 text-xs font-bold sm:col-span-2">
                 Branch
-                <select
-                  required
-                  disabled={Boolean(editingId)}
-                  name="branch_id"
-                  value={form.branch_id}
-                  onChange={updateField}
-                  className="rounded-xl border border-line bg-white p-3 font-normal"
-                >
-                  <option value="">Select branch</option>
-                  {branches.map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
+                {isAdmin ? (
+                  <select
+                    required
+                    disabled={Boolean(editingId)}
+                    name="branch_id"
+                    value={form.branch_id}
+                    onChange={updateField}
+                    className="rounded-xl border border-line bg-white p-3 font-normal"
+                  >
+                    <option value="">Select branch</option>
+                    {branches.map((branch) => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    disabled
+                    value="Your branch"
+                    className="rounded-xl border border-line bg-gray-50 p-3 font-normal text-gray-500"
+                  />
+                )}
               </label>
               <Field
                 label="Service name"

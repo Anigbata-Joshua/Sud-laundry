@@ -3,7 +3,7 @@
 
 import rateLimit from 'express-rate-limit';
 import { env } from '../config/env.js';
-
+const keyByUserOrIp = (req) => req.user?.id ?? req.ip
 export const authLimiter = rateLimit({
     windowMs: env.rateLimit,
     max: env.rateLimitMax,
@@ -16,12 +16,10 @@ export const authLimiter = rateLimit({
 });
 
 export const apiLimiter = rateLimit({
-    windowMs: env.rateLimit,
-    max: env.generalRateLimitMax,
-    message: {
-        success: false,
-        message: 'Too many requests from this IP, please try again later.',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
+  windowMs: env.rateLimit,
+  max: env.generalRateLimitMax,
+  keyGenerator: keyByUserOrIp,
+  message: { success: false, message: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
