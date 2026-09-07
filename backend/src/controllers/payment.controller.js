@@ -1,4 +1,3 @@
-/* global process */
 // Owner: Series
 // Purpose: initialize, verify, and record payments.
 // Payment amounts are always validated against the order total on the server.
@@ -13,8 +12,9 @@ import createNotification from '../services/notification.service.js'
 import ApiError from '../utils/apiError.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import apiResponse from '../utils/apiResponse.js'
+import { env } from '../config/env.js'
 
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY
+const PAYSTACK_SECRET = env.paystackSecretKey
 
 const getUserId = (req) => req.user?._id || req.user?.id
 
@@ -22,16 +22,9 @@ const getOrderBalance = async (orderId) => {
   const normalizedId = typeof orderId === 'string' ? new mongoose.Types.ObjectId(orderId) : orderId
   const [totals] = await Payment.aggregate([
     { $match: { orderId: normalizedId, status: 'completed' } },
-    {
-      $group: {
-        _id: null,
-        netPaid: {
-          $sum: {
-            $ifNull: [
-              '$net_amount',
-              {
-                $cond: [
-                  { $eq: ['$transaction_type', 'refund'] },
+    { $group: { _id: null, netPaid: { $sum: { $ifNull: [
+            '$net_amount',
+              {$cond: [{ $eq: ['$transaction_type', 'refund'] },
                   { $multiply: ['$amount', -1] },
                   '$amount',
                 ],
@@ -168,6 +161,13 @@ export const makePayment = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Order not found')
   }
 
+  // Cash can only ever be recorded by staff who physically received it.
+  // A customer marking their own order as "paid in cash" is not a real
+  // payment — it must go through Paystack (verified below) instead.
+  if (paymentMethod === 'cash' && !['admin', 'branch_manager', 'employee'].includes(req.user.role)) {
+    throw new ApiError(403, 'Only staff can record a cash payment')
+  }
+
   // Customers can only pay for their own orders.
   if (req.user.role === 'customer' && order.customer_id.toString() !== getUserId(req).toString()) {
     throw new ApiError(403, 'You do not have permission to pay for this order')
@@ -237,8 +237,10 @@ export const makePayment = asyncHandler(async (req, res) => {
         paystackError.response?.data || paystackError.message,
       )
 
-      // Test-only fallback.
-      if (process.env.NODE_ENV !== 'production' && transaction_ref.startsWith('test_')) {
+      // Test-only fallback. Requires an explicit ALLOW_TEST_PAYMENTS=true env
+      // flag — never just "not production" — so this can't silently activate
+      // on a staging box or a misconfigured deploy that forgot to set NODE_ENV.
+      if (env.allowTestPayments && !env.isProduction && transaction_ref.startsWith('test_')) {
         status = 'completed'
       } else {
         status = 'failed'
