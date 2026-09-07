@@ -64,7 +64,6 @@ app.use('/api/v1/products', productRoutes)
 app.use('/api/v1/stock-movements', stockMovementRoutes)
 app.use('/api/v1/reports', reportRoutes)
 app.use('/api/v1/suppliers', supplierRoutes)
-app.use('/api/v1/supliers', supplierRoutes) // Alias for backwards compatibility
 app.use('/api/v1/processing-workflows', processingWorkflowRoutes)
 
 // Global Error Handler

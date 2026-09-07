@@ -6,7 +6,7 @@ import  dotenv  from 'dotenv';
 
 dotenv.config();
 
-const MINIMUM_PASSWORD_LENGTH = 3;
+const MINIMUM_PASSWORD_LENGTH = 8;
 
 function getAdminDetails() {
     const name = process.env.ADMIN_NAME?.trim();
@@ -23,7 +23,12 @@ function getAdminDetails() {
         throw new Error('ADMIN_EMAIL must be a valid email address.');
     }
 
-   
+    if (password.length < MINIMUM_PASSWORD_LENGTH) {
+        throw new Error(
+            `ADMIN_PASSWORD must be at least ${MINIMUM_PASSWORD_LENGTH} characters long.`
+        );
+    }
+
     return { name, email, password };
 }
 
