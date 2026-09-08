@@ -5,6 +5,7 @@ import createNotification from '../services/notification.service.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
+import { deductSuppliesForStage } from '../services/inventoryConsumption.service.js'
 
 const workflowPopulate = [
   {
@@ -147,6 +148,14 @@ export const updateStep = asyncHandler(async (req, res) => {
   } else if (req.body.action === 'complete' && step.status === 'accepted') {
     step.status = 'completed'
     step.completed_at = new Date()
+
+    // Deduct supplies for the stage (from deductedSupplies from service)
+    await deductSuppliesForStage({
+      order_id: workflow.order_id,
+      stage: step.name,
+      employee_id: employee._id,
+      branch_id: workflow.branch_id,
+    })
   } else {
     throw new ApiError(409, 'That action is not valid for the current process status')
   }

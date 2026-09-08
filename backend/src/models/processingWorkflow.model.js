@@ -2,7 +2,7 @@ import mongoose from 'mongoose'
 
 const processStepSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true, enum: ['intake', 'washing', 'processing', 'quality_check', 'packaging', 'delivery_ready'], },
     sequence: { type: Number, required: true, min: 1 },
     employee_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     status: {
