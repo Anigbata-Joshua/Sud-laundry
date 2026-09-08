@@ -21,9 +21,9 @@ const userSchema = new Schema(
             type: String,
             required: [true, 'Password is required'],
         },
-        role: {
+          role: {
             type: String,
-            enum: ['admin', 'branch_manager', 'employee', 'customer'],
+            enum: ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer', 'customer'],
             default: 'customer',
         },
         phone: {
