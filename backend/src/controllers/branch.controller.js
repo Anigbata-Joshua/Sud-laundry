@@ -44,10 +44,7 @@ export const getBranchById = asyncHandler(async (req, res) => {
 //
 // Route should be protected by admin authorization.
 export const createBranch = asyncHandler(async (req, res) => {
-    const { name, address, phone, } = req.body;
-    if (!name || !address) {
-        throw new ApiError(400, 'Name and address are required');
-    }
+    const { name, address, phone } = req.body;
     const existingBranch = await Branch.findOne({ name });
     if (existingBranch) {
         throw new ApiError(409, 'A branch with this name already exists');
