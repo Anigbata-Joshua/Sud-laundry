@@ -44,9 +44,7 @@ export const deductSuppliesForStage = async ({ order_id, stage, employee_id, bra
                 }).session(session);
 
                 if (!product) {
-                    console.warn(
-                        `[Inventory] Product "${item.productName}" not found at branch ${branch_id}. Skipping automatic deduction.`
-                    );
+                    console.warn(`[Inventory] Product "${item.productName}" not found at branch ${branch_id}. Skipping automatic deduction.`);
                     continue;
                 }
 

@@ -40,15 +40,7 @@ const orderSchema = new mongoose.Schema(
     branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
     status: {
       type: String,
-      enum: [
-        'placed',
-        'received',
-        'processing',
-        'quality_check',
-        'ready',
-        'delivered',
-        'cancelled',
-      ],
+      enum: ['placed','received','processing','quality_check','ready','delivered','cancelled',],
       default: 'placed',
     },
     fulfillment: {

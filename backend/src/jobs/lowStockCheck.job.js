@@ -31,12 +31,8 @@ export const checkLowStock = async () => {
         const lowStockProducts = await Product.find({
             is_active: true,
             reorder_point: { $gt: 0 },
-            $expr: {
-                $lte: ['$quantity', '$reorder_point'],
-            },
-        }).select(
-            'branch_id name quantity reorder_point unit'
-        );
+            $expr: { $lte: ['$quantity', '$reorder_point'], },
+        }).select('branch_id name quantity reorder_point unit');
 
         if (lowStockProducts.length === 0) {
             console.log('✅ No low-stock products found.');
@@ -49,13 +45,7 @@ export const checkLowStock = async () => {
 
 
         // Get the unique branches affected by low-stock products.
-        const branchIds = [
-            ...new Set(
-                lowStockProducts.map(product =>
-                    product.branch_id.toString()
-                )
-            ),
-        ];
+        const branchIds = [...new Set(lowStockProducts.map(product => product.branch_id.toString()))];
 
 
         // Find active employees in these branches
@@ -65,9 +55,7 @@ export const checkLowStock = async () => {
         }).select('user_id branch_id');
 
         if (employees.length === 0) {
-            console.log(
-                '⚠️ Low-stock products found, but no employees assigned to branches.'
-            );
+            console.log('⚠️ Low-stock products found, but no employees assigned to branches.');
             return;
         }
 
@@ -81,9 +69,7 @@ export const checkLowStock = async () => {
         }).select('_id');
 
         if (managers.length === 0) {
-            console.log(
-                '⚠️ Low-stock products found, but no active branch managers were found.'
-            );
+            console.log('⚠️ Low-stock products found, but no active branch managers were found.');
             return;
         }
 
@@ -109,14 +95,10 @@ export const checkLowStock = async () => {
         for (const product of lowStockProducts) {
             const branchId = product.branch_id.toString();
 
-            const branchManagers =
-                managersByBranch.get(branchId) || [];
+            const branchManagers = managersByBranch.get(branchId) || [];
 
             if (branchManagers.length === 0) {
-                console.log(
-                    `⚠️ No active manager found for branch ${branchId} — ${product.name}`
-                );
-
+                console.log(`⚠️ No active manager found for branch ${branchId} — ${product.name}`);
                 continue;
             }
 
@@ -154,10 +136,6 @@ export const checkLowStock = async () => {
 //
 // Africa/Lagos ensures midnight means Nigerian midnight,
 // regardless of the server's timezone.
-cron.schedule(
-    LOW_STOCK_CRON,
-    checkLowStock,
-    {
-        timezone: 'Africa/Lagos',
-    }
-);
+cron.schedule(LOW_STOCK_CRON, checkLowStock, {
+    timezone: 'Africa/Lagos',
+});
