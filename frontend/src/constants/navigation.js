@@ -12,14 +12,14 @@ import {
 } from 'lucide-react'
 
 // Keep this the single source of truth for who sees what.
-export const ALL_STAFF_ROLES = ['admin', 'branch_manager', 'employee']
+export const ALL_STAFF_ROLES = ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer']
 
 export const navigationGroups = [
   {
     label: 'Workspace',
     items: [
       ['Overview', '/', LayoutDashboard, null, null, ['admin', 'branch_manager']],
-      ['Orders', '/orders', Shirt, 14, null, ['admin', 'branch_manager']],
+      ['Orders', '/orders', Shirt, 14, null, ['admin', 'branch_manager', 'front_desk']],
       ['Workflow', '/workflow', ClipboardList, null, null, ['admin', 'branch_manager']],
       ['Processing', '/processing', ClipboardList], // all roles (default)
       ['Tasks', '/tasks', ClipboardList], // all roles (default)
@@ -28,8 +28,8 @@ export const navigationGroups = [
   {
     label: 'Operations',
     items: [
-      ['Inventory', '/inventory', Boxes, 3, null, ['admin', 'branch_manager']],
-      ['Stock history', '/stock-movements', Boxes, null, null, ['admin', 'branch_manager']],
+      ['Inventory', '/inventory', Boxes, 3, null, ['admin', 'branch_manager', 'inventory_officer']],
+      ['Stock history', '/stock-movements', Boxes, null, null, ['admin', 'branch_manager', 'inventory_officer']],
       ['Suppliers', '/suppliers', Truck, null, null, ['admin']],
       ['Branches', '/branches', Building2, null, null, ['admin']],
       ['Services', '/services', Shirt, null, null, ['admin', 'branch_manager']],
