@@ -8,7 +8,7 @@ import { authorize } from '../middlewares/role.middleware.js';
 const router = express.Router();
 
 // Staff/admin only — inventory movements are never customer-facing.
-router.use(authenticate, authorize('admin', 'branch_manager', 'employee'));
+router.use(authenticate, authorize('admin', 'branch_manager', 'employee', 'inventory_officer'));
 
 router.get('/', stockMovementController.getAllStock);
 router.get('/:id', stockMovementController.getById);

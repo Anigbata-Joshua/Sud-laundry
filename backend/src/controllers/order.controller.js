@@ -201,7 +201,7 @@ export const getMyOrders = asyncHandler(async (req, res) => {
 export const getAllOrders = asyncHandler(async (req, res) => {
   const currentUser = req.user
 
-  if (!['admin', 'branch_manager', 'employee'].includes(currentUser.role)) {
+  if (!['admin', 'branch_manager', 'employee', 'front_desk'].includes(currentUser.role)) {
     throw new ApiError(403, 'You do not have permission to view orders')
   }
 
@@ -211,7 +211,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
   const filter = {}
 
   // Staff are restricted to their branch
-  if (['branch_manager', 'employee'].includes(currentUser.role)) {
+  if (['branch_manager', 'employee', 'front_desk'].includes(currentUser.role)) {
     filter.branch_id = currentUser.branch_id
   }
 
@@ -253,7 +253,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
     ? order.branch_id._id.toString()
     : order.branch_id?.toString()
   if (
-    ['branch_manager', 'employee'].includes(req.user.role) &&
+    ['branch_manager', 'employee', 'front_desk'].includes(req.user.role) &&
     branchId !== req.user.branch_id
   ) {
     throw new ApiError(403, 'Cannot view an order outside your branch')
@@ -306,7 +306,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
   }
 
   // STAFF / ADMIN PATH
-  if (!['admin', 'branch_manager', 'employee'].includes(req.user.role)) {
+  if (!['admin', 'branch_manager', 'employee', 'front_desk'].includes(req.user.role)) {
     throw new ApiError(403, 'You do not have permission to update orders')
   }
 

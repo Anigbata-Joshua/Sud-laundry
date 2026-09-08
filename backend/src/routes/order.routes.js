@@ -17,7 +17,7 @@ router.get('/me', orderController.getMyOrders);
 router.post('/', orderController.createOrder);
 
 // Staff/admin — branch-scoped list (admin sees all branches)
-router.get( '/', authorize('admin', 'branch_manager', 'employee'), orderController.getAllOrders);
+router.get( '/', authorize('admin', 'branch_manager', 'employee', 'front_desk'), orderController.getAllOrders);
 
 // Shared — customer (own order) or staff/admin (branch-scoped), checked inside the controller
 router.get('/:id', orderController.getOrderById);
