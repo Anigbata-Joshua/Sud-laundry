@@ -240,8 +240,7 @@ export const updateService = asyncHandler(async (req, res) => {
 
 
 // DELETE /services/:id
-// Soft-delete by deactivating the service.
-// This preserves historical order data.
+// Soft-delete by deactivating the service. This preserves historical order data.
 export const removeService = asyncHandler(async (req, res) => {
     const currentUser = req.user;
 
@@ -263,8 +262,7 @@ export const removeService = asyncHandler(async (req, res) => {
         throw new ApiError(403, 'You can only delete services in your branch');
     }
 
-    // Do not physically delete services because existing
-    // orders may reference them.
+    // Do not physically delete services because existing orders may reference them.
     service.is_active = false;
 
     await service.save();

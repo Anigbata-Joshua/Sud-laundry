@@ -104,101 +104,56 @@ export const getProductById = asyncHandler(async (req, res) => {
 
 
 // POST /products
-//
-// Admin can specify the branch.
-// Branch manager is automatically restricted to their own branch.
-//
-// Inventory always starts at zero.
-// Stock must be added through POST /stock-movements.
+// Admin can specify the branch. Branch manager is automatically restricted to their own branch.
+// Inventory always starts at zero. Stock must be added through POST /stock-movements.
 export const createProduct = asyncHandler(async (req, res) => {
-    const {
-        name,
-        description,
-        price,
-        unit = 'pieces',
-        reorder_point = 0,
-    } = req.body;
+    const { name, description, price, unit = 'pieces', reorder_point = 0, } = req.body;
 
     let { branch_id } = req.body;
 
     // Validate name.
     if (typeof name !== 'string' || !name.trim()) {
-        throw new ApiError(
-            400,
-            'Name must be a valid non-empty string'
-        );
+        throw new ApiError(400, 'Name must be a valid non-empty string');
     }
 
     // Validate unit.
     if (typeof unit !== 'string' || !unit.trim()) {
-        throw new ApiError(
-            400,
-            'Unit must be a valid non-empty string'
-        );
+        throw new ApiError(400, 'Unit must be a valid non-empty string');
     }
 
     // Branch manager is restricted to their own branch.
     if (req.user.role === 'branch_manager') {
         if (!req.user.branch_id) {
-            throw new ApiError(
-                403,
-                'You are not assigned to any branch'
-            );
+            throw new ApiError(403, 'You are not assigned to any branch');
         }
 
         branch_id = req.user.branch_id;
     }
 
     if (!branch_id) {
-        throw new ApiError(
-            400,
-            'branch_id is required'
-        );
+        throw new ApiError(400, 'branch_id is required');
     }
 
     // Validate branch ID.
     if (!mongoose.Types.ObjectId.isValid(branch_id)) {
-        throw new ApiError(
-            400,
-            'Invalid branch_id'
-        );
+        throw new ApiError(400, 'Invalid branch_id');
     }
 
     // Validate reorder point.
-    if (
-        typeof reorder_point !== 'number' ||
-        !Number.isFinite(reorder_point) ||
-        reorder_point < 0
-    ) {
-        throw new ApiError(
-            400,
-            'reorder_point must be a valid non-negative number'
-        );
+    if (typeof reorder_point !== 'number' || !Number.isFinite(reorder_point) || reorder_point < 0) {
+        throw new ApiError(400, 'reorder_point must be a valid non-negative number');
     }
 
     // Validate price.
-    if (
-        price !== undefined &&
-        (
-            typeof price !== 'number' ||
-            !Number.isFinite(price) ||
-            price < 0
-        )
-    ) {
-        throw new ApiError(
-            400,
-            'price must be a valid non-negative number'
-        );
+    if (price !== undefined &&(typeof price !== 'number' || !Number.isFinite(price) || price < 0)) {
+        throw new ApiError(400, 'price must be a valid non-negative number');
     }
 
     // Verify branch exists.
     const branch = await Branch.findById(branch_id);
 
     if (!branch) {
-        throw new ApiError(
-            404,
-            'Branch not found'
-        );
+        throw new ApiError(404, 'Branch not found');
     }
 
     // Prevent duplicate product names within branch.
@@ -208,10 +163,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
 
     if (existingProduct) {
-        throw new ApiError(
-            409,
-            'A product with this name already exists at this branch'
-        );
+        throw new ApiError(409, 'A product with this name already exists at this branch');
     }
 
     // Product always starts with zero inventory.
@@ -226,23 +178,13 @@ export const createProduct = asyncHandler(async (req, res) => {
         is_active: true,
     });
 
-    return apiResponse(
-        res,
-        201,
-        product,
-        'Product created successfully'
-    );
+    return apiResponse(res,201,product, 'Product created successfully');
 });
 
 
 // PATCH /products/:id
-//
-// Admin can update any product.
-// Branch manager can only update products in their branch.
-//
-// IMPORTANT:
-// quantity cannot be changed here.
-// Use POST /stock-movements for inventory changes.
+// Admin can update any product.Branch manager can only update products in their branch.
+// IMPORTANT:quantity cannot be changed here.Use POST /stock-movements for inventory changes.
 export const updateProduct = asyncHandler(async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         throw new ApiError(400, 'Invalid product ID');
@@ -257,51 +199,25 @@ export const updateProduct = asyncHandler(async (req, res) => {
     // Branch manager can only update products in their branch.
     if (req.user.role === 'branch_manager') {
         if (!req.user.branch_id) {
-            throw new ApiError(
-                403,
-                'You are not assigned to any branch'
-            );
+            throw new ApiError(403,'You are not assigned to any branch');
         }
 
-        if (
-            product.branch_id.toString() !==
-            req.user.branch_id.toString()
-        ) {
-            throw new ApiError(
-                403,
-                'Cannot update inventory outside your branch'
-            );
+        if (product.branch_id.toString() !== req.user.branch_id.toString()){
+            throw new ApiError(403,'Cannot update inventory outside your branch');
         }
     }
 
-    const {
-        name,
-        description,
-        price,
-        unit,
-        quantity,
-        reorder_point,
-        is_active,
-    } = req.body;
+    const { name,description,price,unit,quantity,reorder_point, is_active } = req.body;
 
     // Quantity must NOT be directly modified.
     if (quantity !== undefined) {
-        throw new ApiError(
-            400,
-            'Product quantity cannot be changed directly. Use a stock movement instead.'
-        );
+        throw new ApiError(400,'Product quantity cannot be changed directly. Use a stock movement instead.');
     }
 
     // Validate name.
     if (name !== undefined) {
-        if (
-            typeof name !== 'string' ||
-            !name.trim()
-        ) {
-            throw new ApiError(
-                400,
-                'Name must be a valid non-empty string'
-            );
+        if (typeof name !== 'string' || !name.trim()) {
+            throw new ApiError(400,'Name must be a valid non-empty string');
         }
 
         const trimmedName = name.trim();
@@ -313,10 +229,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
         });
 
         if (duplicate) {
-            throw new ApiError(
-                409,
-                'A product with this name already exists at this branch'
-            );
+            throw new ApiError(409,'A product with this name already exists at this branch');
         }
 
         product.name = trimmedName;
@@ -324,33 +237,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
     // Description.
     if (description !== undefined) {
-        if (
-            description !== null &&
-            typeof description !== 'string'
-        ) {
-            throw new ApiError(
-                400,
-                'Description must be a string or null'
-            );
+        if (description !== null && typeof description !== 'string') {
+            throw new ApiError(400, 'Description must be a string or null');
         }
 
-        product.description =
-            typeof description === 'string'
-                ? description.trim()
-                : null;
+        product.description = typeof description === 'string' ? description.trim() : null;
     }
 
     // Price.
     if (price !== undefined) {
-        if (
-            typeof price !== 'number' ||
-            !Number.isFinite(price) ||
-            price < 0
-        ) {
-            throw new ApiError(
-                400,
-                'price must be a valid non-negative number'
-            );
+        if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
+            throw new ApiError(400, 'price must be a valid non-negative number');
         }
 
         product.price = price;
@@ -358,14 +255,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
     // Unit.
     if (unit !== undefined) {
-        if (
-            typeof unit !== 'string' ||
-            !unit.trim()
-        ) {
-            throw new ApiError(
-                400,
-                'Unit must be a valid non-empty string'
-            );
+        if (typeof unit !== 'string' || !unit.trim()) {
+            throw new ApiError(400,'Unit must be a valid non-empty string');
         }
 
         product.unit = unit.trim();
@@ -373,15 +264,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
     // Reorder point.
     if (reorder_point !== undefined) {
-        if (
-            typeof reorder_point !== 'number' ||
-            !Number.isFinite(reorder_point) ||
-            reorder_point < 0
-        ) {
-            throw new ApiError(
-                400,
-                'reorder_point must be a valid non-negative number'
-            );
+        if (typeof reorder_point !== 'number' || !Number.isFinite(reorder_point) || reorder_point < 0) {
+            throw new ApiError(400,'reorder_point must be a valid non-negative number');
         }
 
         product.reorder_point = reorder_point;
@@ -390,10 +274,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
     // Activation/deactivation.
     if (is_active !== undefined) {
         if (typeof is_active !== 'boolean') {
-            throw new ApiError(
-                400,
-                'is_active must be a boolean'
-            );
+            throw new ApiError(400,'is_active must be a boolean');
         }
 
         product.is_active = is_active;
@@ -401,12 +282,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
     await product.save();
 
-    return apiResponse(
-        res,
-        200,
-        product,
-        'Product updated successfully'
-    );
+    return apiResponse(res, 200, product, 'Product updated successfully');
 });
 
 
@@ -428,20 +304,11 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     // Branch manager can only deactivate products in their branch.
     if (req.user.role === 'branch_manager') {
         if (!req.user.branch_id) {
-            throw new ApiError(
-                403,
-                'You are not assigned to any branch'
-            );
+            throw new ApiError(403,'You are not assigned to any branch');
         }
 
-        if (
-            product.branch_id.toString() !==
-            req.user.branch_id.toString()
-        ) {
-            throw new ApiError(
-                403,
-                'Cannot delete inventory outside your branch'
-            );
+        if (product.branch_id.toString() !==req.user.branch_id.toString()) {
+            throw new ApiError(403,'Cannot delete inventory outside your branch');
         }
     }
 
@@ -449,10 +316,5 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 
     await product.save();
 
-    return apiResponse(
-        res,
-        200,
-        null,
-        'Product deactivated successfully'
-    );
+    return apiResponse(res, 200, null, 'Product deactivated successfully');
 });
