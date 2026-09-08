@@ -1,50 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { getCurrentUser, login as loginRequest } from '../api/auth.api'
-import { storage } from '../utils/storage'
+import { getCurrentUser, login as loginRequest, logout as logoutRequest } from '../api/auth.api'
 import AuthContext from './auth.context'
 
-const SESSION_KEY = 'suds.admin.session'
+const ALLOWED_ROLES = ['admin', 'branch_manager', 'employee', 'customer']
 
-function readSession() {
-  try {
-    return JSON.parse(storage.get(SESSION_KEY))
-  } catch {
-    storage.remove(SESSION_KEY)
-    return null
-  }
-}
-
+// The session token itself lives only in an httpOnly cookie set by the
+// backend — it is never stored here, in localStorage, or anywhere else
+// JS can read it. On load we don't know whether a session cookie exists,
+// so we just ask the backend via /users/me; the cookie rides along
+// automatically.
 export default function AuthProvider({ children }) {
-  const [session, setSession] = useState(readSession)
+  const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const logout = useCallback(() => {
-    storage.remove(SESSION_KEY)
-    setSession(null)
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest()
+    } catch {
+      // Even if the network call fails, clear local state so the UI
+      // reflects "logged out" — the cookie will still expire on its own.
+    }
+    setUser(null)
   }, [])
 
   useEffect(() => {
     async function restoreSession() {
-      if (!session?.token || !session?.user?.id) {
-        logout()
-        setIsLoading(false)
-        return
-      }
-
       try {
         const response = await getCurrentUser()
-        const user = response.data.data
+        const restoredUser = response.data.data
 
-        if (!['admin', 'branch_manager', 'employee', 'customer'].includes(user.role)) {
-          logout()
+        if (!ALLOWED_ROLES.includes(restoredUser.role)) {
+          await logout()
           return
         }
 
-        const restoredSession = { token: session.token, user }
-        storage.set(SESSION_KEY, JSON.stringify(restoredSession))
-        setSession(restoredSession)
+        setUser(restoredUser)
       } catch {
-        logout()
+        // No valid cookie / session expired — that's a normal logged-out state.
+        setUser(null)
       } finally {
         setIsLoading(false)
       }
@@ -57,38 +50,32 @@ export default function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const response = await loginRequest(credentials)
-    const nextSession = response.data.data
+    const nextUser = response.data.data.user
 
-    if (!['admin', 'branch_manager', 'employee', 'customer'].includes(nextSession.user.role)) {
+    if (!ALLOWED_ROLES.includes(nextUser.role)) {
       const error = new Error('Invalid user role.')
       error.code = 'INVALID_ROLE'
       throw error
     }
 
-    storage.set(SESSION_KEY, JSON.stringify(nextSession))
-    setSession(nextSession)
-    return nextSession.user
+    setUser(nextUser)
+    return nextUser
   }, [])
 
-  const updateUser = useCallback((user) => {
-    setSession((current) => {
-      const nextSession = { ...current, user }
-      storage.set(SESSION_KEY, JSON.stringify(nextSession))
-      return nextSession
-    })
+  const updateUser = useCallback((nextUser) => {
+    setUser(nextUser)
   }, [])
 
   const value = useMemo(
     () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session?.token && session?.user),
+      user,
+      isAuthenticated: Boolean(user),
       isLoading,
       login,
       logout,
       updateUser,
     }),
-    [isLoading, login, logout, session, updateUser],
+    [isLoading, login, logout, user, updateUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
