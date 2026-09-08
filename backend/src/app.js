@@ -11,7 +11,6 @@ import errorHandler from './middlewares/error.middleware.js'
 import authRoutes from './routes/auth.routes.js'
 import employeeRoutes from './routes/employee.routes.js'
 import leaveRequestRoutes from './routes/leaveRequest.routes.js'
-import taskRoutes from './routes/task.routes.js'
 import userRoutes from './routes/user.routes.js'
 import paymentRoutes from './routes/payment.routes.js'
 import notificationRoutes from './routes/notification.routes.js'
@@ -55,7 +54,6 @@ app.use('/api', apiLimiter)
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/employees', employeeRoutes)
 app.use('/api/v1/leave-requests', leaveRequestRoutes)
-app.use('/api/v1/tasks', taskRoutes)
 app.use('/api/v1/users', userRoutes)
 app.use('/api/v1/payments', paymentRoutes)
 app.use('/api/v1/notifications', notificationRoutes)
