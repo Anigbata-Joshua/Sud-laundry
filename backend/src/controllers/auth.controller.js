@@ -8,7 +8,7 @@ import Employee from '../models/employee.model.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import generateToken from '../utils/generateToken.js';
+import generateToken, { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../utils/generateToken.js';
 import { env } from '../config/env.js';
 import sendMail from '../services/email.service.js';
 
@@ -37,7 +37,11 @@ export const register = asyncHandler(async (req, res, next) => {
     // Generate token
     const token = generateToken(user._id);
 
-    // Return response (don't send password_hash)
+    // Session lives in an httpOnly cookie — never in the JSON body, so it's
+    // not readable by JS and can't be lifted by an XSS payload.
+    res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+
+    // Return response (don't send password_hash, don't send the token)
     const userResponse = {
         id: user._id,
         name: user.name,
@@ -47,7 +51,7 @@ export const register = asyncHandler(async (req, res, next) => {
         address: user.address,
     };
 
-    return apiResponse(res, 201, { user: userResponse, token }, 'Registration successful');
+    return apiResponse(res, 201, { user: userResponse }, 'Registration successful');
 });
 
 export const login = asyncHandler(async (req, res, next) => {
@@ -82,6 +86,8 @@ export const login = asyncHandler(async (req, res, next) => {
     // Generate token
     const token = generateToken(user._id, branch_id ? { branch_id } : {});
 
+    res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+
     // Return response
     const userResponse = {
         id: user._id,
@@ -93,7 +99,14 @@ export const login = asyncHandler(async (req, res, next) => {
         branch_id: branch_id ?? null,
     };
 
-    return apiResponse(res, 200, { user: userResponse, token }, 'Login successful');
+    return apiResponse(res, 200, { user: userResponse }, 'Login successful');
+});
+
+export const logout = asyncHandler(async (req, res, next) => {
+    // Clear with the exact same options used to set it — mismatched
+    // attributes (path, sameSite, secure) mean the browser won't delete it.
+    res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
+    return apiResponse(res, 200, {}, 'Logged out successfully');
 });
 
 export const forgotPassword = asyncHandler(async (req, res, next) => {
