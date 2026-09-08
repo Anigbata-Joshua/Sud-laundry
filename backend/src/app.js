@@ -4,6 +4,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import env from './config/env.js'
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js'
 import errorHandler from './middlewares/error.middleware.js'
@@ -33,7 +34,8 @@ app.use(
     credentials: true,
   }),
 )
-app.use(express.json())
+app.use(express.json());
+app.use(cookieParser());
 
 // Health check — placed BEFORE rate limiters so monitoring/uptime pings
 // can never be blocked by rate limiting, regardless of frequency.
