@@ -242,12 +242,20 @@ export default function ProcessingPage() {
                   className="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
                 >
                   <Field label={`Process ${index + 1}`}>
-                    <input
+                    <select
                       required
                       value={step.name}
                       onChange={(event) => updateStep(index, 'name', event.target.value)}
-                      placeholder="e.g. Wash garments"
-                    />
+                    >
+                      <option value="">Select stage</option>
+                      {['intake', 'washing', 'processing', 'quality_check', 'packaging', 'delivery_ready'].map(
+                        (stage) => (
+                          <option key={stage} value={stage}>
+                            {stage.replaceAll('_', ' ')}
+                          </option>
+                        ),
+                      )}
+                    </select>
                   </Field>
                   <Field label="Assigned employee">
                     <select
