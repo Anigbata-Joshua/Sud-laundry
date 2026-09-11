@@ -25,6 +25,7 @@ const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📦 Environment: ${env.nodeEnv}`);
     console.log(`🌐 Frontend URI: ${env.frontendURI}`);
+    console.log(`📧 Email service: ${env.useMockEmail ? 'MOCK' : 'Resend'} (from: ${env.resendFromDomain})`);
     if (env.corsOrigins.length > 0) {
         console.log(`🔗 CORS Origins: ${env.corsOrigins.join(', ')}`);
     }

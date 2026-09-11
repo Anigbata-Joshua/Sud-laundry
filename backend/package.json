@@ -9,7 +9,8 @@
     "test:prod": "node scripts/run_production_tests.js",
     "start": "node --no-deprecation src/server.js",
     "dev": "nodemon --no-deprecation src/server.js",
-    "seed:services": "node --no-deprecation src/seeders/service.seeder.js"
+    "seed:services": "node --no-deprecation src/seeders/service.seeder.js",
+    "seed:supply-products": "node --no-deprecation scripts/seedSupplyProducts.js"
   },
   "keywords": [],
   "author": "",
@@ -32,7 +33,7 @@
     "mongoose": "^8.5.0",
     "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.14",
+    "resend": "^6.27.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

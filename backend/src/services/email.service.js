@@ -1,20 +1,12 @@
+// services/email.service.js
 // Owner: Josh
-// Shared foundation / shared business logic
+// Purpose: single entry point for email sending. Switches between mock
+// and real (Resend) implementations based on USE_MOCK_EMAIL.
 
-/**
- * Mock email service to log transactional emails directly to the console.
- * This is used during development to bypass external SMTP configuration.
- */
-export const sendMail = async ({ to, subject, text, html }) => {
-    console.log('\n=================== MOCK EMAIL SENT ===================');
-    console.log(`To:      ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Text:    ${text}`);
-    if (html) {
-        console.log(`HTML:    [HTML Content Hidden]`);
-    }
-    console.log('=======================================================\n');
-    return { messageId: `mock_${Date.now()}` };
-};
+import sendMockMail from './mockEmail.service.js';
+import sendResendMail from './resendEmail.service.js';
+import { env } from '../config/env.js';
+
+const sendMail = env.useMockEmail ? sendMockMail : sendResendMail;
 
 export default sendMail;
