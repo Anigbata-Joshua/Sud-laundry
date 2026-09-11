@@ -9,7 +9,7 @@ import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import Branch from '../models/branch.model.js'
 
-const staffRoles = ['employee', 'branch_manager', 'admin']
+const staffRoles = ['employee', 'branch_manager', 'admin', 'front_desk', 'inventory_officer']
 
 // POST /employees
 export const createEmployee = asyncHandler(async (req, res) => {

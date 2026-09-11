@@ -11,22 +11,23 @@ import { withCache, deleteCached } from '../services/cache.service.js';
 
 // GET /services
 // Public service listing.
-// Only active services are shown.
+// Only active services are shown. Optional ?branch_id= filters to one branch.
 export const getAllServices = asyncHandler(async (req, res) => {
-    const services = await withCache('services:all', async () => {
-        return await Service.find({ is_active: true })
-            .select(
-                'branch_id name type category price turnaround_hours is_active'
-            )
+    const { branch_id } = req.query;
+    const filter = { is_active: true };
+    if (branch_id) {
+        filter.branch_id = branch_id;
+    }
+
+    // Get services from cache base on branchId or get all
+    const cacheKey = branch_id ? `services:branch:${branch_id}` : 'services:all';
+    const services = await withCache(cacheKey, async () => {
+        return await Service.find(filter)
+            .select('branch_id name type category price turnaround_hours is_active')
             .sort({ name: 1 });
     });
 
-    return apiResponse(
-        res,
-        200,
-        services,
-        'Service list fetched successfully'
-    );
+    return apiResponse(res, 200, services, 'Service list fetched successfully');
 });
 
 

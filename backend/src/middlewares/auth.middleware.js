@@ -51,16 +51,15 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     };
 
     // Attach branch context for staff roles
-    if (['employee', 'branch_manager'].includes(user.role)) {
+    if (['employee', 'branch_manager', 'front_desk', 'inventory_officer'].includes(user.role)) {
         const employee = await Employee.findOne({ user_id: user._id });
 
         if (!employee || !employee.branch_id) {
-            throw new ApiError(403, 'Staff account is not associated with any branch');
+        throw new ApiError(403, 'Staff account is not associated with any branch');
         }
 
         req.user.branch_id = employee.branch_id.toString();
     }
-
     next();
 });
 

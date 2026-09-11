@@ -1,112 +1,163 @@
-// Owner: Josh
-// Purpose: Real-time inventory consumption engine during order processing stages,
-// with atomic ledger logging and automatic low-stock notifications to Branch Managers.
 
 import mongoose from 'mongoose';
 import Product from '../models/product.model.js';
 import StockMovement from '../models/stockMovement.model.js';
-import Order from '../models/order.model.js';
 import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from './notification.service.js';
-import { STAGE_SUPPLIES_RECIPE } from '../config/stageSupplies.config.js';
+import {
+    SERVICE_SUPPLIES_RECIPE,
+    DEFAULT_PACKAGING_PER_UNIT,
+    getTier,
+} from '../config/serviceSupplies.config.js';
+
+// calculate the amount of supply need for an order
+export function calculateSuppliesForStep({ order, stepName }) {
+    const totals = new Map(); // productName -> { quantity, unit }
+
+    const addAmount = (productName, quantity, unit) => {
+        const existing = totals.get(productName);
+        if (existing) {
+            existing.quantity += quantity;
+        } else {
+            totals.set(productName, { quantity, unit });
+        }
+    };
+
+    for (const item of order.items ?? []) {
+        const recipe = SERVICE_SUPPLIES_RECIPE[item.name];
+        if (!recipe) continue; // service has no supply requirement
+
+        if (recipe.perUnit) {
+            for (const supply of recipe.perUnit) {
+                addAmount(supply.productName, supply.quantity * item.quantity, supply.unit);
+            }
+            continue;
+        }
+
+        const tier = getTier(item.quantity);
+        const tierSupplies = recipe[tier];
+        if (!tierSupplies) continue;
+
+        for (const supply of tierSupplies) {
+            addAmount(supply.productName, supply.quantity, supply.unit);
+        }
+    }
+
+    if (stepName === 'packaging') {
+        const totalGarments = (order.items ?? []).reduce((sum, item) => sum + item.quantity, 0);
+        for (const supply of DEFAULT_PACKAGING_PER_UNIT) {
+            addAmount(supply.productName, supply.quantity * totalGarments, supply.unit);
+        }
+    }
+
+    return Array.from(totals.entries()).map(([productName, { quantity, unit }]) => ({
+        productName,
+        quantity,
+        unit,
+    }));
+}
 
 /**
- * Automatically deducts required inventory supplies when an order stage is completed.
- * Executes atomically within a MongoDB session transaction.
+ * Resolves calculated productNames to real Product documents at the branch,
+ * so the officer sees actual product_ids (and current stock) to review,
+ * not just names.
  */
-export const deductSuppliesForStage = async ({ order_id, stage, employee_id, branch_id }) => {
-    const requiredSupplies = STAGE_SUPPLIES_RECIPE[stage];
-    if (!requiredSupplies || requiredSupplies.length === 0) {
-        return;
-    }
+export async function resolveSuppliesToProducts({ branch_id, supplies }) {
+    const resolved = [];
+    for (const supply of supplies) {
+        const product = await Product.findOne({
+            branch_id,
+            name: { $regex: new RegExp(`^${supply.productName}$`, 'i') },
+            is_active: true,
+        });
 
-    if (!order_id || !branch_id) {
-        return;
+        resolved.push({
+            product_id: product?._id ?? null,
+            product_name: supply.productName,
+            quantity: supply.quantity,
+            unit: supply.unit,
+            available: product ? product.quantity : null,
+            found: Boolean(product),
+        });
     }
+    return resolved;
+}
 
+/**
+ * Deducts stock for an APPROVED supply request. This is the only place
+ * stock is actually decremented for order fulfillment — atomic per product,
+ * with an immutable ledger entry per item and low-stock alerts dispatched
+ * after the transaction commits.
+ */
+export async function disburseApprovedSupplies({ order, supplyRequest }) {
     const session = await mongoose.startSession();
     const lowStockAlerts = [];
 
     try {
         await session.withTransaction(async () => {
-            const order = await Order.findById(order_id).session(session);
-            if (!order) {
-                throw new Error(`Order not found: ${order_id}`);
-            }
-
-            for (const item of requiredSupplies) {
-                // Find matching active product at the given branch
-                const product = await Product.findOne({
-                    branch_id,
-                    name: { $regex: new RegExp(`^${item.productName}$`, 'i') },
-                    is_active: true,
-                }).session(session);
-
+            for (const line of supplyRequest.approved_items) {
+                const product = await Product.findById(line.product_id).session(session);
                 if (!product) {
-                    console.warn(`[Inventory] Product "${item.productName}" not found at branch ${branch_id}. Skipping automatic deduction.`);
-                    continue;
+                    throw new Error(`Product not found: ${line.product_id}`);
                 }
 
-                const qtyToDeduct = item.defaultQuantity || 1;
-                product.quantity = Math.max(0, product.quantity - qtyToDeduct);
+                if (product.quantity < line.quantity) {
+                    throw new Error(
+                        `Insufficient stock for "${product.name}": have ${product.quantity} ${product.unit || 'units'}, tried to disburse ${line.quantity}`,
+                    );
+                }
+
+                product.quantity -= line.quantity;
                 await product.save({ session });
 
-                // 1. Create immutable audit ledger entry
                 await StockMovement.create(
                     [
                         {
                             product_id: product._id,
-                            branch_id,
-                            employee_id: employee_id || undefined,
-                            order_id,
+                            branch_id: supplyRequest.branch_id,
+                            employee_id: supplyRequest.requested_by,
+                            order_id: order._id,
                             type: 'usage',
-                            quantity: -qtyToDeduct,
-                            notes: `Auto-consumed during "${stage}" stage for Order #${order._id.toString().slice(-6)}`,
+                            quantity: -line.quantity,
+                            notes: `Approved by inventory officer for Order #${order._id
+                                .toString()
+                                .slice(-6)} (request ${supplyRequest._id})`,
                         },
                     ],
-                    { session }
+                    { session },
                 );
 
-                // 2. Record on order's audit record
                 order.supplies_used.push({
                     product_id: product._id,
                     name: product.name,
-                    quantity_used: qtyToDeduct,
-                    employee_id: employee_id || undefined,
+                    quantity_used: line.quantity,
+                    employee_id: supplyRequest.requested_by,
                     used_at: new Date(),
                 });
 
-                // 3. Check for low-stock threshold breach
                 if (product.reorder_point > 0 && product.quantity <= product.reorder_point) {
                     lowStockAlerts.push({
                         productName: product.name,
                         remaining: product.quantity,
                         reorderPoint: product.reorder_point,
                         unit: product.unit || 'units',
-                        branchId: branch_id,
+                        branchId: supplyRequest.branch_id,
                     });
                 }
             }
 
             await order.save({ session });
         });
-    } catch (error) {
-        console.error('❌ Failed to deduct supplies for stage:', error.message);
     } finally {
         await session.endSession();
     }
 
-    // Dispatch real-time low-stock alerts to Branch Managers
     for (const alert of lowStockAlerts) {
         await notifyBranchManagersOfLowStock(alert);
     }
-};
+}
 
-/**
- * Dispatches an in-app notification to all active Branch Managers assigned to a branch
- * when product inventory falls at or below its reorder point.
- */
 export const notifyBranchManagersOfLowStock = async ({
     productName,
     remaining,
@@ -120,9 +171,7 @@ export const notifyBranchManagersOfLowStock = async ({
             is_active: true,
         }).select('user_id');
 
-        if (!branchEmployees.length) {
-            return;
-        }
+        if (!branchEmployees.length) return;
 
         const userIds = branchEmployees.map((emp) => emp.user_id);
 
@@ -147,6 +196,8 @@ export const notifyBranchManagersOfLowStock = async ({
 };
 
 export default {
-    deductSuppliesForStage,
+    calculateSuppliesForStep,
+    resolveSuppliesToProducts,
+    disburseApprovedSupplies,
     notifyBranchManagersOfLowStock,
 };
