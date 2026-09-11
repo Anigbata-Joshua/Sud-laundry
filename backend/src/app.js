@@ -1,6 +1,5 @@
 // Shared foundation.
 // Purpose: Express app setup — middleware pipeline and route mounting.
-
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -22,6 +21,7 @@ import stockMovementRoutes from './routes/stockMovement.routes.js'
 import reportRoutes from './routes/report.routes.js'
 import supplierRoutes from './routes/supplier.routes.js'
 import processingWorkflowRoutes from './routes/processingWorkflow.routes.js'
+import supplyRequestRoutes from './routes/supplyRequest.routes.js'
 
 const app = express()
 
@@ -65,6 +65,7 @@ app.use('/api/v1/stock-movements', stockMovementRoutes)
 app.use('/api/v1/reports', reportRoutes)
 app.use('/api/v1/suppliers', supplierRoutes)
 app.use('/api/v1/processing-workflows', processingWorkflowRoutes)
+app.use('/api/v1/supply-requests', supplyRequestRoutes)
 
 // Global Error Handler
 app.use(errorHandler)

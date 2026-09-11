@@ -3,6 +3,7 @@
 
 import mongoose from 'mongoose'
 
+// An order item
 const orderItemSchema = new mongoose.Schema(
   {
     service_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
@@ -14,6 +15,7 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false },
 )
 
+// A supply used in the laundry process or requested by an employee for an order 
 const supplyUsedSchema = new mongoose.Schema(
   {
     product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -25,6 +27,7 @@ const supplyUsedSchema = new mongoose.Schema(
   { _id: false },
 )
 
+// Feedback from a customer for an order
 const feedbackSchema = new mongoose.Schema(
   {
     rating: { type: Number, min: 1, max: 5 },
@@ -34,6 +37,18 @@ const feedbackSchema = new mongoose.Schema(
   { _id: false },
 )
 
+// Intake of an order by an employee
+const intakeSchema = new mongoose.Schema(
+  {
+    original_items: [orderItemSchema],
+    verified_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
+    verified_at: { type: Date },
+    notes: { type: String, trim: true },
+  },
+  { _id: false },
+)
+
+// The main order document
 const orderSchema = new mongoose.Schema(
   {
     customer_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -66,6 +81,7 @@ const orderSchema = new mongoose.Schema(
     items: [orderItemSchema],
     supplies_used: [supplyUsedSchema],
     feedback: feedbackSchema,
+    intake: intakeSchema,
     cancellation_reason: { type: String },
     cancelled_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     cancelled_at: { type: Date },
@@ -76,6 +92,8 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+
+// Pre-validation hook to update actual fulfillment times
 orderSchema.pre('validate', function updateActualFulfillmentTimes() {
   if (this.isModified('status') && this.status === 'received' && !this.received_at) {
     this.received_at = new Date()
@@ -93,10 +111,13 @@ orderSchema.pre('validate', function updateActualFulfillmentTimes() {
   }
 })
 
+// Index for customer lookup
 orderSchema.index({ customer_id: 1 })
+
+// Index for branch status
 orderSchema.index({ branch_id: 1, status: 1 })
 
-// Keep this below schema
+  // Indexes for order retrieval
 orderSchema.index({ status: 1, createdAt: -1 })
 orderSchema.index({ branch_id: 1, createdAt: -1 })
 
