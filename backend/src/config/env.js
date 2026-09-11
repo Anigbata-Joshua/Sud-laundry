@@ -35,8 +35,10 @@ export const env = {
     port: parseInt(process.env.PORT, 10) || 3573,
     databaseUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/laundry',
 
+
     mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/laundry',
-    redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+    redisUrl: process.env.REDIS_URL,
+
 
     jwtSecret: resolveJwtSecret(),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
@@ -53,6 +55,12 @@ export const env = {
     cancellationWindowMinutes: parseInt(process.env.CANCELLATION_WINDOW_MINUTES, 10) || 30,
     expressSurchargePercent: Number(process.env.EXPRESS_SURCHARGE_PERCENT) || 30,
 
+    // Email settings
+    useMockEmail: process.env.USE_MOCK_EMAIL === 'true',
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    resendFromDomain: process.env.RESEND_FROM_DOMAIN || 'resend.dev',
+
+    // Payment settings
     paystackSecretKey: process.env.PAYSTACK_SECRET_KEY || '',
 
     // Explicit opt-in for the "test_" reference bypass in makePayment.

@@ -1,11 +1,31 @@
 import Employee from '../models/employee.model.js'
 import Order from '../models/order.model.js'
 import ProcessingWorkflow from '../models/processingWorkflow.model.js'
+import SupplyRequest from '../models/supplyRequest.model.js'
 import createNotification from '../services/notification.service.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
-import { deductSuppliesForStage } from '../services/inventoryConsumption.service.js'
+
+// Stages that actually consume supplies and therefore require an approved
+// SupplyRequest before the attendant can accept them.
+const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
+
+// Max distinct non-ready orders an attendant can be actively assigned to at
+// once, so managers can't overload a single attendant across many orders.
+const MAX_ACTIVE_ORDERS_PER_EMPLOYEE = 5
+const NON_ACTIVE_ORDER_STATUSES = ['ready', 'delivered', 'cancelled']
+
+async function countActiveOrdersForEmployee(employeeId) {
+  const orderIds = await ProcessingWorkflow.find({ 'steps.employee_id': employeeId }).distinct(
+    'order_id',
+  )
+  if (orderIds.length === 0) return 0
+  return Order.countDocuments({
+    _id: { $in: orderIds },
+    status: { $nin: NON_ACTIVE_ORDER_STATUSES },
+  })
+}
 
 const workflowPopulate = [
   {
@@ -49,6 +69,22 @@ export const createWorkflow = asyncHandler(async (req, res) => {
   }).populate('user_id', 'name')
   if (employees.length !== new Set(steps.map((step) => step.employee_id)).size) {
     throw new ApiError(400, 'Every process must use an active employee from the order branch')
+  }
+
+  // Workload cap: don't pile more active orders onto an already-loaded
+  // attendant. Checked per distinct employee in this workflow (an employee
+  // assigned multiple steps within THIS same order only needs one check,
+  // since this order isn't counted as "already active" for them yet).
+  const uniqueEmployeeIds = [...new Set(steps.map((step) => step.employee_id))]
+  for (const employeeId of uniqueEmployeeIds) {
+    const activeCount = await countActiveOrdersForEmployee(employeeId)
+    if (activeCount >= MAX_ACTIVE_ORDERS_PER_EMPLOYEE) {
+      const employee = employees.find((item) => item._id.toString() === employeeId)
+      throw new ApiError(
+        409,
+        `${employee?.user_id?.name ?? 'This employee'} already has ${activeCount} active orders (max ${MAX_ACTIVE_ORDERS_PER_EMPLOYEE}) and cannot be assigned more until some are marked ready`,
+      )
+    }
   }
 
   const previous = await ProcessingWorkflow.findOne({ order_id }).sort({ cycle: -1 })
@@ -143,19 +179,23 @@ export const updateStep = asyncHandler(async (req, res) => {
   if (previousIncomplete) throw new ApiError(409, 'The previous process must be completed first')
 
   if (req.body.action === 'accept' && step.status === 'assigned') {
+    if (SUPPLY_STAGES.includes(step.name)) {
+      const approvedRequest = await SupplyRequest.exists({
+        step_id: step._id,
+        status: 'approved',
+      })
+      if (!approvedRequest) {
+        throw new ApiError(
+          409,
+          'Supplies for this step must be requested and approved by an inventory officer before you can start',
+        )
+      }
+    }
     step.status = 'accepted'
     step.accepted_at = new Date()
   } else if (req.body.action === 'complete' && step.status === 'accepted') {
     step.status = 'completed'
     step.completed_at = new Date()
-
-    // Deduct supplies for the stage (from deductedSupplies from service)
-    await deductSuppliesForStage({
-      order_id: workflow.order_id,
-      stage: step.name,
-      employee_id: employee._id,
-      branch_id: workflow.branch_id,
-    })
   } else {
     throw new ApiError(409, 'That action is not valid for the current process status')
   }

@@ -311,29 +311,59 @@ export const updateOrder = asyncHandler(async (req, res) => {
   }
 
   // Branch restriction
-
-  if (
-    ['branch_manager', 'employee'].includes(req.user.role) &&
-    order.branch_id.toString() !== req.user.branch_id
-  ) {
+  if (['branch_manager', 'employee', 'front_desk'].includes(req.user.role) &&
+    order.branch_id.toString() !== req.user.branch_id) {
     throw new ApiError(403, 'Cannot update an order outside your branch')
   }
 
-  const { pickup_time, delivery_time, payment_status, status } = req.body
+  const { pickup_time, delivery_time, payment_status, status, intake_items, intake_notes } =
+    req.body
 
   // STATUS
   if (status !== undefined) {
-    const allowedTransition =
-      (order.status === 'placed' && status === 'received') ||
-      (order.status === 'ready' && status === 'delivered')
+    const allowedTransition = (order.status === 'placed' && status === 'received') || (order.status === 'ready' && status === 'delivered')
     if (!allowedTransition) {
       throw new ApiError(409, 'Order status is controlled by its workflow')
     }
+
+    // Intake verification: front desk (or manager/admin covering for them)
+    if (order.status === 'placed' && status === 'received' && Array.isArray(intake_items)) {
+      if (intake_items.length !== order.items.length) {
+        throw new ApiError(400, 'intake_items must match the number of items on the order')
+      }
+
+      const employee = await Employee.findOne({ user_id: req.user.id })
+      if (!employee) throw new ApiError(404, 'Employee record not found')
+
+      const correctedItems = order.items.map((item, index) => {
+        const correction = intake_items[index]
+        const quantity = Number(correction?.quantity)
+        if (!Number.isFinite(quantity) || quantity < 1) {
+          throw new ApiError(400, `intake_items[${index}].quantity must be a positive number`)
+        }
+        return {
+          ...item.toObject(),
+          quantity,
+          unit_price: item.unit_price,
+          subtotal: Math.round(item.unit_price * quantity * 100) / 100,
+        }
+      })
+
+      order.intake = {
+        original_items: order.items,
+        verified_by: employee._id,
+        verified_at: new Date(),
+        notes: intake_notes?.trim() || undefined,
+      }
+      order.items = correctedItems
+      order.total_price = correctedItems.reduce((sum, item) => sum + item.subtotal, 0)
+      order.amount_due = order.total_price + order.express_surcharge
+    }
+
     order.status = status
   }
 
   // OTHER UPDATES
-
   if (pickup_time !== undefined) {
     const pickupDate = new Date(pickup_time)
 
