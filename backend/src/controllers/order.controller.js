@@ -105,6 +105,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       service_id: service._id,
       name: service.name,
       category: service.category,
+      type: service.type,
       quantity: item.quantity,
       unit_price: service.price,
       subtotal,

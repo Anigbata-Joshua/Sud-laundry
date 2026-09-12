@@ -6,9 +6,9 @@ function tiered(small, medium, large) {
 }
 // mapping of workflow stage → service categories that use it
 export const STAGE_SERVICE_CATEGORIES = {
-    washing: ['Laundry'],
+    washing: ['Laundry', 'Treatment'],
     processing: ['Dry Cleaning', 'Household', 'Specialty'],
-    packaging: null, // packaging applies regardless of category — handled separately below
+    packaging: ['Finishing'],
 };
 
 // key = exact Service.name from services seed data

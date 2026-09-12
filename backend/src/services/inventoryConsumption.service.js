@@ -45,9 +45,13 @@ export function calculateSuppliesForStep({ order, stepName }) {
             addAmount(supply.productName, supply.quantity, supply.unit);
         }
     }
-
+    
     if (stepName === 'packaging') {
-        const totalGarments = (order.items ?? []).reduce((sum, item) => sum + item.quantity, 0);
+        // Only real garments need packaging materials — add-ons (Perfume,
+        // Special Packaging, Stain Removal) aren't separate physical items.
+        const totalGarments = (order.items ?? [])
+            .filter((item) => item.type === 'service')
+            .reduce((sum, item) => sum + item.quantity, 0);
         for (const supply of DEFAULT_PACKAGING_PER_UNIT) {
             addAmount(supply.productName, supply.quantity * totalGarments, supply.unit);
         }
