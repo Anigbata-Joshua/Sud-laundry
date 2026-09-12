@@ -1,16 +1,15 @@
 // Owner: Josh
 // Purpose: supply consumption rules keyed by SERVICE, not by workflow stage.
-// The old STAGE_SUPPLIES_RECIPE fired the same products for any step named
-// "washing" regardless of what was actually ordered — a Dry Cleaning order
-// would have consumed laundry detergent. This config is looked up by the
-// order's actual service line(s), then tiered by garment quantity.
-//
-// STARTING DEFAULTS — NOT FINAL. Tune tier thresholds and quantities once
-// real order sizes are observed. Tiers: small 1-5, medium 6-10, large 11+.
 
 function tiered(small, medium, large) {
     return { small, medium, large };
 }
+// mapping of workflow stage → service categories that use it
+export const STAGE_SERVICE_CATEGORIES = {
+    washing: ['Laundry'],
+    processing: ['Dry Cleaning', 'Household', 'Specialty'],
+    packaging: null, // packaging applies regardless of category — handled separately below
+};
 
 // key = exact Service.name from services seed data
 export const SERVICE_SUPPLIES_RECIPE = {

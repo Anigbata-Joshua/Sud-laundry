@@ -5,11 +5,7 @@ import StockMovement from '../models/stockMovement.model.js';
 import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from './notification.service.js';
-import {
-    SERVICE_SUPPLIES_RECIPE,
-    DEFAULT_PACKAGING_PER_UNIT,
-    getTier,
-} from '../config/serviceSupplies.config.js';
+import { SERVICE_SUPPLIES_RECIPE, DEFAULT_PACKAGING_PER_UNIT, STAGE_SERVICE_CATEGORIES, getTier } from '../config/serviceSupplies.config.js';
 
 // calculate the amount of supply need for an order
 export function calculateSuppliesForStep({ order, stepName }) {
@@ -24,10 +20,16 @@ export function calculateSuppliesForStep({ order, stepName }) {
         }
     };
 
+    const relevantCategories = STAGE_SERVICE_CATEGORIES[stepName];
+
     for (const item of order.items ?? []) {
+        // Only count a service's supplies against the stage it actually
+        // belongs to — otherwise a multi-service order double-counts the
+        // same supplies once per step.
+        if (relevantCategories && !relevantCategories.includes(item.category)) continue;
+
         const recipe = SERVICE_SUPPLIES_RECIPE[item.name];
         if (!recipe) continue; // service has no supply requirement
-
         if (recipe.perUnit) {
             for (const supply of recipe.perUnit) {
                 addAmount(supply.productName, supply.quantity * item.quantity, supply.unit);
