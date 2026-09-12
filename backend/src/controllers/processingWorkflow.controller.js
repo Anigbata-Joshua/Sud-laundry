@@ -6,6 +6,7 @@ import createNotification from '../services/notification.service.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
+import { STAGE_SERVICE_CATEGORIES } from '../config/serviceSupplies.config.js'
 
 // Stages that actually consume supplies and therefore require an approved
 // SupplyRequest before the attendant can accept them.
@@ -71,10 +72,23 @@ export const createWorkflow = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Every process must use an active employee from the order branch')
   }
 
-  // Workload cap: don't pile more active orders onto an already-loaded
-  // attendant. Checked per distinct employee in this workflow (an employee
-  // assigned multiple steps within THIS same order only needs one check,
-  // since this order isn't counted as "already active" for them yet).
+  // A step must correspond to something on this order
+  // Example: a manager could name a step "washing" on a household-only
+  // order (e.g. Duvet Cleaning), and the supply-request flow would return
+  // an empty calculated_items with no clear reason why — confusing for
+  // both the attendant and the officer.
+  const orderCategories = new Set(order.items.map((item) => item.category).filter(Boolean))
+  for (const step of steps) {
+    const relevantCategories = STAGE_SERVICE_CATEGORIES[step.name]
+    if (relevantCategories && !relevantCategories.some((category) => orderCategories.has(category))) {
+      throw new ApiError(
+        400,
+        `The "${step.name}" stage doesn't match any service on this order (order has: ${[...orderCategories].join(', ') || 'no categorized services'}). Choose a stage that matches what was actually ordered.`,
+      )
+    }
+  }
+
+  // Workload cap: don't pile more active orders onto an already-loaded attendant
   const uniqueEmployeeIds = [...new Set(steps.map((step) => step.employee_id))]
   for (const employeeId of uniqueEmployeeIds) {
     const activeCount = await countActiveOrdersForEmployee(employeeId)
