@@ -45,7 +45,7 @@ export function calculateSuppliesForStep({ order, stepName }) {
             addAmount(supply.productName, supply.quantity, supply.unit);
         }
     }
-    
+
     if (stepName === 'packaging') {
         // Only real garments need packaging materials — add-ons (Perfume,
         // Special Packaging, Stain Removal) aren't separate physical items.
@@ -64,11 +64,9 @@ export function calculateSuppliesForStep({ order, stepName }) {
     }));
 }
 
-/**
- * Resolves calculated productNames to real Product documents at the branch,
- * so the officer sees actual product_ids (and current stock) to review,
- * not just names.
- */
+// Resolves calculated productNames to real Product documents at the branch,
+// so the officer sees actual product_ids (and current stock) to review,
+// not just names.
 export async function resolveSuppliesToProducts({ branch_id, supplies }) {
     const resolved = [];
     for (const supply of supplies) {
@@ -90,12 +88,8 @@ export async function resolveSuppliesToProducts({ branch_id, supplies }) {
     return resolved;
 }
 
-/**
- * Deducts stock for an APPROVED supply request. This is the only place
- * stock is actually decremented for order fulfillment — atomic per product,
- * with an immutable ledger entry per item and low-stock alerts dispatched
- * after the transaction commits.
- */
+// Deducts stock for an APPROVED supply request. This is the only place
+// stock is actually decremented for order fulfillment.
 export async function disburseApprovedSupplies({ order, supplyRequest }) {
     const session = await mongoose.startSession();
     const lowStockAlerts = [];

@@ -4,6 +4,7 @@
 function tiered(small, medium, large) {
     return { small, medium, large };
 }
+
 // mapping of workflow stage → service categories that use it
 export const STAGE_SERVICE_CATEGORIES = {
     washing: ['Laundry', 'Treatment'],
@@ -44,6 +45,7 @@ export const SERVICE_SUPPLIES_RECIPE = {
             { productName: 'Ironing Starch', quantity: 3, unit: 'spray' },
         ],
     ),
+
     // Folding needs no extra supply beyond washing itself.
     'Washing & Folding': tiered(
         [
