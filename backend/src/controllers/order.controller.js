@@ -104,6 +104,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     resolvedItems.push({
       service_id: service._id,
       name: service.name,
+      category: service.category,
       quantity: item.quantity,
       unit_price: service.price,
       subtotal,
