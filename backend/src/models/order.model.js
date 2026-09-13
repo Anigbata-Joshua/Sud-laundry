@@ -70,6 +70,7 @@ const orderSchema = new mongoose.Schema(
     // Actual fulfillment timestamps
     picked_up_at: { type: Date },
     received_at: { type: Date },
+    processing_started_at: { type: Date },
     delivered_at: { type: Date },
     actual_turnaround_hours: { type: Number, min: 0 },
 

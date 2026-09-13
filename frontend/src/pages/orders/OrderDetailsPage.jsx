@@ -9,6 +9,7 @@ import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { formatNaira } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
+import CountdownTimer from '../../components/orders/CountdownTimer'
 
 function formatTime(value, fallback) {
   return value ? new Date(value).toLocaleString('en-NG') : fallback
@@ -33,7 +34,7 @@ export default function OrderDetailsPage() {
       .then((response) => {
         if (active) setPayments(response.data.data?.payments ?? response.data.data?.items ?? [])
       })
-      .catch(() => {})
+      .catch(() => { })
       .catch((requestError) => {
         if (active) setError(requestError.response?.data?.message ?? 'Unable to load order.')
       })
@@ -108,6 +109,12 @@ export default function OrderDetailsPage() {
               <StatusBadge status={order.payment_status} />
               <strong className="ml-auto text-xl">{formatNaira(order.total_price)}</strong>
             </div>
+            <CountdownTimer
+              deliveryTime={order.delivery_time}
+              processingStartedAt={order.processing_started_at}
+              turnaroundHours={order.fulfillment?.turnaround_hours}
+              status={order.status}
+            />
             {['admin', 'branch_manager'].includes(user.role) && order.status === 'placed' && (
               <Button
                 primary
