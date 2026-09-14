@@ -10,6 +10,7 @@ import StatusBadge from '../../components/tables/StatusBadge'
 import { formatNaira } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
 import CountdownTimer from '../../components/orders/CountdownTimer'
+import { getCustomerStatusLabel } from '../../constants/orderStatusLabels'
 
 function formatTime(value, fallback) {
   return value ? new Date(value).toLocaleString('en-NG') : fallback
@@ -105,7 +106,10 @@ export default function OrderDetailsPage() {
         <div className="grid gap-4">
           <Panel className="p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={order.status} />
+              <StatusBadge
+                status={order.status}
+                label={user.role === 'customer' ? getCustomerStatusLabel(order.status) : undefined}
+              />
               <StatusBadge status={order.payment_status} />
               <strong className="ml-auto text-xl">{formatNaira(order.total_price)}</strong>
             </div>
