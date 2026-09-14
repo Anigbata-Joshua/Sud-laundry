@@ -10,6 +10,7 @@ import {
   reviewProcessingQuality,
   updateProcessingStep,
 } from '../../api/processingWorkflows.api'
+import { createSupplyRequest } from '../../api/supplyRequests.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
@@ -17,6 +18,7 @@ import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
 
 const emptyStep = { name: '', employee_id: '' }
+const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
 
 export default function ProcessingPage() {
   const { orderId } = useParams()
@@ -301,6 +303,34 @@ export default function ProcessingPage() {
 
 function WorkflowCard({ workflow, user, busy, canManage, orderPage, onStepAction, onReview }) {
   const order = workflow.order_id
+  const [requestedSteps, setRequestedSteps] = useState({})
+  const [supplyBusy, setSupplyBusy] = useState('')
+  const [supplyMessage, setSupplyMessage] = useState({})
+
+  async function requestSupplies(stepId) {
+    setSupplyBusy(stepId)
+    setSupplyMessage((current) => ({ ...current, [stepId]: '' }))
+    try {
+      const response = await createSupplyRequest({ workflow_id: workflow._id, step_id: stepId })
+      const items = response.data.data.calculated_items
+      setRequestedSteps((current) => ({ ...current, [stepId]: true }))
+      setSupplyMessage((current) => ({
+        ...current,
+        [stepId]:
+          items.length > 0
+            ? `Requested: ${items.map((item) => `${item.product_name} × ${item.quantity}`).join(', ')}. Waiting on officer approval.`
+            : 'Request sent — awaiting officer approval.',
+      }))
+    } catch (error) {
+      setSupplyMessage((current) => ({
+        ...current,
+        [stepId]: error.response?.data?.message ?? 'Unable to request supplies.',
+      }))
+    } finally {
+      setSupplyBusy('')
+    }
+  }
+
   return (
     <Panel className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
@@ -342,13 +372,26 @@ function WorkflowCard({ workflow, user, busy, canManage, orderPage, onStepAction
                 </span>
               </div>
               {isMine && previousComplete && step.status === 'assigned' && (
-                <Button
-                  primary
-                  disabled={busy === step._id}
-                  onClick={() => onStepAction(workflow._id, step._id, 'accept')}
-                >
-                  Accept task
-                </Button>
+                <div className="grid gap-1.5">
+                  {SUPPLY_STAGES.includes(step.name) && !requestedSteps[step._id] && (
+                    <Button
+                      disabled={supplyBusy === step._id}
+                      onClick={() => requestSupplies(step._id)}
+                    >
+                      {supplyBusy === step._id ? 'Requesting…' : 'Request supplies'}
+                    </Button>
+                  )}
+                  <Button
+                    primary
+                    disabled={busy === step._id}
+                    onClick={() => onStepAction(workflow._id, step._id, 'accept')}
+                  >
+                    Accept task
+                  </Button>
+                  {supplyMessage[step._id] && (
+                    <p className="text-[10px] text-gray-500">{supplyMessage[step._id]}</p>
+                  )}
+                </div>
               )}
               {isMine && step.status === 'accepted' && (
                 <Button
