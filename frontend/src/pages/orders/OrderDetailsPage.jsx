@@ -12,6 +12,12 @@ import { useAuth } from '../../hooks/useAuth'
 import CountdownTimer from '../../components/orders/CountdownTimer'
 import { getCustomerStatusLabel } from '../../constants/orderStatusLabels'
 
+// front_desk is who actually confirms intake in practice — this was
+// missing before, meaning a front_desk user could never see or use the
+// "Mark order received" action at all.
+const CAN_RECEIVE_ROLES = ['admin', 'branch_manager', 'front_desk']
+const CAN_MANAGE_ROLES = ['admin', 'branch_manager']
+
 function formatTime(value, fallback) {
   return value ? new Date(value).toLocaleString('en-NG') : fallback
 }
@@ -24,6 +30,11 @@ export default function OrderDetailsPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [payments, setPayments] = useState([])
+
+  // Intake-correction form state — only relevant while status is 'placed'.
+  const [intakeMode, setIntakeMode] = useState(false)
+  const [intakeQuantities, setIntakeQuantities] = useState([])
+  const [intakeNotes, setIntakeNotes] = useState('')
 
   useEffect(() => {
     let active = true
@@ -60,6 +71,36 @@ export default function OrderDetailsPage() {
     }
   }
 
+  function startIntakeCheck() {
+    // Pre-fill with the customer's declared quantities — staff only edits
+    // what's actually different, rather than retyping everything.
+    setIntakeQuantities(order.items.map((item) => item.quantity))
+    setIntakeNotes('')
+    setIntakeMode(true)
+  }
+
+  async function confirmIntake() {
+    if (intakeQuantities.some((qty) => !Number.isFinite(qty) || qty < 1)) {
+      setError('Each item quantity must be a positive number.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const response = await updateOrder(id, {
+        status: 'received',
+        intake_items: intakeQuantities.map((quantity) => ({ quantity })),
+        intake_notes: intakeNotes.trim() || undefined,
+      })
+      setOrder((current) => ({ ...current, ...response.data.data }))
+      setIntakeMode(false)
+    } catch (requestError) {
+      setError(requestError.response?.data?.message ?? 'Unable to confirm intake.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function cancelOrder() {
     const reason = window.prompt('Enter reason for force-cancellation:')
     if (!reason || !reason.trim()) return
@@ -84,6 +125,9 @@ export default function OrderDetailsPage() {
 
   const customer = order.customer_id
   const branch = order.branch_id
+  const canReceive = CAN_RECEIVE_ROLES.includes(user.role)
+  const canManage = CAN_MANAGE_ROLES.includes(user.role)
+
   return (
     <>
       <PageHeading
@@ -91,12 +135,11 @@ export default function OrderDetailsPage() {
         title={`ORD-${order._id.slice(-6).toUpperCase()}`}
         subtitle={`Created ${formatTime(order.createdAt, 'Unknown')}`}
       >
-        {['admin', 'branch_manager'].includes(user.role) &&
-          ['received', 'processing', 'quality_check'].includes(order.status) && (
-            <Button primary onClick={() => navigate(`/orders/${id}/processing`)}>
-              Create / view workflow
-            </Button>
-          )}
+        {canManage && ['received', 'processing', 'quality_check'].includes(order.status) && (
+          <Button primary onClick={() => navigate(`/orders/${id}/processing`)}>
+            Create / view workflow
+          </Button>
+        )}
         <Button onClick={() => navigate(-1)}>
           <ArrowLeft className="size-4" /> Back
         </Button>
@@ -119,17 +162,61 @@ export default function OrderDetailsPage() {
               turnaroundHours={order.fulfillment?.turnaround_hours}
               status={order.status}
             />
-            {['admin', 'branch_manager'].includes(user.role) && order.status === 'placed' && (
-              <Button
-                primary
-                className="mt-4"
-                disabled={saving}
-                onClick={() => changeStatus('received')}
-              >
-                Mark order received
+
+            {canReceive && order.status === 'placed' && !intakeMode && (
+              <Button primary className="mt-4" disabled={saving} onClick={startIntakeCheck}>
+                Verify & mark received
               </Button>
             )}
-            {['admin', 'branch_manager'].includes(user.role) && order.status === 'ready' && (
+
+            {canReceive && order.status === 'placed' && intakeMode && (
+              <div className="mt-4 rounded-lg border border-line p-4">
+                <h3 className="mb-1 text-xs font-extrabold">Confirm what actually arrived</h3>
+                <p className="mb-3 text-[11px] text-gray-500">
+                  Adjust quantities below to match what the customer physically dropped off. The
+                  customer's original numbers are kept on record for reference.
+                </p>
+                <div className="grid gap-3">
+                  {order.items.map((item, index) => (
+                    <div key={item.service_id} className="flex items-center gap-3 text-xs">
+                      <span className="flex-1">
+                        {item.name}{' '}
+                        <span className="text-gray-400">(declared {item.quantity})</span>
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-20 rounded-lg border border-line p-2 text-xs"
+                        value={intakeQuantities[index] ?? item.quantity}
+                        onChange={(event) => {
+                          const value = Number(event.target.value)
+                          setIntakeQuantities((current) =>
+                            current.map((qty, i) => (i === index ? value : qty)),
+                          )
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <textarea
+                  className="mt-3 w-full rounded-lg border border-line p-2 text-xs"
+                  rows={2}
+                  placeholder="Notes (optional) — e.g. '1 shirt missing, customer notified'"
+                  value={intakeNotes}
+                  onChange={(event) => setIntakeNotes(event.target.value)}
+                />
+                <div className="mt-3 flex gap-2">
+                  <Button primary disabled={saving} onClick={confirmIntake}>
+                    Confirm receipt
+                  </Button>
+                  <Button disabled={saving} onClick={() => setIntakeMode(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {canManage && order.status === 'ready' && (
               <Button
                 primary
                 className="mt-4"
@@ -139,12 +226,11 @@ export default function OrderDetailsPage() {
                 Mark order delivered
               </Button>
             )}
-            {['admin', 'branch_manager'].includes(user.role) &&
-              !['delivered', 'cancelled'].includes(order.status) && (
-                <Button className="mt-4 ml-2" disabled={saving} onClick={cancelOrder}>
-                  Force cancel
-                </Button>
-              )}
+            {canManage && !['delivered', 'cancelled'].includes(order.status) && (
+              <Button className="mt-4 ml-2" disabled={saving} onClick={cancelOrder}>
+                Force cancel
+              </Button>
+            )}
           </Panel>
           <Panel className="overflow-hidden">
             <h2 className="border-b border-line p-5 text-sm font-extrabold">Payments</h2>
@@ -173,6 +259,21 @@ export default function OrderDetailsPage() {
               </div>
             ))}
           </Panel>
+          {order.intake && (
+            <Panel className="overflow-hidden">
+              <h2 className="border-b border-line p-5 text-sm font-extrabold">Intake correction</h2>
+              <div className="p-5 text-xs text-gray-600">
+                <p className="mb-2">
+                  Customer originally declared:{' '}
+                  {order.intake.original_items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}
+                </p>
+                {order.intake.notes && <p className="mb-2 italic">"{order.intake.notes}"</p>}
+                <p className="text-gray-400">
+                  Verified {formatTime(order.intake.verified_at, 'Unknown time')}
+                </p>
+              </div>
+            </Panel>
+          )}
         </div>
         <div className="grid content-start gap-4">
           <Panel className="p-5">
