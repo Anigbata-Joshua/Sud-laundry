@@ -29,6 +29,8 @@ import SuppliersPage from '../pages/suppliers/SuppliersPage'
 import LeaveRequestsPage from '../pages/leave-requests/LeaveRequestsPage'
 import ProductDetailsPage from '../pages/products/ProductDetailsPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import CustomerLayout from '../layouts/CustomerLayout'
+import CustomerOrdersPage from '../pages/orders/CustomerOrdersPage'
 
 export default function AppRoutes() {
   const { user } = useAuth()
@@ -42,36 +44,47 @@ export default function AppRoutes() {
         <Route path="reset-password" element={<ResetPasswordPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
-        <Route element={<StaffLayout />}>
-          <Route
-            index
-            element={
-              user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
-            }
-          />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="orders/new" element={<CreateOrderPage />} />
-          <Route path="orders/:id" element={<OrderDetailsPage />} />
-          <Route path="workflow" element={<WorkflowPage />} />
-          <Route path="processing" element={<ProcessingPage />} />
-          <Route path="orders/:orderId/processing" element={<ProcessingPage />} />
-          <Route path="inventory" element={<ProductsPage />} />
-          <Route path="inventory/:id" element={<ProductDetailsPage />} />
-          <Route path="stock-movements" element={<StockMovementsPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="leave-requests" element={<LeaveRequestsPage />} />
-          <Route path="people" element={<EmployeesPage />} />
-          <Route path="people/employees/:id" element={<EmployeeDetailsPage />} />
-          <Route path="people/clients/:id" element={<UserDetailsPage />} />
-          <Route path="branches" element={<BranchesPage />} />
-          <Route path="services" element={<ServicesPage />} />
-          <Route path="payments" element={<PaymentsPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
+        {user?.role === 'customer' ? (
+          <Route element={<CustomerLayout/>}>
+            <Route index element={<CustomerOrdersPage />} />
+            <Route path="orders/new" element={<CreateOrderPage />} />
+            <Route path="orders/:id" element={<OrderDetailsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        ) : (
+          <Route element={<StaffLayout />}>
+            <Route
+              index
+              element={
+                user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
+              }
+            />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="orders/new" element={<CreateOrderPage />} />
+            <Route path="orders/:id" element={<OrderDetailsPage />} />
+            <Route path="workflow" element={<WorkflowPage />} />
+            <Route path="processing" element={<ProcessingPage />} />
+            <Route path="orders/:orderId/processing" element={<ProcessingPage />} />
+            <Route path="inventory" element={<ProductsPage />} />
+            <Route path="inventory/:id" element={<ProductDetailsPage />} />
+            <Route path="stock-movements" element={<StockMovementsPage />} />
+            <Route path="suppliers" element={<SuppliersPage />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="leave-requests" element={<LeaveRequestsPage />} />
+            <Route path="people" element={<EmployeesPage />} />
+            <Route path="people/employees/:id" element={<EmployeeDetailsPage />} />
+            <Route path="people/clients/:id" element={<UserDetailsPage />} />
+            <Route path="branches" element={<BranchesPage />} />
+            <Route path="services" element={<ServicesPage />} />
+            <Route path="payments" element={<PaymentsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        )}
       </Route>
     </Routes>
   )
