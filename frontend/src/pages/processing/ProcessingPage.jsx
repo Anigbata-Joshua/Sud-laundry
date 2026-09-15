@@ -71,7 +71,11 @@ export default function ProcessingPage() {
   const canCreate = order && ['received', 'processing'].includes(order.status) && !hasActiveWorkflow
   const visibleWorkflows = useMemo(() => {
     return workflows.filter((workflow) => {
-      const isHistory = ['completed', 'qc_failed'].includes(workflow.status)
+      // A workflow marked 'completed' still needs a QC decision while its
+      // order is 'quality_check' — that's an open action, not history.
+      const awaitingQualityCheck =
+        workflow.status === 'completed' && workflow.order_id?.status === 'quality_check'
+      const isHistory = ['completed', 'qc_failed'].includes(workflow.status) && !awaitingQualityCheck
       if ((view === 'history') !== isHistory) return false
       const customer = workflow.order_id?.customer_id?.name ?? ''
       if (!customer.toLowerCase().includes(customerQuery.toLowerCase())) return false

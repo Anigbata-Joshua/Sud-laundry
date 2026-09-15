@@ -31,6 +31,7 @@ import ProductDetailsPage from '../pages/products/ProductDetailsPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import CustomerLayout from '../layouts/CustomerLayout'
 import CustomerOrdersPage from '../pages/orders/CustomerOrdersPage'
+import SupplyRequestsPage from '../pages/supply-requests/SupplyRequestsPage'
 
 export default function AppRoutes() {
   const { user } = useAuth()
@@ -45,7 +46,7 @@ export default function AppRoutes() {
       </Route>
       <Route element={<ProtectedRoute />}>
         {user?.role === 'customer' ? (
-          <Route element={<CustomerLayout/>}>
+          <Route element={<CustomerLayout />}>
             <Route index element={<CustomerOrdersPage />} />
             <Route path="orders/new" element={<CreateOrderPage />} />
             <Route path="orders/:id" element={<OrderDetailsPage />} />
@@ -55,10 +56,12 @@ export default function AppRoutes() {
           </Route>
         ) : (
           <Route element={<StaffLayout />}>
+            <Route path="supply-requests" element={<SupplyRequestsPage />} />
             <Route
               index
               element={
                 user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
+
               }
             />
             <Route path="orders" element={<OrdersPage />} />

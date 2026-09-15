@@ -33,6 +33,7 @@ export const navigationGroups = [
       ['Suppliers', '/suppliers', Truck, null, null, ['admin']],
       ['Branches', '/branches', Building2, null, null, ['admin']],
       ['Services', '/services', Shirt, null, null, ['admin', 'branch_manager']],
+      ['Supply requests', '/supply-requests', Boxes, null, null, ['admin', 'branch_manager', 'inventory_officer']],
       [
         'People',
         '/people?view=employees',
@@ -62,6 +63,7 @@ export const pageTitles = {
   '/workflow': 'Workflow',
   '/processing': 'Processing',
   '/inventory': 'Inventory',
+  '/supply-requests': 'Supply requests',
   '/people': 'People',
   '/branches': 'Branches',
   '/services': 'Services',
