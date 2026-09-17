@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles } from 'lucide-react'
+import { Droplets, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import { useAuth } from '../hooks/useAuth'
@@ -53,11 +53,11 @@ export default function LoginPage() {
   return (
     <>
       <section className="relative hidden overflow-hidden bg-sidebar p-12 text-white lg:flex lg:flex-col">
-        <div className="absolute -left-28 top-1/3 size-96 rounded-full bg-violet-500/15 blur-3xl" />
-        <div className="absolute -right-28 bottom-0 size-96 rounded-full bg-lime-300/10 blur-3xl" />
+        <div className="absolute -left-28 top-1/3 size-96 rounded-full bg-sky-500/15 blur-3xl" />
+        <div className="absolute -right-28 bottom-0 size-96 rounded-full bg-teal-400/10 blur-3xl" />
         <div className="relative flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-400 to-brand">
-            <Sparkles className="size-5" />
+          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 shadow-sm shadow-sky-900/50">
+            <Droplets className="size-5 text-white" />
           </span>
           <div className="grid">
             <strong className="text-lg">Suds</strong>
@@ -67,7 +67,7 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="relative my-auto max-w-lg">
-          <span className="mb-6 grid size-12 place-items-center rounded-2xl bg-white/10 text-violet-300">
+          <span className="mb-6 grid size-12 place-items-center rounded-2xl bg-white/10 text-sky-300">
             <ShieldCheck className="size-6" />
           </span>
           <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
@@ -87,7 +87,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <span className="grid size-10 place-items-center rounded-xl bg-brand text-white">
-              <Sparkles className="size-5" />
+              <Droplets className="size-5" />
             </span>
             <strong className="text-xl">Suds</strong>
           </div>
@@ -100,7 +100,7 @@ export default function LoginPage() {
           <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
             <label className="grid gap-2 text-xs font-bold text-gray-700">
               Email address
-              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-violet-100">
+              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-sky-100">
                 <Mail className="size-4 text-gray-400" />
                 <input
                   required
@@ -118,7 +118,7 @@ export default function LoginPage() {
 
             <label className="grid gap-2 text-xs font-bold text-gray-700">
               Password
-              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-violet-100">
+              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-sky-100">
                 <LockKeyhole className="size-4 text-gray-400" />
                 <input
                   required

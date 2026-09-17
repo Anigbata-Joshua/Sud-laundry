@@ -78,7 +78,7 @@ export default function WorkflowPage() {
                     <button
                       type="button"
                       onClick={() => navigate(`/orders/${order._id}`)}
-                      className="flex w-full justify-between text-left text-[9px] font-bold text-violet-600"
+                      className="flex w-full justify-between text-left text-[9px] font-bold text-sky-700"
                     >
                       ORD-{order._id.slice(-6).toUpperCase()}
                       <ExternalLink className="size-3.5" />

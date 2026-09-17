@@ -70,7 +70,7 @@ function buildRevenueDays(entries) {
 function LoadingState() {
   return (
     <div className="grid min-h-80 place-items-center">
-      <div className="size-8 animate-spin rounded-full border-4 border-violet-100 border-t-brand" />
+      <div className="size-8 animate-spin rounded-full border-4 border-sky-100 border-t-sky-600" />
     </div>
   )
 }
@@ -209,7 +209,7 @@ export default function DashboardPage() {
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <MetricCard
           icon={Shirt}
-          tone="violet"
+          tone="sky"
           label="Orders today"
           value={dashboard.ordersToday}
           note="Created since midnight"
@@ -236,14 +236,14 @@ export default function DashboardPage() {
             <span className="text-[10px] text-gray-400">Last 7 days</span>
           </PanelTitle>
           <div className="my-4 flex items-center gap-2">
-            <strong className="text-xl">{formatNaira(dashboard.revenueTotal)}</strong>
+            <strong className="text-xl font-black text-ink">{formatNaira(dashboard.revenueTotal)}</strong>
             <span
-              className={`rounded-full px-2 py-1 text-[9px] ${change !== null && change < 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
+              className={`rounded-full px-2 py-1 text-[9px] font-bold ${change !== null && change < 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
             >
               {changeLabel}
             </span>
           </div>
-          <div className="flex h-32 items-end gap-2 border-b border-gray-100 bg-[repeating-linear-gradient(#fff_0,#fff_30px,#f1f2f5_31px)]">
+          <div className="flex h-32 items-end gap-2 border-b border-gray-100 bg-[repeating-linear-gradient(#fff_0,#fff_30px,#f8fafc_31px)]">
             {dashboard.revenueDays.map((day, index) => (
               <div
                 key={day.label}
@@ -251,7 +251,7 @@ export default function DashboardPage() {
               >
                 <i
                   style={{ height: `${Math.max((day.revenue / maxRevenue) * 100, 2)}%` }}
-                  className={`w-2/3 rounded-t bg-violet-200 ${index === 6 ? 'bg-violet-600' : ''}`}
+                  className={`w-2/3 rounded-t transition-all ${index === 6 ? 'bg-sky-600 shadow-xs' : 'bg-sky-200 hover:bg-sky-300'}`}
                   title={formatNaira(day.revenue)}
                 />
                 <small className="-mb-5 text-[9px] text-gray-400">{day.label}</small>
@@ -262,7 +262,7 @@ export default function DashboardPage() {
 
         <Panel className="p-5">
           <PanelTitle eyebrow="Action centre" title="Needs attention">
-            <b className="grid size-6 place-items-center rounded-lg bg-violet-50 text-[10px] text-brand">
+            <b className="grid size-6 place-items-center rounded-lg bg-sky-50 text-[10px] font-extrabold text-sky-700 border border-sky-100">
               {attentionCount}
             </b>
           </PanelTitle>
@@ -294,7 +294,7 @@ export default function DashboardPage() {
           )}
           <button
             onClick={() => navigate('/orders')}
-            className="mt-3 flex items-center gap-1 text-[10px] font-bold text-brand"
+            className="mt-3 flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700"
           >
             View all activity <ArrowRight className="size-3.5" />
           </button>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
         <PanelTitle eyebrow="Live activity" title="Recent orders">
           <button
             onClick={() => navigate('/orders')}
-            className="flex items-center gap-1 text-[10px] font-bold text-brand"
+            className="flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700"
           >
             View all orders <ArrowRight className="size-3.5" />
           </button>

@@ -4,12 +4,14 @@
 @theme {
   --font-sans: 'Manrope', sans-serif;
   --font-mono: 'DM Mono', monospace;
-  --color-brand: #6656d9;
-  --color-ink: #262934;
-  --color-muted: #858995;
-  --color-line: #e7e8ee;
-  --color-canvas: #f6f7fb;
-  --color-sidebar: #191b28;
+  --color-brand: #0284c7;
+  --color-brand-hover: #0369a1;
+  --color-brand-light: #f0f9ff;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-canvas: #f8fafc;
+  --color-sidebar: #0f172a;
 }
 
 @layer base {

@@ -202,7 +202,7 @@ export default function CreateOrderPage() {
             </div>
           </div>
 
-          <p className="rounded-lg bg-violet-50 p-3 text-xs font-bold text-brand">
+          <p className="rounded-lg bg-sky-50 p-3 text-xs font-bold text-brand">
             Order total: {formatNaira(total)}
           </p>
           {message && <p className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}

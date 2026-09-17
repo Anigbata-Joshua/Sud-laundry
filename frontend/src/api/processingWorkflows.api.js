@@ -1,6 +1,6 @@
 import apiClient from './client'
 
-export const getProcessingWorkflows = () => apiClient.get('/processing-workflows')
+export const getProcessingWorkflows = (params) => apiClient.get('/processing-workflows', { params })
 export const getOrderProcessingWorkflows = (orderId) =>
   apiClient.get(`/processing-workflows/order/${orderId}`)
 export const createProcessingWorkflow = (details) =>

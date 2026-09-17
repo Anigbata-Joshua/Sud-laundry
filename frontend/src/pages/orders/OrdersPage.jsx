@@ -125,7 +125,7 @@ export default function OrdersPage() {
                 setTab(item)
                 setPage(1)
               }}
-              className={`rounded-md px-3 py-2 text-[10px] font-bold ${tab === item ? 'bg-violet-50 text-brand' : 'text-gray-500'}`}
+              className={`rounded-md px-3 py-2 text-[10px] font-bold ${tab === item ? 'bg-sky-50 text-brand' : 'text-gray-500'}`}
             >
               {item}
             </button>

@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Building2, Edit3, Plus, Trash2, X } from 'lucide-react'
+import {
+  ArrowRight,
+  Building2,
+  Edit3,
+  MapPin,
+  Phone,
+  Plus,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { createBranch, deleteBranch, getBranches, updateBranch } from '../../api/branches.api'
+import { getEmployees } from '../../api/employees.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
@@ -9,26 +21,39 @@ import SearchInput from '../../components/common/SearchInput'
 const emptyForm = { name: '', address: '', phone: '' }
 
 export default function BranchesPage() {
+  const navigate = useNavigate()
   const [branches, setBranches] = useState([])
+  const [employees, setEmployees] = useState([])
   const [query, setQuery] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState('')
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  function load() {
-    getBranches()
-      .then((response) => setBranches(response.data.data))
-      .catch(() => setMessage('Unable to load branches.'))
+  async function load() {
+    setLoading(true)
+    try {
+      const [branchesRes, employeesRes] = await Promise.all([
+        getBranches(),
+        getEmployees().catch(() => ({ data: { data: [] } })),
+      ])
+      setBranches(branchesRes.data.data ?? [])
+      setEmployees(employeesRes.data.data ?? [])
+      setMessage('')
+    } catch {
+      setMessage('Unable to load branches.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    getBranches()
-      .then((response) => setBranches(response.data.data))
-      .catch(() => setMessage('Unable to load branches.'))
+    load()
   }, [])
 
-  function beginEdit(branch) {
+  function beginEdit(branch, event) {
+    event.stopPropagation()
     setEditingId(branch._id)
     setForm({ name: branch.name, address: branch.address, phone: branch.phone ?? '' })
     setOpen(true)
@@ -49,7 +74,8 @@ export default function BranchesPage() {
     }
   }
 
-  async function remove(branch) {
+  async function remove(branch, event) {
+    event.stopPropagation()
     if (!window.confirm(`Delete ${branch.name}?`)) return
     try {
       await deleteBranch(branch._id)
@@ -59,15 +85,24 @@ export default function BranchesPage() {
     }
   }
 
+  const staffCountByBranch = employees.reduce((acc, emp) => {
+    const bId = emp.branch_id?._id ?? emp.branch_id
+    if (bId) {
+      acc[bId] = (acc[bId] || 0) + 1
+    }
+    return acc
+  }, {})
+
   const visible = branches.filter((branch) =>
     `${branch.name} ${branch.address}`.toLowerCase().includes(query.toLowerCase()),
   )
+
   return (
     <>
       <PageHeading
         eyebrow="Business setup"
         title="Branches"
-        subtitle="Create and manage every operating location."
+        subtitle="Manage locations, inspect branch workflows, staff, and live analytics."
       >
         <Button
           primary
@@ -80,39 +115,112 @@ export default function BranchesPage() {
           <Plus className="size-4" /> New branch
         </Button>
       </PageHeading>
-      <Panel className="overflow-hidden">
-        <div className="border-b border-line p-4">
-          <SearchInput
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search branches…"
-            className="max-w-sm"
-          />
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SearchInput
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search branches by name or location…"
+          className="w-full max-w-sm"
+        />
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="inline-block size-2 rounded-full bg-emerald-500" />
+          <b>{branches.length}</b> Operating Location{branches.length === 1 ? '' : 's'}
         </div>
-        {message && <p className="m-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
-        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
-          {visible.map((branch) => (
-            <article key={branch._id} className="rounded-xl border border-line p-4">
-              <span className="grid size-9 place-items-center rounded-lg bg-violet-50 text-brand">
-                <Building2 className="size-4" />
-              </span>
-              <h2 className="mt-3 text-sm font-extrabold">{branch.name}</h2>
-              <p className="mt-1 text-[11px] text-gray-500">{branch.address}</p>
-              <p className="mt-1 text-[10px] text-gray-400">
-                {branch.phone || 'No phone provided'}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Button onClick={() => beginEdit(branch)}>
-                  <Edit3 className="size-3.5" /> Edit
-                </Button>
-                <Button onClick={() => remove(branch)}>
-                  <Trash2 className="size-3.5" /> Delete
-                </Button>
-              </div>
-            </article>
-          ))}
+      </div>
+
+      {message && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
+
+      {loading ? (
+        <div className="grid min-h-60 place-items-center">
+          <div className="size-8 animate-spin rounded-full border-4 border-sky-100 border-t-sky-600" />
         </div>
-      </Panel>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visible.map((branch) => {
+            const staffCount = staffCountByBranch[branch._id] || 0
+            return (
+              <Panel
+                key={branch._id}
+                className="group relative flex flex-col justify-between overflow-hidden p-5 transition hover:border-sky-300 hover:shadow-md"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-11 place-items-center rounded-xl bg-sky-50 text-sky-700 transition group-hover:bg-sky-600 group-hover:text-white">
+                        <Building2 className="size-5" />
+                      </span>
+                      <div>
+                        <h2 className="text-base font-extrabold text-ink transition group-hover:text-sky-700">
+                          {branch.name}
+                        </h2>
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                          <span className="size-1.5 rounded-full bg-emerald-500" /> Active Branch
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        title="Edit branch"
+                        onClick={(e) => beginEdit(branch, e)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-ink"
+                      >
+                        <Edit3 className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Delete branch"
+                        onClick={(e) => remove(branch, e)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-1.5 text-xs text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="size-3.5 shrink-0 text-gray-400" />
+                      <span className="truncate">{branch.address}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="size-3.5 shrink-0 text-gray-400" />
+                      <span>{branch.phone || 'No phone recorded'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3">
+                    <span className="flex items-center gap-1.5 rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                      <Users className="size-3.5 text-sky-600" />
+                      <b>{staffCount}</b> Staff Member{staffCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-gray-100 pt-4">
+                  <Button
+                    primary
+                    className="w-full justify-between"
+                    onClick={() => navigate(`/branches/${branch._id}`)}
+                  >
+                    <span>Enter branch dashboard</span>
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </div>
+              </Panel>
+            )
+          })}
+        </div>
+      )}
+
+      {visible.length === 0 && !loading && (
+        <Panel className="p-12 text-center text-xs text-gray-400">
+          No branches match your search criteria.
+        </Panel>
+      )}
+
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <Panel className="w-full max-w-lg p-6">
@@ -128,6 +236,7 @@ export default function BranchesPage() {
                 name="name"
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
+                placeholder="e.g. Victoria Island Hub"
                 required
               />
               <Field
@@ -135,6 +244,7 @@ export default function BranchesPage() {
                 name="address"
                 value={form.address}
                 onChange={(event) => setForm({ ...form, address: event.target.value })}
+                placeholder="e.g. 14 Adeola Odeku St, VI"
                 required
               />
               <Field
@@ -142,6 +252,7 @@ export default function BranchesPage() {
                 name="phone"
                 value={form.phone}
                 onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                placeholder="e.g. +234 801 234 5678"
               />
               <Button primary type="submit">
                 {editingId ? 'Save changes' : 'Create branch'}

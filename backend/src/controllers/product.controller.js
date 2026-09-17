@@ -51,6 +51,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     }
 
     const products = await Product.find(filter)
+        .populate('branch_id', 'name')
         .sort({ name: 1 });
 
     return apiResponse(res, 200, products, 'Products fetched successfully');

@@ -1,8 +1,13 @@
 const iconTones = {
-  violet: 'bg-violet-50 text-violet-700',
-  green: 'bg-emerald-50 text-emerald-700',
-  blue: 'bg-blue-50 text-blue-700',
-  coral: 'bg-red-50 text-red-600',
+  sky: 'bg-sky-50 text-sky-700 border border-sky-100',
+  teal: 'bg-teal-50 text-teal-700 border border-teal-100',
+  indigo: 'bg-indigo-50 text-indigo-700 border border-indigo-100',
+  green: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+  lime: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+  blue: 'bg-blue-50 text-blue-700 border border-blue-100',
+  violet: 'bg-sky-50 text-sky-700 border border-sky-100',
+  coral: 'bg-rose-50 text-rose-700 border border-rose-100',
+  amber: 'bg-amber-50 text-amber-700 border border-amber-100',
 }
 
 export default function MetricCard({ icon: Icon, tone, label, value, note }) {

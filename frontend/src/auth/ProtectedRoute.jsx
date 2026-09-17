@@ -8,7 +8,7 @@ export default function ProtectedRoute() {
   if (isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-canvas">
-        <div className="size-8 animate-spin rounded-full border-4 border-violet-100 border-t-brand" />
+        <div className="size-8 animate-spin rounded-full border-4 border-sky-100 border-t-brand" />
       </main>
     )
   }

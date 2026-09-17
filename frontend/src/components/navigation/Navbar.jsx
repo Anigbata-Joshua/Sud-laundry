@@ -94,7 +94,7 @@ export default function Navbar({ branchId, onBranchChange, onMenuClick }) {
           type="button"
           aria-label="View notifications"
           onClick={() => navigate('/notifications')}
-          className={`relative grid size-8 place-items-center rounded-lg border transition ${unreadCount > 0 ? 'border-violet-300 bg-violet-50 text-brand shadow-[0_0_0_3px_rgba(108,92,231,0.1)]' : 'border-line bg-white text-gray-600'}`}
+          className={`relative grid size-8 place-items-center rounded-lg border transition ${unreadCount > 0 ? 'border-sky-300 bg-sky-50 text-sky-700 shadow-[0_0_0_3px_rgba(2,132,199,0.12)]' : 'border-line bg-white text-gray-600'}`}
         >
           <Bell className="size-4" />
           {unreadCount > 0 && (

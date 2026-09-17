@@ -138,6 +138,8 @@ export const getWorkflows = asyncHandler(async (req, res) => {
     query['steps.employee_id'] = employee._id
   } else if (req.user.role === 'branch_manager') {
     query.branch_id = req.user.branch_id
+  } else if (req.query.branch_id) {
+    query.branch_id = req.query.branch_id
   }
 
   // Get workflows and populate them

@@ -10,7 +10,7 @@ import Order from '../src/models/order.model.js';
 import { env } from '../src/config/env.js';
 import generateToken from '../src/utils/generateToken.js';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:4567';
+const BASE_URL = process.env.TEST_BASE_URL || `http://localhost:${env.PORT || 3573}`;
 const API = `${BASE_URL}/api/v1`;
 
 const results = [];

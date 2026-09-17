@@ -127,6 +127,8 @@ export const listRequests = asyncHandler(async (req, res) => {
   const filter = {}
   if (req.user.role !== 'admin') {
     filter.branch_id = req.user.branch_id
+  } else if (req.query.branch_id) {
+    filter.branch_id = req.query.branch_id
   }
   if (req.query.status) {
     filter.status = req.query.status
