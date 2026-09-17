@@ -2,6 +2,7 @@
 // Shared foundation / shared business logic
 
 import redisClient from '../config/redis.js';
+import logger from '../utils/logger.js';
 
 const DEFAULT_TTL_SECONDS = 300; // 5 minutes
 
@@ -16,7 +17,7 @@ export const getCached = async (key) => {
     const value = await redisClient.get(key);
     return value ? JSON.parse(value) : null;
   } catch (err) {
-    console.error(`Cache read failed for key "${key}":`, err.message);
+    logger.error(`Cache read failed for key "${key}":`, { error: err.message });
     return null;
   }
 };
@@ -26,7 +27,7 @@ export const setCached = async (key, value, ttlSeconds = DEFAULT_TTL_SECONDS) =>
   try {
     await redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   } catch (err) {
-    console.error(`Cache write failed for key "${key}":`, err.message);
+    logger.error(`Cache write failed for key "${key}":`, { error: err.message });
   }
 };
 
@@ -35,7 +36,7 @@ export const deleteCached = async (key) => {
   try {
     await redisClient.del(key);
   } catch (err) {
-    console.error(`Cache delete failed for key "${key}":`, err.message);
+    logger.error(`Cache delete failed for key "${key}":`, { error: err.message });
   }
 };
 
@@ -49,11 +50,11 @@ export const withCache = async (key, computeFn, ttlSeconds = DEFAULT_TTL_SECONDS
 
   const cached = await getCached(key);
   if (cached !== null) {
-    console.log(`[Cache Hit] Key: ${key}`);
+    logger.debug(`[Cache Hit] Key: ${key}`);
     return cached;
   }
 
-  console.log(`[Cache Miss] Key: ${key}. Computing fresh value...`);
+  logger.debug(`[Cache Miss] Key: ${key}. Computing fresh value...`);
   const fresh = await computeFn();
   await setCached(key, fresh, ttlSeconds);
   return fresh;

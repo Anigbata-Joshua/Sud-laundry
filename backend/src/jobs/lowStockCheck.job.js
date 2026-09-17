@@ -15,6 +15,7 @@ import Product from '../models/product.model.js';
 import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from '../services/notification.service.js';
+import logger from '../utils/logger.js';
 
 
 // Run once every day at midnight in Nigeria.
@@ -24,7 +25,7 @@ const LOW_STOCK_CRON = '0 0 * * *';
 // Check all branches for low-stock products.
 export const checkLowStock = async () => {
     try {
-        console.log('🔄 Running daily low-stock inventory check...');
+        logger.info('🔄 Running daily low-stock inventory check...');
 
         // Find active products that have a configured reorder point
         // and are at or below that point.
@@ -35,13 +36,11 @@ export const checkLowStock = async () => {
         }).select('branch_id name quantity reorder_point unit');
 
         if (lowStockProducts.length === 0) {
-            console.log('✅ No low-stock products found.');
+            logger.info('✅ No low-stock products found.');
             return;
         }
 
-        console.log(
-            `⚠️ Found ${lowStockProducts.length} low-stock product(s).`
-        );
+        logger.warn(`⚠️ Found ${lowStockProducts.length} low-stock product(s).`);
 
 
         // Get the unique branches affected by low-stock products.
@@ -55,7 +54,7 @@ export const checkLowStock = async () => {
         }).select('user_id branch_id');
 
         if (employees.length === 0) {
-            console.log('⚠️ Low-stock products found, but no employees assigned to branches.');
+            logger.warn('⚠️ Low-stock products found, but no employees assigned to branches.');
             return;
         }
 
@@ -69,7 +68,7 @@ export const checkLowStock = async () => {
         }).select('_id');
 
         if (managers.length === 0) {
-            console.log('⚠️ Low-stock products found, but no active branch managers were found.');
+            logger.warn('⚠️ Low-stock products found, but no active branch managers were found.');
             return;
         }
 
@@ -98,7 +97,7 @@ export const checkLowStock = async () => {
             const branchManagers = managersByBranch.get(branchId) || [];
 
             if (branchManagers.length === 0) {
-                console.log(`⚠️ No active manager found for branch ${branchId} — ${product.name}`);
+                logger.warn(`⚠️ No active manager found for branch ${branchId} — ${product.name}`);
                 continue;
             }
 
@@ -119,15 +118,10 @@ export const checkLowStock = async () => {
         }
 
 
-        console.log(
-            '✅ Low-stock checks and notifications completed.'
-        );
+        logger.info('✅ Low-stock checks and notifications completed.');
 
     } catch (error) {
-        console.error(
-            '❌ Error during low-stock check:',
-            error.message
-        );
+        logger.error('❌ Error during low-stock check:', { error: error.message });
     }
 };
 

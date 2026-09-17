@@ -6,6 +6,7 @@ import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import createNotification from './notification.service.js';
 import { SERVICE_SUPPLIES_RECIPE, DEFAULT_PACKAGING_PER_UNIT, STAGE_SERVICE_CATEGORIES, getTier } from '../config/serviceSupplies.config.js';
+import logger from '../utils/logger.js';
 
 // calculate the amount of supply need for an order
 export function calculateSuppliesForStep({ order, stepName }) {
@@ -191,7 +192,7 @@ export const notifyBranchManagersOfLowStock = async ({
             });
         }
     } catch (err) {
-        console.error('Failed to notify branch managers of low stock:', err.message);
+        logger.error('Failed to notify branch managers of low stock:', { error: err.message });
     }
 };
 
