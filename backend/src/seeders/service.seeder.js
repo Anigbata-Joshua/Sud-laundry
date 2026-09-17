@@ -6,16 +6,14 @@ import dotenv from 'dotenv';
 
 import Service from '../models/service.model.js';
 import Branch from '../models/branch.model.js';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
 const branchId = process.argv[2];
 
 if (!branchId) {
-    console.error('❌ Please provide a branch ID.');
-    console.error(
-        'Example: npm run seed:services <BRANCH_ID>'
-    );
+    logger.error('❌ Please provide a branch ID. Example: npm run seed:services <BRANCH_ID>');
     process.exit(1);
 }
 
@@ -150,7 +148,7 @@ const seedServices = async () => {
 
         await mongoose.connect(process.env.MONGODB_URI);
 
-        console.log('✅ Connected to MongoDB');
+        logger.info('✅ Connected to MongoDB');
 
         // Verify branch exists
         const branch = await Branch.findById(branchId);
@@ -161,9 +159,7 @@ const seedServices = async () => {
             );
         }
 
-        console.log(
-            `📍 Seeding services for: ${branch.name}`
-        );
+        logger.info(`📍 Seeding services for: ${branch.name}`);
 
         let createdCount = 0;
         let skippedCount = 0;
@@ -175,10 +171,7 @@ const seedServices = async () => {
             });
 
             if (existingService) {
-                console.log(
-                    `⏭️ Skipped: ${serviceData.name} already exists`
-                );
-
+                logger.info(`⏭️ Skipped: ${serviceData.name} already exists`);
                 skippedCount++;
                 continue;
             }
@@ -188,27 +181,17 @@ const seedServices = async () => {
                 ...serviceData,
             });
 
-            console.log(
-                `✅ Created: ${serviceData.name}`
-            );
-
+            logger.info(`✅ Created: ${serviceData.name}`);
             createdCount++;
         }
 
-        console.log('\n--------------------------------');
-        console.log('Service seeding completed');
-        console.log('--------------------------------');
-        console.log(`Branch: ${branch.name}`);
-        console.log(`Created: ${createdCount}`);
-        console.log(`Skipped: ${skippedCount}`);
-        console.log('--------------------------------\n');
+        logger.info(`Service seeding completed for branch: ${branch.name} (Created: ${createdCount}, Skipped: ${skippedCount})`);
 
         await mongoose.disconnect();
 
         process.exit(0);
     } catch (error) {
-        console.error('\n❌ Service seeding failed:');
-        console.error(error.message);
+        logger.error('❌ Service seeding failed:', { error: error.message });
 
         await mongoose.disconnect();
 

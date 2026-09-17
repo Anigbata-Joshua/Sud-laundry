@@ -9,14 +9,14 @@ import dotenv from 'dotenv';
 
 import Product from '../src/models/product.model.js';
 import Branch from '../src/models/branch.model.js';
+import logger from '../src/utils/logger.js';
 
 dotenv.config();
 
 const branchId = process.argv[2];
 
 if (!branchId) {
-    console.error('❌ Please provide a branch ID.');
-    console.error('Example: npm run seed:supply-products <BRANCH_ID>');
+    logger.error('❌ Please provide a branch ID. Example: npm run seed:supply-products <BRANCH_ID>');
     process.exit(1);
 }
 
@@ -35,14 +35,14 @@ const seedSupplyProducts = async () => {
         }
 
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log('✅ Connected to MongoDB');
+        logger.info('✅ Connected to MongoDB');
 
         const branch = await Branch.findById(branchId);
         if (!branch) {
             throw new Error(`Branch not found: ${branchId}`);
         }
 
-        console.log(`📍 Seeding supply products for: ${branch.name}`);
+        logger.info(`📍 Seeding supply products for: ${branch.name}`);
 
         let createdCount = 0;
         let skippedCount = 0;
@@ -54,7 +54,7 @@ const seedSupplyProducts = async () => {
             });
 
             if (existingProduct) {
-                console.log(`⏭️ Skipped: ${productData.name} already exists`);
+                logger.info(`⏭️ Skipped: ${productData.name} already exists`);
                 skippedCount++;
                 continue;
             }
@@ -65,23 +65,16 @@ const seedSupplyProducts = async () => {
                 ...productData,
             });
 
-            console.log(`✅ Created: ${productData.name}`);
+            logger.info(`✅ Created: ${productData.name}`);
             createdCount++;
         }
 
-        console.log('\n--------------------------------');
-        console.log('Supply product seeding completed');
-        console.log('--------------------------------');
-        console.log(`Branch: ${branch.name}`);
-        console.log(`Created: ${createdCount}`);
-        console.log(`Skipped: ${skippedCount}`);
-        console.log('--------------------------------\n');
+        logger.info(`Supply product seeding completed for branch: ${branch.name} (Created: ${createdCount}, Skipped: ${skippedCount})`);
 
         await mongoose.disconnect();
         process.exit(0);
     } catch (error) {
-        console.error('\n❌ Supply product seeding failed:');
-        console.error(error.message);
+        logger.error('❌ Supply product seeding failed:', { error: error.message });
         await mongoose.disconnect();
         process.exit(1);
     }

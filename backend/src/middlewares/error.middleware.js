@@ -2,13 +2,19 @@
 // Purpose: centralized error handler, returns consistent error responses.
 
 import { env } from '../config/env.js';
+import logger from '../utils/logger.js';
 
 const errorHandler = (err, req, res, next) => {
     let statusCode = err.statusCode || 500;
     let message = err.message || 'Internal Server Error';
 
-    // Log the error to console (essential for debugging in production)
-    console.error(`[API Error] ${req.method} ${req.url} -> Status ${statusCode}:`, err);
+    // Structured error logging
+    logger.error(`[API Error] ${req.method} ${req.originalUrl || req.url} -> Status ${statusCode}: ${err.message}`, {
+        method: req.method,
+        url: req.originalUrl || req.url,
+        statusCode,
+        stack: err.stack,
+    });
 
     // Mongoose bad ObjectId (e.g. malformed :id in a route param)
     if (err.name === 'CastError') {

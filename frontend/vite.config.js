@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
-})
+  oxc: {
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
+}))

@@ -13,6 +13,7 @@ import ApiError from '../utils/apiError.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import apiResponse from '../utils/apiResponse.js'
 import { env } from '../config/env.js'
+import logger from '../utils/logger.js'
 
 const PAYSTACK_SECRET = env.paystackSecretKey
 
@@ -232,10 +233,9 @@ export const makePayment = asyncHandler(async (req, res) => {
         }
       }
     } catch (paystackError) {
-      console.error(
-        'Paystack verification failed:',
-        paystackError.response?.data || paystackError.message,
-      )
+      logger.error('Paystack verification failed:', {
+        error: paystackError.response?.data || paystackError.message,
+      })
 
       // Test-only fallback. Requires an explicit ALLOW_TEST_PAYMENTS=true env
       // flag — never just "not production" — so this can't silently activate

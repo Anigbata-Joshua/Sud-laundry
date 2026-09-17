@@ -1,15 +1,7 @@
-// Owner: Josh
-// Mock email service — logs transactional emails to console instead of sending.
+import logger from '../utils/logger.js';
 
 export const sendMail = async ({ to, subject, text, html }) => {
-    console.log('\n=================== MOCK EMAIL SENT ===================');
-    console.log(`To:      ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Text:    ${text}`);
-    if (html) {
-        console.log(`HTML:    [HTML Content Hidden]`);
-    }
-    console.log('=======================================================\n');
+    logger.info(`[MOCK EMAIL SENT] To: ${to} | Subject: "${subject}" | Text: ${text}`);
     return { messageId: `mock_${Date.now()}` };
 };
 

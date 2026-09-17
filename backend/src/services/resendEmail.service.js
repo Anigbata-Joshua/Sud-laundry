@@ -4,20 +4,21 @@
 
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
+import logger from '../utils/logger.js';
 
 let resend = null;
 
 if (env.resendApiKey) {
     resend = new Resend(env.resendApiKey);
 } else {
-    console.warn('⚠️ RESEND_API_KEY is not set — email sending is disabled.');
+    logger.warn('⚠️ RESEND_API_KEY is not set — email sending is disabled.');
 }
 
 const FROM_ADDRESS = `Suds Laundry <onboarding@${env.resendFromDomain}>`;
 
 export const sendMail = async ({ to, subject, text, html }) => {
     if (!resend) {
-        console.warn(`⚠️ Email not sent (Resend not configured): "${subject}" to ${to}`);
+        logger.warn(`⚠️ Email not sent (Resend not configured): "${subject}" to ${to}`);
         return { messageId: null, error: 'not_configured' };
     }
 
@@ -31,14 +32,14 @@ export const sendMail = async ({ to, subject, text, html }) => {
         });
 
         if (error) {
-            console.error('⚠️ Resend API error:', error.message);
+            logger.error('⚠️ Resend API error:', { error: error.message });
             return { messageId: null, error: error.message };
         }
 
-        console.log(`✅ Email sent: "${subject}" to ${to} (id: ${data.id})`);
+        logger.info(`✅ Email sent: "${subject}" to ${to} (id: ${data.id})`);
         return { messageId: data.id };
     } catch (err) {
-        console.error('❌ Failed to send email:', err.message);
+        logger.error('❌ Failed to send email:', { error: err.message });
         return { messageId: null, error: err.message };
     }
 };

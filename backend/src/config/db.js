@@ -3,20 +3,21 @@
 
 import mongoose from 'mongoose';
 import { env } from './env.js';
+import logger from '../utils/logger.js';
 
 // Establish global event listeners once when the module loads
 mongoose.set('strictQuery', true);
 
 mongoose.connection.on('connected', () => {
-    console.log('✅ Connected to the Laundry App database successfully');
+    logger.info('✅ Connected to the Laundry App database successfully');
 });
 
 mongoose.connection.on('error', (error) => {
-    console.error('❌ Laundry App database error:', error.message);
+    logger.error('❌ Laundry App database error:', { error: error.message });
 });
 
 mongoose.connection.on('disconnected', () => {
-    console.warn('⚠️ Disconnected from Laundry App database. Attempting to reconnect...');
+    logger.warn('⚠️ Disconnected from Laundry App database. Attempting to reconnect...');
 });
 
 // Targeted database orchestration methods
@@ -31,7 +32,7 @@ export async function connectDatabase() {
     try {
         await mongoose.connect(env.mongoUri, options);
     } catch (error) {
-        console.error('❌ Critical: Initial database connection failed ->', error.message);
+        logger.error('❌ Critical: Initial database connection failed ->', { error: error.message });
         if (env.nodeEnv !== 'test') {
             process.exit(1);
         } else {
@@ -43,9 +44,9 @@ export async function connectDatabase() {
 export async function closeDatabase() {
     try {
         await mongoose.connection.close();
-        console.log('✅ MongoDB connection closed safely');
+        logger.info('✅ MongoDB connection closed safely');
     } catch (error) {
-        console.error('❌ Error during MongoDB shutdown:', error.message);
+        logger.error('❌ Error during MongoDB shutdown:', { error: error.message });
     }
 }
 

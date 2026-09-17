@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
 import { closeDatabase, connectDatabase } from '../src/config/db.js';
 import User from '../src/models/user.model.js';
-import  dotenv  from 'dotenv';
-
+import dotenv from 'dotenv';
+import logger from '../src/utils/logger.js';
 
 dotenv.config();
 
@@ -45,7 +45,7 @@ async function seedAdmin() {
             );
         }
 
-        console.log(`Admin already exists: ${existingUser.email}`);
+        logger.info(`Admin already exists: ${existingUser.email}`);
         return;
     }
 
@@ -67,13 +67,13 @@ async function seedAdmin() {
         is_active: true,
     });
 
-    console.log(`Admin created successfully: ${admin.email}`);
+    logger.info(`Admin created successfully: ${admin.email}`);
 }
 
 try {
     await seedAdmin();
 } catch (error) {
-    console.error(`Admin seed failed: ${error.message}`);
+    logger.error(`Admin seed failed: ${error.message}`);
     process.exitCode = 1;
 } finally {
     await closeDatabase();

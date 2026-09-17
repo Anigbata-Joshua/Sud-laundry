@@ -4,6 +4,7 @@
 
 import Redis from 'ioredis';
 import { env } from './env.js';
+import logger from '../utils/logger.js';
 
 let redisClient = null;
 
@@ -15,7 +16,7 @@ try {
         connectTimeout: 2000,
         retryStrategy(times) {
             if (times > 2) {
-                console.warn('⚠️ Redis server is unreachable. Bypassing cache services.');
+                logger.warn('⚠️ Redis server is unreachable. Bypassing cache services.');
                 return null; // Stop retrying
             }
             return Math.min(times * 200, 1000);
@@ -25,14 +26,14 @@ try {
     redisClient = new Redis(env.redisUrl, redisOptions);
 
     redisClient.on('connect', () => {
-        console.log('✅ Redis Connected');
+        logger.info('✅ Redis Connected');
     });
 
     redisClient.on('error', (err) => {
-        console.error('⚠️ Redis Connection Error:', err.message);
+        logger.error('⚠️ Redis Connection Error:', { error: err.message });
     });
 } catch (error) {
-    console.error('❌ Failed to initialize Redis client:', error.message);
+    logger.error('❌ Failed to initialize Redis client:', { error: error.message });
 }
 
 export default redisClient;

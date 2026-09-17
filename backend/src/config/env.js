@@ -3,6 +3,7 @@
 
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ function resolveJwtSecret() {
         throw new Error('JWT_SECRET must be set in production. Refusing to start.');
     }
 
-    console.warn(
+    logger.warn(
         '⚠️  JWT_SECRET is not set — using a random secret for this process only. ' +
         'Set JWT_SECRET in backend/.env so tokens survive a restart.'
     );
@@ -45,6 +46,7 @@ export const env = {
 
     nodeEnv,
     isProduction,
+    logLevel: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
 
     corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [],
     frontendURI: process.env.FRONTEND_URI || process.env.CLIENT_URL || 'http://localhost:5173',
