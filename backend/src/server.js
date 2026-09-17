@@ -4,6 +4,8 @@ import app from './app.js';
 import logger from './utils/logger.js';
 import './jobs/lowStockCheck.job.js';
 
+// Server entry point
+
 // Global Uncaught Error Listeners
 const handleFatalError = async (err, type) => {
     logger.error(`❌ ${type}! Shutting down gracefully...`, { error: err.message, stack: err.stack });

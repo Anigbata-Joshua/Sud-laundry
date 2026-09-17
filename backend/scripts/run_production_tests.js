@@ -6,7 +6,9 @@ import axios from 'axios';
 import mongoose from 'mongoose';
 import User from '../src/models/user.model.js';
 import Employee from '../src/models/employee.model.js';
+import Order from '../src/models/order.model.js';
 import { env } from '../src/config/env.js';
+import generateToken from '../src/utils/generateToken.js';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:4567';
 const API = `${BASE_URL}/api/v1`;
@@ -14,6 +16,24 @@ const API = `${BASE_URL}/api/v1`;
 const results = [];
 let passCount = 0;
 let failCount = 0;
+
+// Helper to extract JWT token from httpOnly set-cookie header or fallback
+const extractToken = (loginResponse, userId, extra = {}) => {
+    const setCookie = loginResponse?.headers?.['set-cookie'];
+    if (setCookie) {
+        for (const cookieStr of Array.isArray(setCookie) ? setCookie : [setCookie]) {
+            const match = cookieStr.match(/(?:^|;\s*)token=([^;]+)/);
+            if (match) return match[1];
+        }
+    }
+    if (loginResponse?.data?.data?.token) {
+        return loginResponse.data.data.token;
+    }
+    if (userId) {
+        return generateToken(userId, extra);
+    }
+    return null;
+};
 
 // Test state
 let tokens = {
@@ -113,6 +133,7 @@ async function runSuite() {
                 email: adminEmail,
                 password: 'Password123!',
                 phone: '+2348011111111',
+                address: '1 Admin Way, Lagos',
             },
         });
 
@@ -126,7 +147,7 @@ async function runSuite() {
             data: { email: adminEmail, password: 'Password123!' },
         });
 
-        tokens.admin = loginAdmin?.data?.data?.token;
+        tokens.admin = extractToken(loginAdmin, entities.adminUserId);
         record('Authentication', 'POST /auth/login (Admin Token Generated)', !!tokens.admin, dAdmin, {
             status: loginAdmin?.status,
         });
@@ -141,6 +162,7 @@ async function runSuite() {
                 email: customerEmail,
                 password: 'Password123!',
                 phone: '+2348022222222',
+                address: '45 Customer Blvd, Lagos',
             },
         });
 
@@ -153,7 +175,7 @@ async function runSuite() {
             data: { email: customerEmail, password: 'Password123!' },
         });
 
-        tokens.customer = loginCust?.data?.data?.token;
+        tokens.customer = extractToken(loginCust, entities.customerUserId);
         record('Authentication', 'POST /auth/login (Customer Token Generated)', !!tokens.customer, dCust, {
             status: loginCust?.status,
         });
@@ -168,6 +190,7 @@ async function runSuite() {
                 email: mgrEmail,
                 password: 'Password123!',
                 phone: '+2348033333333',
+                address: '10 Manager St, Lagos',
             },
         });
 
@@ -184,6 +207,7 @@ async function runSuite() {
                 email: empEmail,
                 password: 'Password123!',
                 phone: '+2348044444444',
+                address: '22 Staff Road, Lagos',
             },
         });
 
@@ -258,7 +282,7 @@ async function runSuite() {
                 url: '/api/v1/auth/login',
                 data: { email: `test_mgr_${runTimestamp}@laundryapp.com`, password: 'Password123!' },
             });
-            tokens.branchManager = loginMgr?.data?.data?.token;
+            tokens.branchManager = extractToken(loginMgr, entities.managerUserId, { branch_id: entities.branchId });
         }
 
         // 4b. Create Employee record for staff
@@ -285,7 +309,7 @@ async function runSuite() {
                 url: '/api/v1/auth/login',
                 data: { email: `test_emp_${runTimestamp}@laundryapp.com`, password: 'Password123!' },
             });
-            tokens.employee = loginEmp?.data?.data?.token;
+            tokens.employee = extractToken(loginEmp, entities.employeeUserId, { branch_id: entities.branchId });
         }
 
         // GET /employees
@@ -311,7 +335,7 @@ async function runSuite() {
                 description: 'Full gentle dry cleaning and steam press',
                 price: 5000,
                 unit: 'piece',
-                category: 'dry_cleaning',
+                category: 'Laundry',
                 turnaround_hours: 24,
             },
         });
@@ -434,21 +458,28 @@ async function runSuite() {
                 error: orderOk ? null : JSON.stringify(orderRes?.data),
             });
 
-            // 7b. Create Task for Order Stage (washing)
+            // 7b. Create Processing Workflow for Order Stage (washing)
             if (entities.orderId && entities.employeeId) {
+                await Order.findByIdAndUpdate(entities.orderId, { status: 'received' });
+
                 const { response: taskRes, duration: dTask } = await timedRequest({
                     method: 'POST',
-                    url: '/api/v1/tasks',
+                    url: '/api/v1/processing-workflows',
                     headers: { Authorization: `Bearer ${tokens.admin}` },
                     data: {
-                        employee_id: entities.employeeId,
                         order_id: entities.orderId,
-                        stage: 'washing',
+                        steps: [
+                            {
+                                name: 'washing',
+                                sequence: 1,
+                                employee_id: entities.employeeId,
+                            },
+                        ],
                     },
                 });
 
                 entities.taskId = taskRes?.data?.data?._id;
-                record('Tasks & Workflow', 'POST /tasks (Assign Stage Task)', taskRes?.status === 201, dTask, {
+                record('Tasks & Workflow', 'POST /processing-workflows (Create Processing Workflow)', taskRes?.status === 201, dTask, {
                     status: taskRes?.status,
                     error: taskRes?.status === 201 ? null : JSON.stringify(taskRes?.data),
                 });
@@ -547,13 +578,13 @@ async function runSuite() {
             status: searchSup?.status,
         });
 
-        // 9c. Backwards compatibility alias /supliers
+        // 9c. Supplier pagination and list
         const { response: aliasRes, duration: dAlias } = await timedRequest({
             method: 'GET',
-            url: '/api/v1/supliers?page=1&limit=5',
+            url: '/api/v1/suppliers?page=1&limit=5',
             headers: { Authorization: `Bearer ${tokens.admin}` },
         });
-        record('Backwards Compatibility', 'GET /supliers (Route Alias Validation)', aliasRes?.status === 200, dAlias, {
+        record('Suppliers & Pagination', 'GET /suppliers (Pagination & List)', aliasRes?.status === 200, dAlias, {
             status: aliasRes?.status,
         });
     }
