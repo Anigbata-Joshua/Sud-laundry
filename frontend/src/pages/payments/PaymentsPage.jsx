@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CircleDollarSign, Plus, RotateCcw, WalletCards, X } from 'lucide-react'
+import { Banknote, CircleDollarSign, Plus, RotateCcw, WalletCards, X } from 'lucide-react'
 import { getOrders } from '../../api/orders.api'
 import { createPayment, getPayments, refundPayment } from '../../api/payments.api'
 import Button from '../../components/common/Button'
@@ -9,15 +9,18 @@ import SearchInput from '../../components/common/SearchInput'
 import MetricCard from '../../components/dashboard/MetricCard'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { formatNaira } from '../../utils/formatters'
+import { useAuth } from '../../hooks/useAuth'
 
 const emptyPayment = {
   orderId: '',
   amount: '',
   paymentMethod: 'cash',
   transaction_ref: '',
+  customer_Name: '',
 }
 
 export default function PaymentsPage() {
+  const { user } = useAuth()
   const [payments, setPayments] = useState([])
   const [orders, setOrders] = useState([])
   const [query, setQuery] = useState('')
@@ -26,6 +29,8 @@ export default function PaymentsPage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const canRecordPayment = ['admin', 'branch_manager'].includes(user?.role)
 
   function load() {
     Promise.all([getPayments({ limit: 200 }), getOrders({ limit: 100 })])
@@ -59,6 +64,18 @@ export default function PaymentsPage() {
     .filter((payment) => payment.transaction_type !== 'refund')
     .reduce((sum, payment) => sum + payment.amount, 0)
 
+  const selectableOrders = useMemo(() => {
+    return orders.filter((order) => {
+      if (['paid', 'refunded'].includes(order.payment_status)) return false
+      if (order.status === 'cancelled') return false
+      if (user?.role === 'branch_manager') {
+        const orderBranchId = order.branch_id?._id ?? order.branch_id
+        return orderBranchId?.toString() === user?.branch_id?.toString()
+      }
+      return true
+    })
+  }, [orders, user])
+
   const visiblePayments = useMemo(
     () =>
       payments.filter((payment) => {
@@ -74,12 +91,27 @@ export default function PaymentsPage() {
     setPaymentForm((current) => ({ ...current, [event.target.name]: event.target.value }))
   }
 
+  function handleOrderSelect(event) {
+    const selectedId = event.target.value
+    const selectedOrder = selectableOrders.find((o) => o._id === selectedId)
+    setPaymentForm((current) => ({
+      ...current,
+      orderId: selectedId,
+      amount: selectedOrder ? String(selectedOrder.amount_due ?? selectedOrder.total_price) : '',
+      customer_Name: selectedOrder?.customer_id?.name || '',
+    }))
+  }
+
   async function submitPayment(event) {
     event.preventDefault()
     setSaving(true)
     setMessage('')
     try {
-      await createPayment({ ...paymentForm, amount: Number(paymentForm.amount) })
+      await createPayment({
+        ...paymentForm,
+        amount: Number(paymentForm.amount),
+        customer_Name: paymentForm.customer_Name.trim() || undefined,
+      })
       setPaymentOpen(false)
       setPaymentForm(emptyPayment)
       load()
@@ -115,9 +147,11 @@ export default function PaymentsPage() {
         title="Payments"
         subtitle="Record collections, monitor balances, and process refunds."
       >
-        <Button primary onClick={() => setPaymentOpen(true)}>
-          <Plus className="size-4" /> Record payment
-        </Button>
+        {canRecordPayment && (
+          <Button primary onClick={() => setPaymentOpen(true)}>
+            <Plus className="size-4" /> Record payment
+          </Button>
+        )}
       </PageHeading>
       <section className="mb-3 grid gap-3 md:grid-cols-3">
         <MetricCard
@@ -229,23 +263,35 @@ export default function PaymentsPage() {
       </Panel>
 
       {paymentOpen && (
-        <Modal title="Record payment" onClose={() => setPaymentOpen(false)}>
+        <Modal
+          title={
+            <div className="flex items-center gap-2">
+              <Banknote className="size-5 text-emerald-600" />
+              <span>Record payment</span>
+              {user?.role === 'branch_manager' && (
+                <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 border border-sky-100">
+                  Your branch only
+                </span>
+              )}
+            </div>
+          }
+          onClose={() => setPaymentOpen(false)}
+        >
           <form className="grid gap-4" onSubmit={submitPayment}>
-            <Field label="Order">
-              <select required name="orderId" value={paymentForm.orderId} onChange={updatePayment}>
-                <option value="">Select any order</option>
-                {orders
-                  .filter((order) => !['paid', 'refunded'].includes(order.payment_status))
-                  .map((order) => (
-                    <option key={order._id} value={order._id}>
-                      ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
-                      {order.customer_id?.name ?? 'Customer'} ·{' '}
-                      {formatNaira(order.amount_due ?? order.total_price)}
-                    </option>
-                  ))}
+            <Field label="Select Order">
+              <select required name="orderId" value={paymentForm.orderId} onChange={handleOrderSelect}>
+                <option value="">Select an order to pay for</option>
+                {selectableOrders.map((order) => (
+                  <option key={order._id} value={order._id}>
+                    ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
+                    {order.customer_id?.name ?? 'Customer'} ·{' '}
+                    {formatNaira(order.amount_due ?? order.total_price)}
+                  </option>
+                ))}
               </select>
             </Field>
-            <Field label="Amount">
+
+            <Field label="Amount (₦)">
               <input
                 required
                 min="0.01"
@@ -254,29 +300,48 @@ export default function PaymentsPage() {
                 name="amount"
                 value={paymentForm.amount}
                 onChange={updatePayment}
+                placeholder="0.00"
               />
             </Field>
-            <Field label="Payment method">
+
+            <Field label="Customer Name (Optional)">
+              <input
+                type="text"
+                name="customer_Name"
+                value={paymentForm.customer_Name}
+                onChange={updatePayment}
+                placeholder="Customer name"
+              />
+            </Field>
+
+            <Field label="Payment Method">
               <select
                 name="paymentMethod"
                 value={paymentForm.paymentMethod}
                 onChange={updatePayment}
               >
-                <option value="cash">Cash</option>
-                <option value="transfer">Transfer</option>
-                <option value="card">Card</option>
+                <option value="cash">Cash (Physical collection at counter)</option>
+                <option value="transfer">Bank Transfer (Paystack Verified)</option>
+                <option value="card">Card Payment (Paystack Verified)</option>
               </select>
             </Field>
-            {paymentForm.paymentMethod !== 'cash' && (
-              <Field label="Paystack transaction reference">
+
+            {paymentForm.paymentMethod === 'cash' ? (
+              <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 text-xs text-emerald-800">
+                <strong>Cash Payment:</strong> Physical cash received will be credited immediately towards the order balance and marked completed.
+              </div>
+            ) : (
+              <Field label="Paystack Transaction Reference">
                 <input
                   required
                   name="transaction_ref"
                   value={paymentForm.transaction_ref}
                   onChange={updatePayment}
+                  placeholder="e.g. T123456789"
                 />
               </Field>
             )}
+
             <Button primary type="submit" disabled={saving}>
               {saving ? 'Recording…' : 'Record payment'}
             </Button>

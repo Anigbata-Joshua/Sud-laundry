@@ -192,7 +192,7 @@ export const getMyOrders = asyncHandler(async (req, res) => {
   const skip = Math.max(parseInt(req.query.skip, 10) || 0, 0)
 
   const orders = await Order.find({ customer_id: req.user.id })
-  .populate('branch_id', 'name')
+    .populate('branch_id', 'name')
     .sort({ createdAt: -1 })
     .limit(limit)
     .skip(skip)

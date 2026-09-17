@@ -61,8 +61,15 @@ export default function AppRoutes() {
             <Route
               index
               element={
-                user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
-
+                user?.role === 'employee' ? (
+                  <Navigate to="/processing" replace />
+                ) : user?.role === 'front_desk' ? (
+                  <Navigate to="/orders" replace />
+                ) : user?.role === 'inventory_officer' ? (
+                  <Navigate to="/inventory" replace />
+                ) : (
+                  <DashboardPage />
+                )
               }
             />
             <Route path="orders" element={<OrdersPage />} />
@@ -80,6 +87,8 @@ export default function AppRoutes() {
             <Route path="people" element={<EmployeesPage />} />
             <Route path="people/employees/:id" element={<EmployeeDetailsPage />} />
             <Route path="people/clients/:id" element={<UserDetailsPage />} />
+            <Route path="employees" element={<Navigate to="/people" replace />} />
+            <Route path="products" element={<Navigate to="/inventory" replace />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="branches/:id" element={<BranchDetailsPage />} />
             <Route path="services" element={<ServicesPage />} />

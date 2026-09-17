@@ -16,6 +16,8 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
+import { useDialog } from '../../hooks/useDialog'
 
 const emptyStep = { name: '', employee_id: '' }
 const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
@@ -23,6 +25,8 @@ const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
 export default function ProcessingPage() {
   const { orderId } = useParams()
   const { user } = useAuth()
+  const toast = useToast()
+  const { prompt } = useDialog()
   const navigate = useNavigate()
   const [workflows, setWorkflows] = useState([])
   const [order, setOrder] = useState(null)
@@ -123,16 +127,35 @@ export default function ProcessingPage() {
   }
 
   async function review(workflowId, result) {
-    const notes = result === 'fail' ? window.prompt('Why did quality control fail?') : ''
-    if (result === 'fail' && notes === null) return
+    let notes = ''
+    if (result === 'fail') {
+      notes = await prompt({
+        title: 'Quality Check Feedback',
+        message: 'Please specify the quality issue found (e.g. stains remaining, item needs repressing).',
+        placeholder: 'Enter details of quality check issue...',
+        isTextarea: true,
+        required: true,
+        confirmText: 'Mark Quality Failed',
+        tone: 'danger',
+      })
+      if (!notes) return
+    }
+
     setBusy(workflowId)
     setMessage('')
     try {
       await reviewProcessingQuality(workflowId, result, notes)
       setOrder((current) => ({ ...current, status: result === 'pass' ? 'ready' : 'processing' }))
+      if (result === 'pass') {
+        toast.success('Quality check passed! Order is ready for pickup.')
+      } else {
+        toast.warning('Quality check failed. Workflow returned to processing.')
+      }
       load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to record quality result.')
+      const msg = error.response?.data?.message ?? 'Unable to record quality result.'
+      setMessage(msg)
+      toast.error(msg)
     } finally {
       setBusy('')
     }
