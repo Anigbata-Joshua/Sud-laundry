@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Sparkles, X } from 'lucide-react'
+import { ChevronDown, Droplets, LogOut, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { navigationGroups, ALL_STAFF_ROLES } from '../../constants/navigation'
 import { useAuth } from '../../hooks/useAuth'
@@ -30,15 +30,15 @@ export default function Sidebar({ open, onClose }) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-30 flex w-61 flex-col bg-sidebar px-3.5 py-5 text-gray-500 transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+      className={`fixed inset-y-0 left-0 z-30 flex w-61 flex-col border-r border-slate-800/80 bg-slate-900 px-3.5 py-5 text-slate-400 transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
     >
       <div className="flex items-center gap-3 px-2 pb-7">
-        <span className="grid size-9 place-items-center rounded-lg bg-gradient-to-br from-violet-400 to-brand text-white">
-          <Sparkles className="size-[18px]" />
+        <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sm shadow-sky-900/40">
+          <Droplets className="size-[18px]" />
         </span>
         <div className="grid flex-1">
-          <strong className="text-sm text-white">Suds</strong>
-          <small className="text-[9px] uppercase tracking-widest">Operations</small>
+          <strong className="text-sm font-black text-white tracking-wide">Suds</strong>
+          <small className="text-[9px] uppercase tracking-widest text-sky-400 font-semibold">Fabric Care & Ops</small>
         </div>
         <button type="button" className="text-white lg:hidden" onClick={onClose}>
           <X className="size-5" />
@@ -46,7 +46,7 @@ export default function Sidebar({ open, onClose }) {
       </div>
       {visibleGroups.map((group) => (
         <div key={group.label} className="mb-5">
-          <p className="mb-2 px-2.5 text-[9px] font-extrabold uppercase tracking-widest text-gray-600">
+          <p className="mb-2 px-2.5 text-[9px] font-extrabold uppercase tracking-widest text-slate-500">
             {group.label}
           </p>
           <nav className="grid gap-1">
@@ -57,7 +57,7 @@ export default function Sidebar({ open, onClose }) {
                   end={path === '/'}
                   onClick={onClose}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-xs font-semibold transition ${isActive && !children ? 'bg-[#272938] text-white' : 'hover:bg-[#272938] hover:text-white'}`
+                    `flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-xs font-semibold transition ${isActive && !children ? 'bg-slate-800 text-white font-bold border-l-2 border-sky-400' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'}`
                   }
                 >
                   <Icon className="size-[17px]" />
@@ -93,7 +93,7 @@ export default function Sidebar({ open, onClose }) {
       <div className="mt-auto grid gap-3">
         <button
           type="button"
-          className="flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold hover:bg-[#272938] hover:text-white"
+          className="flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold hover:bg-slate-800 hover:text-white"
           onClick={logout}
         >
           <LogOut className="size-[17px]" />
@@ -102,7 +102,7 @@ export default function Sidebar({ open, onClose }) {
         <NavLink
           to="/profile"
           onClick={onClose}
-          className="flex items-center gap-2 border-t border-gray-800 px-2 pt-3 hover:text-white"
+          className="flex items-center gap-2 border-t border-slate-800 px-2 pt-3 hover:text-white"
         >
           <Avatar tone="lime">{initials}</Avatar>
           <span className="grid flex-1">

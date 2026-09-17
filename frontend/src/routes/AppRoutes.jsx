@@ -7,6 +7,7 @@ import ProtectedRoute from '../auth/ProtectedRoute'
 import AuthLayout from '../layouts/AuthLayout'
 import StaffLayout from '../layouts/StaffLayout'
 import BranchesPage from '../pages/branches/BranchesPage'
+import BranchDetailsPage from '../pages/branches/BranchDetailsPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
 import EmployeesPage from '../pages/employees/EmployeesPage'
 import OrdersPage from '../pages/orders/OrdersPage'
@@ -80,6 +81,7 @@ export default function AppRoutes() {
             <Route path="people/employees/:id" element={<EmployeeDetailsPage />} />
             <Route path="people/clients/:id" element={<UserDetailsPage />} />
             <Route path="branches" element={<BranchesPage />} />
+            <Route path="branches/:id" element={<BranchDetailsPage />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="reports" element={<ReportsPage />} />

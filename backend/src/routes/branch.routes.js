@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.get('/', branchController.getAllBranches);
 router.get('/:id', branchController.getBranchById);
+router.get('/:id/stats', authenticate, authorize('admin', 'branch_manager'), branchController.getBranchStats);
 router.post('/', authenticate, authorize('admin'), validate(createBranchSchema), branchController.createBranch);
 router.delete('/:id', authenticate, authorize('admin'), branchController.deleteBranch);
 router.put( '/:id', authenticate, authorize('admin', 'branch_manager'), enforceBranchScope, validate(updateBranchSchema), branchController.updateBranch );

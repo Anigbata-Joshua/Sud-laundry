@@ -135,7 +135,7 @@ export default function ReportsPage() {
         />
         <MetricCard
           icon={ShoppingBag}
-          tone="violet"
+          tone="sky"
           label="Average transaction"
           value={formatNaira(data?.revenue?.averageOrderValue ?? 0)}
           note="For selected period"
@@ -167,7 +167,7 @@ export default function ReportsPage() {
                 {formatNaira(row.revenue)}
               </span>
               <i
-                className="w-full max-w-10 rounded-t bg-violet-500"
+                className="w-full max-w-10 rounded-t bg-sky-600 hover:bg-sky-500 transition-colors"
                 style={{ height: `${Math.max((row.revenue / maxTrend) * 100, 2)}%` }}
               />
               <small className="mt-2 text-[8px] text-gray-400">{String(row._id).slice(5)}</small>
@@ -230,12 +230,12 @@ function Ranking({ title, rows }) {
           key={row.id ?? index}
           className="grid grid-cols-[24px_1fr_auto] items-center gap-3 border-b border-gray-100 py-3 text-xs"
         >
-          <b className="text-violet-400">{String(index + 1).padStart(2, '0')}</b>
+          <b className="text-sky-500">{String(index + 1).padStart(2, '0')}</b>
           <span className="grid gap-1 capitalize">
             {row.name || 'Unknown'}
             <i className="h-1 rounded bg-gray-100">
               <em
-                className="block h-full rounded bg-violet-600"
+                className="block h-full rounded bg-sky-600"
                 style={{ width: `${(row.value / max) * 100}%` }}
               />
             </i>

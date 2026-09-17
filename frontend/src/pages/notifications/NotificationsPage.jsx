@@ -71,7 +71,7 @@ export default function NotificationsPage() {
               <button
                 key={value}
                 onClick={() => setFilter(value)}
-                className={`rounded-lg px-3 py-2 text-[10px] font-bold capitalize ${filter === value ? 'bg-violet-50 text-brand' : 'text-gray-500'}`}
+                className={`rounded-lg px-3 py-2 text-[10px] font-bold capitalize ${filter === value ? 'bg-sky-50 text-brand' : 'text-gray-500'}`}
               >
                 {value}
               </button>
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
             <button
               key={item._id}
               onClick={() => readOne(item)}
-              className={`flex w-full gap-3 border-b border-gray-100 p-4 text-left hover:bg-gray-50 ${item.is_read ? 'bg-white' : 'bg-violet-50/40'}`}
+              className={`flex w-full gap-3 border-b border-gray-100 p-4 text-left hover:bg-gray-50 ${item.is_read ? 'bg-white' : 'bg-sky-50/50'}`}
             >
               <span
                 className={`mt-1 size-2 shrink-0 rounded-full ${item.is_read ? 'bg-gray-200' : 'bg-brand'}`}

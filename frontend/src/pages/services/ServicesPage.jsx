@@ -167,7 +167,7 @@ export default function ServicesPage() {
           {visibleServices.map((service) => (
             <article key={service._id} className="rounded-xl border border-line p-4">
               <div className="flex items-start justify-between">
-                <span className="grid size-9 place-items-center rounded-lg bg-violet-50 text-brand">
+                <span className="grid size-9 place-items-center rounded-lg bg-sky-50 text-brand">
                   <Shirt className="size-4" />
                 </span>
                 <strong className="text-base">{formatNaira(service.price)}</strong>

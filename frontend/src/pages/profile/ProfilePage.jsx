@@ -70,7 +70,7 @@ export default function ProfilePage() {
           </span>
           <h2 className="mt-4 text-xl font-extrabold">{user.name}</h2>
           <p className="mt-1 text-xs text-muted">{user.email}</p>
-          <span className="mt-4 inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-[10px] font-bold capitalize text-brand">
+          <span className="mt-4 inline-flex items-center gap-1 rounded-full bg-sky-50 px-3 py-1 text-[10px] font-bold capitalize text-brand">
             <ShieldCheck className="size-3.5" />
             {user.role}
           </span>
@@ -135,7 +135,7 @@ function Input({ label, ...props }) {
       {label}
       <input
         {...props}
-        className="rounded-xl border border-line px-3 py-3 font-normal outline-none focus:border-brand focus:ring-3 focus:ring-violet-100"
+        className="rounded-xl border border-line px-3 py-3 font-normal outline-none focus:border-brand focus:ring-3 focus:ring-sky-100"
       />
     </label>
   )

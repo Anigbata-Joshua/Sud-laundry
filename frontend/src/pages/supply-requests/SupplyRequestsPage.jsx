@@ -117,7 +117,7 @@ export default function SupplyRequestsPage() {
             key={status || 'all'}
             type="button"
             onClick={() => setStatusFilter(status)}
-            className={`rounded-md px-3 py-2 text-xs font-bold capitalize ${statusFilter === status ? 'bg-violet-50 text-brand' : 'text-gray-500'}`}
+            className={`rounded-md px-3 py-2 text-xs font-bold capitalize ${statusFilter === status ? 'bg-sky-50 text-brand' : 'text-gray-500'}`}
           >
             {status || 'all'}
           </button>

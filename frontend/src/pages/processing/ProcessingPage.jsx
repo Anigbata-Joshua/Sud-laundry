@@ -366,7 +366,7 @@ function WorkflowCard({ workflow, user, busy, canManage, orderPage, onStepAction
               key={step._id}
               className="grid gap-3 border-b border-gray-100 py-4 md:grid-cols-[36px_1fr_auto] md:items-center"
             >
-              <b className="grid size-8 place-items-center rounded-full bg-violet-50 text-xs text-brand">
+              <b className="grid size-8 place-items-center rounded-full bg-sky-50 text-xs text-brand">
                 {index + 1}
               </b>
               <div>

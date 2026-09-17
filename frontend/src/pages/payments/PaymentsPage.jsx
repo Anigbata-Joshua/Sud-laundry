@@ -136,7 +136,7 @@ export default function PaymentsPage() {
         />
         <MetricCard
           icon={WalletCards}
-          tone="violet"
+          tone="sky"
           label="Transactions"
           value={String(completed.length)}
           note={`${payments.length - completed.length} unsuccessful`}

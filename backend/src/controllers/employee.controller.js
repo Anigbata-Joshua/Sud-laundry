@@ -86,6 +86,8 @@ export const getEmployees = asyncHandler(async (req, res) => {
 
   if (currentUser.role === 'branch_manager') {
     query.branch_id = currentUser.branch_id
+  } else if (req.query.branch_id) {
+    query.branch_id = req.query.branch_id
   }
 
   const employees = await Employee.find(query)
