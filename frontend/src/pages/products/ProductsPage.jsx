@@ -27,11 +27,15 @@ import Panel, { PanelTitle } from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
+import { useDialog } from '../../hooks/useDialog'
 
 const emptyProduct = { name: '', description: '', price: '', unit: 'pieces', reorder_point: '', branch_id: '' }
 
 export default function ProductsPage() {
   const { user } = useAuth()
+  const toast = useToast()
+  const { confirm } = useDialog()
   const { branchId: contextBranchId } = useOutletContext()
   const [selectedBranch, setSelectedBranch] = useState(contextBranchId || '')
   const [products, setProducts] = useState([])
@@ -167,19 +171,31 @@ export default function ProductsPage() {
       if (editing?._id) await updateProduct(editing._id, payload)
       else await createProduct(payload)
       setProductDialog(false)
+      toast.success(editing?._id ? 'Product updated' : 'Product created')
       await load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to save product.')
+      const msg = error.response?.data?.message ?? 'Unable to save product.'
+      setMessage(msg)
+      toast.error(msg)
     }
   }
 
   async function remove(product) {
-    if (!window.confirm(`Deactivate ${product.name}?`)) return
+    const confirmed = await confirm({
+      title: 'Deactivate Product',
+      message: `Are you sure you want to deactivate "${product.name}"? It will be hidden from active inventory.`,
+      confirmText: 'Deactivate Product',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await deleteProduct(product._id)
+      toast.success('Product deactivated')
       await load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to deactivate product.')
+      const msg = error.response?.data?.message ?? 'Unable to deactivate product.'
+      setMessage(msg)
+      toast.error(msg)
     }
   }
 
@@ -195,9 +211,12 @@ export default function ProductsPage() {
       })
       setStockProduct(null)
       setStock({ type: 'purchase', quantity: '', notes: '' })
+      toast.success('Stock movement recorded successfully')
       await load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to record stock.')
+      const msg = error.response?.data?.message ?? 'Unable to record stock.'
+      setMessage(msg)
+      toast.error(msg)
     }
   }
 

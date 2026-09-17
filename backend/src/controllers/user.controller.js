@@ -2,6 +2,7 @@
 // Purpose: admin-level user management (view, deactivate accounts).
 
 import User from '../models/user.model.js'
+import Employee from '../models/employee.model.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
@@ -9,18 +10,35 @@ import asyncHandler from '../utils/asyncHandler.js'
 export const getMyProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password_hash')
   if (!user) throw new ApiError(404, 'User not found')
-  return apiResponse(res, 200, user, 'Profile retrieved successfully')
+
+  const userObj = user.toObject()
+  if (['employee', 'branch_manager', 'front_desk', 'inventory_officer'].includes(user.role)) {
+    const employee = await Employee.findOne({ user_id: user._id }).populate('branch_id', 'name address phone')
+    userObj.branch_id = employee?.branch_id?._id ? employee.branch_id._id.toString() : employee?.branch_id?.toString() || null
+    userObj.branch = employee?.branch_id || null
+    userObj.job_title = employee?.job_title || null
+  }
+
+  return apiResponse(res, 200, userObj, 'Profile retrieved successfully')
 })
 
 export const getAllUsers = asyncHandler(async (req, res) => {
   const currentUser = req.user
 
-  // Only admins can view all users
-  if (currentUser.role !== 'admin') {
-    throw new ApiError(403, 'Only admins can view user list')
+  // Admins, branch managers, and front desk staff can view users
+  if (!['admin', 'branch_manager', 'front_desk'].includes(currentUser.role)) {
+    throw new ApiError(403, 'You do not have permission to view users')
   }
 
-  const users = await User.find({}).select('-password_hash').sort({ createdAt: -1 })
+  const filter = {}
+  // Non-admins can only see customers
+  if (currentUser.role !== 'admin') {
+    filter.role = 'customer'
+  } else if (req.query.role) {
+    filter.role = req.query.role
+  }
+
+  const users = await User.find(filter).select('-password_hash').sort({ createdAt: -1 })
 
   return apiResponse(res, 200, users, 'Users retrieved successfully')
 })

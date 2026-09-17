@@ -18,6 +18,8 @@ import ServiceMetrics from '../../components/services/ServiceMetrics'
 import ServiceModal from '../../components/services/ServiceModal'
 import ServiceTable from '../../components/services/ServiceTable'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
+import { useDialog } from '../../hooks/useDialog'
 
 const emptyForm = {
   branch_id: '',
@@ -30,6 +32,8 @@ const emptyForm = {
 
 export default function ServicesPage() {
   const { user } = useAuth()
+  const toast = useToast()
+  const { confirm } = useDialog()
   const isAdmin = user.role === 'admin'
   const isBranchManager = user.role === 'branch_manager'
 
@@ -140,27 +144,44 @@ export default function ServicesPage() {
     }
 
     try {
-      if (editingId) await updateService(editingId, payload)
-      else await createService(payload)
+      if (editingId) {
+        await updateService(editingId, payload)
+        toast.success(`Service "${form.name}" updated successfully.`)
+      } else {
+        await createService(payload)
+        toast.success(`Service "${form.name}" added to catalog.`)
+      }
 
       setOpen(false)
       setForm(emptyForm)
       setEditingId('')
       loadServices()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to save service.')
+      const errMsg = error.response?.data?.message ?? 'Unable to save service.'
+      setMessage(errMsg)
+      toast.error(errMsg)
     } finally {
       setSaving(false)
     }
   }
 
   async function remove(service) {
-    if (!window.confirm(`Deactivate "${service.name}" from catalog?`)) return
+    const confirmed = await confirm({
+      title: 'Deactivate Service',
+      message: `Are you sure you want to deactivate "${service.name}" from the active catalog?`,
+      confirmText: 'Deactivate Service',
+      cancelText: 'Keep Active',
+      tone: 'danger',
+    })
+    if (!confirmed) return
     try {
       await deleteService(service._id)
+      toast.success(`Service "${service.name}" deactivated.`)
       loadServices()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to deactivate service.')
+      const errMsg = error.response?.data?.message ?? 'Unable to deactivate service.'
+      setMessage(errMsg)
+      toast.error(errMsg)
     }
   }
 

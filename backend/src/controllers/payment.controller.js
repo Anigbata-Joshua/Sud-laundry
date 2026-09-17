@@ -23,10 +23,15 @@ const getOrderBalance = async (orderId) => {
   const normalizedId = typeof orderId === 'string' ? new mongoose.Types.ObjectId(orderId) : orderId
   const [totals] = await Payment.aggregate([
     { $match: { orderId: normalizedId, status: 'completed' } },
-    { $group: { _id: null, netPaid: { $sum: { $ifNull: [
-            '$net_amount',
-              {$cond: [{ $eq: ['$transaction_type', 'refund'] },
-                  { $multiply: ['$amount', -1] },
+    {
+      $group: {
+        _id: null, netPaid: {
+          $sum: {
+            $ifNull: [
+              '$net_amount',
+              {
+                $cond: [{ $eq: ['$transaction_type', 'refund'] },
+                { $multiply: ['$amount', -1] },
                   '$amount',
                 ],
               },
@@ -163,10 +168,17 @@ export const makePayment = asyncHandler(async (req, res) => {
   }
 
   // Cash can only ever be recorded by staff who physically received it.
-  // A customer marking their own order as "paid in cash" is not a real
-  // payment — it must go through Paystack (verified below) instead.
-  if (paymentMethod === 'cash' && !['admin', 'branch_manager', 'employee'].includes(req.user.role)) {
-    throw new ApiError(403, 'Only staff can record a cash payment')
+  // Restricted strictly to admin and respective branch managers for their branch.
+  if (paymentMethod === 'cash') {
+    if (!['admin', 'branch_manager'].includes(req.user.role)) {
+      throw new ApiError(403, 'Only admins and respective branch managers can record cash payments')
+    }
+    if (
+      req.user.role === 'branch_manager' &&
+      order.branch_id.toString() !== req.user.branch_id?.toString()
+    ) {
+      throw new ApiError(403, 'Branch managers can only record cash payments for orders in their own branch')
+    }
   }
 
   // Customers can only pay for their own orders.
@@ -266,7 +278,7 @@ export const makePayment = asyncHandler(async (req, res) => {
     transaction_type: 'payment',
     paymentType,
     status,
-    transaction_ref,
+    transaction_ref: transaction_ref || (paymentMethod === 'cash' ? `cash_${order._id}_${Date.now()}` : undefined),
     customer_Name: customer_Name || req.user.name,
     created_by: getUserId(req),
   })
