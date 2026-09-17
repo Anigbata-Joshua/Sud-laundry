@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Clock3, Edit3, Plus, Shirt, Trash2, X } from 'lucide-react'
+import {
+  Building2,
+  Grid,
+  List,
+  Plus,
+  Search,
+  Sparkles,
+} from 'lucide-react'
 import { getBranches } from '../../api/branches.api'
 import { createService, deleteService, getServices, updateService } from '../../api/services.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
+import ServiceCard from '../../components/services/ServiceCard'
+import ServiceMetrics from '../../components/services/ServiceMetrics'
+import ServiceModal from '../../components/services/ServiceModal'
+import ServiceTable from '../../components/services/ServiceTable'
 import { useAuth } from '../../hooks/useAuth'
-import { formatNaira } from '../../utils/formatters'
 
 const emptyForm = {
   branch_id: '',
@@ -15,56 +25,77 @@ const emptyForm = {
   type: 'service',
   category: '',
   price: '',
-  turnaround_hours: '',
+  turnaround_hours: '24',
 }
 
 export default function ServicesPage() {
   const { user } = useAuth()
   const isAdmin = user.role === 'admin'
+  const isBranchManager = user.role === 'branch_manager'
+
   const [services, setServices] = useState([])
   const [branches, setBranches] = useState([])
   const [query, setQuery] = useState('')
-  const [branchId, setBranchId] = useState(isAdmin ? '' : user.branch_id)
+  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'service' | 'add-on'
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [branchId, setBranchId] = useState(isAdmin ? '' : user.branch_id || '')
+  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'table'
+
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState('')
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   function loadServices() {
+    setLoading(true)
     getServices()
-      .then((response) => setServices(response.data.data))
+      .then((response) => setServices(response.data.data || []))
       .catch(() => setMessage('Unable to load services.'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     if (isAdmin) {
       getBranches()
-        .then((response) => setBranches(response.data.data))
+        .then((response) => setBranches(response.data.data || []))
         .catch(() => setMessage('Unable to load branches.'))
     }
     loadServices()
-    // isAdmin can't change during a session — safe to omit from deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isAdmin])
 
   const branchName = (id) => branches.find((branch) => branch._id === id)?.name ?? 'Branch'
-  const visibleServices = useMemo(
-    () =>
-      services.filter((service) => {
-        const serviceBranchId = service.branch_id?._id ?? service.branch_id
-        const matchesBranch = !branchId || serviceBranchId === branchId
-        const text = `${service.name} ${service.category ?? ''} ${branchName(serviceBranchId)}`
-        return matchesBranch && text.toLowerCase().includes(query.toLowerCase())
-      }),
-    // branches supplies the display name used by the search index.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [branchId, branches, query, services],
-  )
+
+  // Extract all unique categories present in the active services
+  const availableCategories = useMemo(() => {
+    const cats = new Set(services.map((s) => s.category).filter(Boolean))
+    return Array.from(cats)
+  }, [services])
+
+  // Filtered services
+  const visibleServices = useMemo(() => {
+    return services.filter((service) => {
+      const serviceBranchId = service.branch_id?._id ?? service.branch_id
+      const matchesBranch = !branchId || serviceBranchId === branchId
+      const matchesType = typeFilter === 'all' || service.type === typeFilter
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        service.category?.toLowerCase() === categoryFilter.toLowerCase()
+
+      const text = `${service.name} ${service.category ?? ''} ${branchName(serviceBranchId)}`.toLowerCase()
+      const matchesQuery = text.includes(query.toLowerCase())
+
+      return matchesBranch && matchesType && matchesCategory && matchesQuery
+    })
+  }, [services, branchId, typeFilter, categoryFilter, query, branches])
 
   function openCreate() {
     setEditingId('')
-    setForm({ ...emptyForm, branch_id: isAdmin ? branchId : user.branch_id })
+    setForm({
+      ...emptyForm,
+      branch_id: isAdmin ? (branchId || branches[0]?._id || '') : user.branch_id,
+    })
     setMessage('')
     setOpen(true)
   }
@@ -77,7 +108,7 @@ export default function ServicesPage() {
       type: service.type ?? 'service',
       category: service.category ?? '',
       price: service.price,
-      turnaround_hours: service.turnaround_hours ?? '',
+      turnaround_hours: service.turnaround_hours ?? '24',
     })
     setMessage('')
     setOpen(true)
@@ -96,15 +127,22 @@ export default function ServicesPage() {
     event.preventDefault()
     setSaving(true)
     setMessage('')
+
     const payload = {
       ...form,
       price: Number(form.price),
       turnaround_hours: form.type === 'service' ? Number(form.turnaround_hours) : undefined,
     }
-    if (editingId) delete payload.branch_id
+
+    if (editingId) {
+      delete payload.branch_id
+      if (!isAdmin) delete payload.price
+    }
+
     try {
       if (editingId) await updateService(editingId, payload)
       else await createService(payload)
+
       setOpen(false)
       setForm(emptyForm)
       setEditingId('')
@@ -117,7 +155,7 @@ export default function ServicesPage() {
   }
 
   async function remove(service) {
-    if (!window.confirm(`Deactivate ${service.name}?`)) return
+    if (!window.confirm(`Deactivate "${service.name}" from catalog?`)) return
     try {
       await deleteService(service._id)
       loadServices()
@@ -129,184 +167,202 @@ export default function ServicesPage() {
   return (
     <>
       <PageHeading
-        eyebrow="Service catalogue"
-        title="Services"
-        subtitle="Manage each branch’s services, add-ons, pricing, and promised turnaround."
+        eyebrow="Service Studio & POS Catalog"
+        title="Services & Pricing"
+        subtitle="Manage branch service menus, promised turnaround times, and specialty fabric add-ons."
       >
         <Button primary onClick={openCreate}>
           <Plus className="size-4" /> New service
         </Button>
       </PageHeading>
-      <Panel className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row">
-          <SearchInput
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search services…"
-            className="flex-1 sm:max-w-sm"
-          />
-          {isAdmin && (
-            <select
-              value={branchId}
-              onChange={(event) => setBranchId(event.target.value)}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-xs"
-            >
-              <option value="">All branches</option>
-              {branches.map((branch) => (
-                <option key={branch._id} value={branch._id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        {message && !open && (
-          <p className="m-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>
-        )}
-        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleServices.map((service) => (
-            <article key={service._id} className="rounded-xl border border-line p-4">
-              <div className="flex items-start justify-between">
-                <span className="grid size-9 place-items-center rounded-lg bg-sky-50 text-brand">
-                  <Shirt className="size-4" />
-                </span>
-                <strong className="text-base">{formatNaira(service.price)}</strong>
-              </div>
-              <h2 className="mt-3 text-sm font-extrabold">{service.name}</h2>
-              <p className="mt-1 text-[10px] capitalize text-gray-400">
-                {service.type} · {service.category || 'General'}
-                {isAdmin && ` · ${branchName(service.branch_id?._id ?? service.branch_id)}`}
-              </p>
-              <p className="mt-3 flex items-center gap-1 text-[10px] text-gray-500">
-                <Clock3 className="size-3.5" />
-                {service.type === 'add-on'
-                  ? 'No separate turnaround'
-                  : `${service.turnaround_hours} hour turnaround`}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <Button onClick={() => openEdit(service)}>
-                  <Edit3 className="size-3.5" /> Edit
-                </Button>
-                <Button onClick={() => remove(service)}>
-                  <Trash2 className="size-3.5" /> Deactivate
-                </Button>
-              </div>
-            </article>
-          ))}
-        </div>
-        {visibleServices.length === 0 && (
-          <p className="p-12 text-center text-xs text-gray-400">No services match your filters.</p>
-        )}
-      </Panel>
 
-      {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <Panel className="w-full max-w-lg p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-extrabold">
-                {editingId ? 'Edit service' : 'New service'}
-              </h2>
-              <button type="button" onClick={() => setOpen(false)}>
-                <X className="size-5" />
+      {/* KPI Metrics Header */}
+      <ServiceMetrics services={services} />
+
+      {/* Main Catalog Explorer Panel */}
+      <Panel className="overflow-hidden p-5">
+        {/* Controls Bar */}
+        <div className="flex flex-col gap-3 pb-4 border-b border-line lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
+            <SearchInput
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search services by name, category, or branch…"
+              className="w-full sm:max-w-xs"
+            />
+
+            {/* Type Segmented Filter */}
+            <div className="flex rounded-xl bg-gray-100 p-1 text-xs font-bold">
+              {[
+                { id: 'all', label: 'All Items' },
+                { id: 'service', label: 'Core Services' },
+                { id: 'add-on', label: 'Add-ons' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTypeFilter(t.id)}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    typeFilter === t.id
+                      ? 'bg-white text-ink shadow-xs font-black'
+                      : 'text-gray-500 hover:text-ink'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Branch Selector (Admin only) */}
+            {isAdmin && (
+              <select
+                value={branchId}
+                onChange={(event) => setBranchId(event.target.value)}
+                className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-brand"
+              >
+                <option value="">All Branches ({branches.length})</option>
+                {branches.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {isBranchManager && (
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+                <Building2 className="size-3.5" />
+                Branch Catalog
+              </span>
+            )}
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-2 self-end lg:self-auto">
+            <span className="text-xs text-gray-400 font-medium">
+              Showing <b>{visibleServices.length}</b> items
+            </span>
+            <div className="flex rounded-lg border border-line bg-gray-50 p-0.5">
+              <button
+                type="button"
+                title="Grid view"
+                onClick={() => setViewMode('grid')}
+                className={`rounded-md p-1.5 transition ${
+                  viewMode === 'grid' ? 'bg-white text-brand shadow-xs' : 'text-gray-400 hover:text-ink'
+                }`}
+              >
+                <Grid className="size-4" />
+              </button>
+              <button
+                type="button"
+                title="Table view"
+                onClick={() => setViewMode('table')}
+                className={`rounded-md p-1.5 transition ${
+                  viewMode === 'table' ? 'bg-white text-brand shadow-xs' : 'text-gray-400 hover:text-ink'
+                }`}
+              >
+                <List className="size-4" />
               </button>
             </div>
-            <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-              <label className="grid gap-2 text-xs font-bold sm:col-span-2">
-                Branch
-                {isAdmin ? (
-                  <select
-                    required
-                    disabled={Boolean(editingId)}
-                    name="branch_id"
-                    value={form.branch_id}
-                    onChange={updateField}
-                    className="rounded-xl border border-line bg-white p-3 font-normal"
-                  >
-                    <option value="">Select branch</option>
-                    {branches.map((branch) => (
-                      <option key={branch._id} value={branch._id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    disabled
-                    value="Your branch"
-                    className="rounded-xl border border-line bg-gray-50 p-3 font-normal text-gray-500"
-                  />
-                )}
-              </label>
-              <Field
-                label="Service name"
-                name="name"
-                value={form.name}
-                onChange={updateField}
-                required
-              />
-              <label className="grid gap-2 text-xs font-bold">
-                Type
-                <select
-                  name="type"
-                  value={form.type}
-                  onChange={updateField}
-                  className="rounded-xl border border-line bg-white p-3 font-normal"
-                >
-                  <option value="service">Service</option>
-                  <option value="add-on">Add-on</option>
-                </select>
-              </label>
-              <Field
-                label="Category"
-                name="category"
-                value={form.category}
-                onChange={updateField}
-                required
-              />
-              <Field
-                label="Price"
-                name="price"
-                type="number"
-                min="0"
-                value={form.price}
-                onChange={updateField}
-                required
-              />
-              {form.type === 'service' && (
-                <Field
-                  label="Turnaround hours"
-                  name="turnaround_hours"
-                  type="number"
-                  min="1"
-                  value={form.turnaround_hours}
-                  onChange={updateField}
-                  required
-                />
-              )}
-              {message && (
-                <p className="rounded-lg bg-red-50 p-3 text-xs text-red-700 sm:col-span-2">
-                  {message}
-                </p>
-              )}
-              <Button primary type="submit" disabled={saving} className="sm:col-span-2">
-                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create service'}
-              </Button>
-            </form>
-          </Panel>
+          </div>
         </div>
-      )}
-    </>
-  )
-}
 
-function Field({ label, ...props }) {
-  return (
-    <label className="grid gap-2 text-xs font-bold">
-      {label}
-      <input
-        {...props}
-        className="rounded-xl border border-line p-3 font-normal outline-none focus:border-brand"
+        {/* Category Pills Bar */}
+        {availableCategories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 py-3 border-b border-gray-100">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 mr-1">
+              Category:
+            </span>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition ${
+                categoryFilter === 'all'
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All Categories
+            </button>
+            {availableCategories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoryFilter(cat)}
+                className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition ${
+                  categoryFilter === cat
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Global Error Banner if any */}
+        {message && !open && (
+          <p className="my-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 font-medium">{message}</p>
+        )}
+
+        {/* Content View: Grid or Table */}
+        <div className="mt-4">
+          {loading ? (
+            <div className="grid min-h-60 place-items-center">
+              <div className="size-8 animate-spin rounded-full border-4 border-sky-100 border-t-brand" />
+            </div>
+          ) : visibleServices.length > 0 ? (
+            viewMode === 'grid' ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleServices.map((service) => (
+                  <ServiceCard
+                    key={service._id}
+                    service={service}
+                    branchName={branchName}
+                    isAdmin={isAdmin}
+                    onEdit={openEdit}
+                    onDelete={remove}
+                  />
+                ))}
+              </div>
+            ) : (
+              <ServiceTable
+                services={visibleServices}
+                branchName={branchName}
+                isAdmin={isAdmin}
+                onEdit={openEdit}
+                onDelete={remove}
+              />
+            )
+          ) : (
+            <div className="p-12 text-center">
+              <Sparkles className="mx-auto size-8 text-gray-300" />
+              <h3 className="mt-3 text-sm font-extrabold text-ink">No services match your filters</h3>
+              <p className="mt-1 text-xs text-gray-400">
+                Try clearing your search query or selecting a different branch/category.
+              </p>
+              <Button primary className="mt-4" onClick={openCreate}>
+                <Plus className="size-4" /> Create first service
+              </Button>
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      {/* Service Modal */}
+      <ServiceModal
+        open={open}
+        onClose={() => setOpen(false)}
+        form={form}
+        onChange={updateField}
+        onSubmit={submit}
+        editingId={editingId}
+        isAdmin={isAdmin}
+        branches={branches}
+        saving={saving}
+        message={message}
       />
-    </label>
+    </>
   )
 }
