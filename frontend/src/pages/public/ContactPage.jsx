@@ -87,16 +87,25 @@ export default function ContactPage() {
 
   return (
     <>
-      <section className="border-b border-line bg-white py-16 sm:py-20">
-        <div className="mx-auto w-[92%] max-w-6xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Contact</p>
-          <h1 className="mt-2 max-w-lg text-[2rem] font-extrabold leading-tight tracking-tight text-ink sm:text-[2.4rem]">
-            Talk to a real person about your laundry.
-          </h1>
-          <p className="mt-4 max-w-md text-[14px] leading-relaxed text-muted">
-            Questions about an order, a branch, or just want to say hi — send us a message and
-            we'll reply within one business day.
-          </p>
+      <section className="border-b border-line bg-white py-14 sm:py-18">
+        <div className="mx-auto flex w-[92%] max-w-6xl flex-col justify-between gap-8 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Contact</p>
+            <h1 className="mt-2 max-w-lg text-[2rem] font-extrabold leading-tight tracking-tight text-ink sm:text-[2.4rem]">
+              Talk to a real person about your laundry.
+            </h1>
+            <p className="mt-4 max-w-md text-[14px] leading-relaxed text-muted">
+              Questions about an order, a branch, or just want to say hi — send us a message and
+              we'll reply within one business day.
+            </p>
+          </div>
+          <div className="hidden shrink-0 sm:block">
+            <img
+              src="/images/laundry-basket.png"
+              alt="Suds laundry care"
+              className="h-32 w-32 object-contain"
+            />
+          </div>
         </div>
       </section>
 
@@ -164,7 +173,22 @@ export default function ContactPage() {
             </button>
           </form>
 
-          <div className="grid gap-8">
+          <div className="grid gap-6">
+            {/* Visual card */}
+            <div className="relative overflow-hidden rounded-2xl border border-line bg-slate-900 shadow-xs">
+              <div className="relative h-36 w-full overflow-hidden">
+                <img
+                  src="/images/laundry-hero-basket.jpg"
+                  alt="Fresh textiles in a clean laundry basket"
+                  className="size-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-black/20 to-transparent" />
+                <span className="absolute bottom-3 left-4 text-[12.5px] font-bold text-white drop-shadow-xs">
+                  Carefully handled by our team, start to finish
+                </span>
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <InfoCard icon={Phone} label="Call us" value="+234 800 000 0000" />
               <InfoCard icon={Mail} label="Email us" value="hello@suds.example" />
@@ -179,7 +203,10 @@ export default function ContactPage() {
                 </p>
                 <ul className="mt-3 grid gap-3.5">
                   {branches.slice(0, 4).map((branch) => (
-                    <li key={branch._id} className="border-t border-line pt-3.5 first:border-t-0 first:pt-0">
+                    <li
+                      key={branch._id}
+                      className="border-t border-line pt-3.5 first:border-t-0 first:pt-0"
+                    >
                       <p className="text-[13px] font-extrabold text-ink">{branch.name}</p>
                       <p className="mt-0.5 text-[12px] text-muted">{branch.address}</p>
                       {branch.phone && <p className="text-[12px] text-muted">{branch.phone}</p>}
