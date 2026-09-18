@@ -16,8 +16,6 @@ import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
-import { useToast } from '../../hooks/useToast'
-import { useDialog } from '../../hooks/useDialog'
 
 const emptyForm = {
   name: '',
@@ -34,8 +32,6 @@ const emptyForm = {
 export default function EmployeesPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const toast = useToast()
-  const { confirm } = useDialog()
   const [params, setParams] = useSearchParams()
   const view = params.get('view') === 'clients' ? 'clients' : 'employees'
   const [data, setData] = useState({ employees: [], users: [], branches: [] })
@@ -86,7 +82,7 @@ export default function EmployeesPage() {
         ...form,
         role: view === 'employees' ? form.role : 'customer',
       })
-      if (view === 'employees') {
+      if (view === 'employees')
         await createEmployee({
           user_id: userResponse.data.data._id,
           branch_id: form.branch_id,
@@ -94,67 +90,34 @@ export default function EmployeesPage() {
           hired_at: form.hired_at,
           role: form.role,
         })
-        toast.success(`Employee "${form.name}" created successfully.`)
-      } else {
-        toast.success(`Customer "${form.name}" created successfully.`)
-      }
       setOpen(false)
       setForm(emptyForm)
       setMessage('')
       load()
     } catch (error) {
-      const errMsg = error.response?.data?.message ?? 'Unable to create user.'
-      setMessage(errMsg)
-      toast.error(errMsg)
+      setMessage(error.response?.data?.message ?? 'Unable to create user.')
     }
   }
 
   async function customerAction(action, user) {
-    if (action === 'delete') {
-      const confirmed = await confirm({
-        title: 'Delete User Account',
-        message: `Are you sure you want to permanently delete account for "${user.name}"? This action cannot be undone.`,
-        confirmText: 'Delete Account',
-        tone: 'danger',
-      })
-      if (!confirmed) return
-    }
+    if (action === 'delete' && !window.confirm(`Delete ${user.name}?`)) return
     try {
-      if (action === 'delete') {
-        await deleteUser(user._id)
-        toast.success(`User "${user.name}" deleted.`)
-      } else if (user.is_active) {
-        await deactivateUser(user._id)
-        toast.info(`User "${user.name}" deactivated.`)
-      } else {
-        await reactivateUser(user._id)
-        toast.success(`User "${user.name}" reactivated.`)
-      }
+      if (action === 'delete') await deleteUser(user._id)
+      else if (user.is_active) await deactivateUser(user._id)
+      else await reactivateUser(user._id)
       load()
     } catch (error) {
-      const errMsg = error.response?.data?.message ?? 'Action failed.'
-      setMessage(errMsg)
-      toast.error(errMsg)
+      setMessage(error.response?.data?.message ?? 'Action failed.')
     }
   }
 
   async function removeEmployee(employee) {
-    const empName = employee.user_id?.name || 'this employee'
-    const confirmed = await confirm({
-      title: 'Remove Staff Assignment',
-      message: `Are you sure you want to remove ${empName} from staff assignments?`,
-      confirmText: 'Remove Staff',
-      tone: 'danger',
-    })
-    if (!confirmed) return
+    if (!window.confirm(`Remove ${employee.user_id?.name} as an employee?`)) return
     try {
       await deleteEmployee(employee._id)
-      toast.success(`Employee "${empName}" removed.`)
       load()
     } catch (error) {
-      const errMsg = error.response?.data?.message ?? 'Unable to remove employee.'
-      setMessage(errMsg)
-      toast.error(errMsg)
+      setMessage(error.response?.data?.message ?? 'Unable to remove employee.')
     }
   }
 

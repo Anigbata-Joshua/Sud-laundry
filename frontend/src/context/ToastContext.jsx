@@ -1,107 +1,87 @@
-import { createContext, useCallback, useContext, useState } from 'react'
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
+// Lightweight in-app notification toasts — used to confirm actions like
+// placing an order or sending a message. Distinct from the persistent
+// /notifications inbox (see api/notifications.api.js): toasts are transient,
+// client-side feedback, while that inbox is the durable, server-backed record.
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Bell, CheckCircle2, TriangleAlert, X } from 'lucide-react'
+import ToastContext from './toast.context'
 
-const ToastContext = createContext(null)
-
-const ICONS = {
-  success: CheckCircle2,
-  error: AlertCircle,
-  warning: AlertTriangle,
-  info: Info,
-}
-
-const STYLES = {
+const TONES = {
   success: {
-    container: 'bg-white/95 border-emerald-200 shadow-emerald-500/10 text-emerald-950',
-    iconBg: 'bg-emerald-50 text-emerald-600',
-    accent: 'bg-emerald-500',
+    icon: CheckCircle2,
+    ring: 'border-emerald-200',
+    iconWrap: 'bg-emerald-50 text-emerald-600',
   },
   error: {
-    container: 'bg-white/95 border-rose-200 shadow-rose-500/10 text-rose-950',
-    iconBg: 'bg-rose-50 text-rose-600',
-    accent: 'bg-rose-500',
-  },
-  warning: {
-    container: 'bg-white/95 border-amber-200 shadow-amber-500/10 text-amber-950',
-    iconBg: 'bg-amber-50 text-amber-600',
-    accent: 'bg-amber-500',
+    icon: TriangleAlert,
+    ring: 'border-red-200',
+    iconWrap: 'bg-red-50 text-red-600',
   },
   info: {
-    container: 'bg-white/95 border-sky-200 shadow-sky-500/10 text-sky-950',
-    iconBg: 'bg-sky-50 text-sky-600',
-    accent: 'bg-sky-500',
+    icon: Bell,
+    ring: 'border-sky-200',
+    iconWrap: 'bg-sky-50 text-brand',
   },
 }
 
-let toastCounter = 0
+const DEFAULT_DURATION_MS = 5500
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
+  const counter = useRef(0)
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+  const dismiss = useCallback((id) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
-  const addToast = useCallback((type, message, description = '', duration = 4000) => {
-    const id = ++toastCounter
-    const newToast = { id, type, message, description, duration }
+  const notify = useCallback(
+    ({ title, message, tone = 'info', duration = DEFAULT_DURATION_MS }) => {
+      counter.current += 1
+      const id = counter.current
+      setToasts((current) => [...current, { id, title, message, tone }])
+      if (duration) {
+        window.setTimeout(() => dismiss(id), duration)
+      }
+      return id
+    },
+    [dismiss],
+  )
 
-    setToasts((prev) => [...prev.slice(-4), newToast])
-
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id)
-      }, duration)
-    }
-
-    return id
-  }, [removeToast])
-
-  const toast = {
-    success: (message, description, duration) => addToast('success', message, description, duration),
-    error: (message, description, duration) => addToast('error', message, description, duration),
-    warning: (message, description, duration) => addToast('warning', message, description, duration),
-    info: (message, description, duration) => addToast('info', message, description, duration),
-    dismiss: removeToast,
-  }
+  const value = useMemo(() => ({ notify, dismiss }), [notify, dismiss])
 
   return (
-    <ToastContext.Provider value={toast}>
+    <ToastContext.Provider value={value}>
       {children}
-      {/* Toast Container */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed top-4 right-4 z-[9999] flex w-full max-w-sm flex-col gap-2.5 sm:max-w-md"
+        aria-atomic="false"
+        className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2.5 px-4 sm:inset-x-auto sm:right-5 sm:items-end"
       >
-        {toasts.map((t) => {
-          const Icon = ICONS[t.type] || Info
-          const style = STYLES[t.type] || STYLES.info
-
+        {toasts.map((toast) => {
+          const tone = TONES[toast.tone] ?? TONES.info
+          const Icon = tone.icon
           return (
             <div
-              key={t.id}
-              className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-3 ${style.container}`}
+              key={toast.id}
+              role="status"
+              className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border bg-white/95 p-4 shadow-lg shadow-slate-900/10 backdrop-blur ${tone.ring}`}
             >
-              {/* Left edge colored bar */}
-              <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${style.accent}`} />
-
-              <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${style.iconBg}`}>
-                <Icon className="size-4.5" />
+              <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${tone.iconWrap}`}>
+                <Icon className="size-4" />
               </span>
-
-              <div className="grid flex-1 gap-0.5 pt-0.5 pr-2">
-                <strong className="text-xs font-bold leading-tight">{t.message}</strong>
-                {t.description && (
-                  <p className="text-[11px] font-medium opacity-80 leading-relaxed">{t.description}</p>
+              <div className="min-w-0 flex-1">
+                {toast.title && <p className="text-xs font-extrabold text-ink">{toast.title}</p>}
+                {toast.message && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{toast.message}</p>
                 )}
               </div>
-
               <button
                 type="button"
-                onClick={() => removeToast(t.id)}
-                className="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Dismiss notification"
+                onClick={() => dismiss(toast.id)}
+                className="shrink-0 rounded-lg p-1 text-gray-300 hover:bg-gray-50 hover:text-gray-500"
               >
-                <X className="size-4" />
+                <X className="size-3.5" />
               </button>
             </div>
           )
@@ -110,13 +90,3 @@ export function ToastProvider({ children }) {
     </ToastContext.Provider>
   )
 }
-
-export function useToast() {
-  const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
-  return context
-}
-
-export default ToastContext

@@ -11,15 +11,11 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
-import { useToast } from '../../hooks/useToast'
-import { useDialog } from '../../hooks/useDialog'
 
 const CAN_ACT_ROLES = ['admin', 'inventory_officer']
 
 export default function SupplyRequestsPage() {
   const { user } = useAuth()
-  const toast = useToast()
-  const { prompt } = useDialog()
   const [requests, setRequests] = useState([])
   const [products, setProducts] = useState([])
   const [message, setMessage] = useState('')
@@ -84,38 +80,24 @@ export default function SupplyRequestsPage() {
     try {
       await approveSupplyRequest(reviewing._id, { items: reviewItems })
       setReviewing(null)
-      toast.success('Supply request approved')
       load()
     } catch (error) {
-      const msg = error.response?.data?.message ?? 'Unable to approve request.'
-      setMessage(msg)
-      toast.error(msg)
+      setMessage(error.response?.data?.message ?? 'Unable to approve request.')
     } finally {
       setBusy('')
     }
   }
 
   async function reject(request) {
-    const reason = await prompt({
-      title: 'Reject Supply Request',
-      message: 'Please provide a reason for rejecting this supply request.',
-      placeholder: 'Reason for rejection...',
-      isTextarea: true,
-      required: true,
-      confirmText: 'Reject Request',
-      tone: 'danger',
-    })
-    if (!reason) return
+    const reason = window.prompt('Reason for rejecting this request:')
+    if (!reason || !reason.trim()) return
     setBusy(request._id)
     setMessage('')
     try {
-      await rejectSupplyRequest(request._id, { reason })
-      toast.info('Supply request rejected')
+      await rejectSupplyRequest(request._id, { reason: reason.trim() })
       load()
     } catch (error) {
-      const msg = error.response?.data?.message ?? 'Unable to reject request.'
-      setMessage(msg)
-      toast.error(msg)
+      setMessage(error.response?.data?.message ?? 'Unable to reject request.')
     } finally {
       setBusy('')
     }
