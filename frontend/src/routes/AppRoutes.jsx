@@ -33,12 +33,24 @@ import NotFoundPage from '../pages/NotFoundPage'
 import CustomerLayout from '../layouts/CustomerLayout'
 import CustomerOrdersPage from '../pages/orders/CustomerOrdersPage'
 import SupplyRequestsPage from '../pages/supply-requests/SupplyRequestsPage'
+import PublicLayout from '../layouts/PublicLayout'
+import HomePage from '../pages/public/HomePage'
+import ContactPage from '../pages/public/ContactPage'
+import OrderPage from '../pages/public/OrderPage'
 
 export default function AppRoutes() {
   const { user } = useAuth()
 
   return (
     <Routes>
+      {/* Public marketing site — no login required. Kept at its own paths
+          (rather than "/") so it doesn't collide with the signed-in app,
+          which already owns "/" for both customer and staff dashboards. */}
+      <Route element={<PublicLayout />}>
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/order" element={<OrderPage />} />
+      </Route>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
@@ -61,15 +73,8 @@ export default function AppRoutes() {
             <Route
               index
               element={
-                user?.role === 'employee' ? (
-                  <Navigate to="/processing" replace />
-                ) : user?.role === 'front_desk' ? (
-                  <Navigate to="/orders" replace />
-                ) : user?.role === 'inventory_officer' ? (
-                  <Navigate to="/inventory" replace />
-                ) : (
-                  <DashboardPage />
-                )
+                user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
+
               }
             />
             <Route path="orders" element={<OrdersPage />} />
@@ -87,8 +92,6 @@ export default function AppRoutes() {
             <Route path="people" element={<EmployeesPage />} />
             <Route path="people/employees/:id" element={<EmployeeDetailsPage />} />
             <Route path="people/clients/:id" element={<UserDetailsPage />} />
-            <Route path="employees" element={<Navigate to="/people" replace />} />
-            <Route path="products" element={<Navigate to="/inventory" replace />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="branches/:id" element={<BranchDetailsPage />} />
             <Route path="services" element={<ServicesPage />} />

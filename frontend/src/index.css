@@ -12,6 +12,10 @@
   --color-line: #e2e8f0;
   --color-canvas: #f8fafc;
   --color-sidebar: #0f172a;
+  --color-accent: #d97706;
+  --color-accent-hover: #b45309;
+  --color-accent-light: #fffbeb;
+  --color-cream: #f6f4ee;
 }
 
 @layer base {

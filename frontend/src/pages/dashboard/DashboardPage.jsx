@@ -120,24 +120,17 @@ export default function DashboardPage() {
   const dashboard = useMemo(() => {
     if (!overview) return null
 
-    const orders = overview.orders || []
-    const products = overview.products || []
-    const leaveRequests = overview.leaveRequests || []
-    const revenueTrend = overview.revenueTrend || []
-    const todayOrderVolume = overview.todayOrderVolume || []
-    const allOrderVolume = overview.allOrderVolume || []
-
-    const activeOrders = orders.filter(
+    const activeOrders = overview.orders.filter(
       (order) => !['delivered', 'cancelled'].includes(order.status),
     )
     const overdueOrders = activeOrders.filter(
       (order) => order.delivery_time && new Date(order.delivery_time) < new Date(),
     )
-    const lowStockItems = products.filter(
+    const lowStockItems = overview.products.filter(
       (product) => product.quantity <= product.reorder_point,
     )
-    const pendingLeave = leaveRequests.filter((request) => request.status === 'pending')
-    const revenueDays = buildRevenueDays(revenueTrend)
+    const pendingLeave = overview.leaveRequests.filter((request) => request.status === 'pending')
+    const revenueDays = buildRevenueDays(overview.revenueTrend)
     const rawRevenueChange = overview.revenueComparison?.percentChange
     const revenueChange =
       rawRevenueChange !== null &&
@@ -147,13 +140,13 @@ export default function DashboardPage() {
         : null
 
     return {
-      ordersToday: todayOrderVolume.reduce((total, item) => total + item.count, 0),
+      ordersToday: overview.todayOrderVolume.reduce((total, item) => total + item.count, 0),
       revenueToday: Number(overview.todayRevenue?.totalRevenue ?? 0),
-      readyForPickup: allOrderVolume.find((item) => item._id === 'ready')?.count ?? 0,
+      readyForPickup: overview.allOrderVolume.find((item) => item._id === 'ready')?.count ?? 0,
       overdueOrders,
       lowStockItems,
       pendingLeave,
-      recentOrders: formatOrders(orders.slice(0, 4)),
+      recentOrders: formatOrders(overview.orders.slice(0, 4)),
       revenueDays,
       revenueTotal: revenueDays.reduce((total, day) => total + day.revenue, 0),
       revenueChange,
@@ -276,25 +269,22 @@ export default function DashboardPage() {
           {dashboard.overdueOrders.length > 0 && (
             <Attention
               title={`${dashboard.overdueOrders.length} overdue order${dashboard.overdueOrders.length === 1 ? '' : 's'}`}
-              subtitle="Past promised delivery time • Click to view"
-              onClick={() => navigate('/orders')}
+              subtitle="Past the promised delivery time"
             />
           )}
           {dashboard.lowStockItems.length > 0 && (
             <Attention
               title={`${dashboard.lowStockItems.length} products are low in stock`}
-              subtitle={`${dashboard.lowStockItems
+              subtitle={dashboard.lowStockItems
                 .slice(0, 3)
                 .map((item) => item.name)
-                .join(', ')} • Click to restock`}
-              onClick={() => navigate('/inventory')}
+                .join(', ')}
             />
           )}
           {dashboard.pendingLeave.length > 0 && (
             <Attention
               title={`${dashboard.pendingLeave.length} leave request${dashboard.pendingLeave.length === 1 ? '' : 's'} pending`}
-              subtitle="Awaiting review • Click to inspect"
-              onClick={() => navigate('/leave-requests')}
+              subtitle="Awaiting your review"
             />
           )}
           {attentionCount === 0 && (
@@ -332,24 +322,16 @@ export default function DashboardPage() {
   )
 }
 
-function Attention({ title, subtitle, onClick }) {
+function Attention({ title, subtitle }) {
   return (
-    <div
-      onClick={onClick}
-      className={`flex items-center gap-2.5 border-b border-gray-100 py-3 ${
-        onClick
-          ? 'cursor-pointer rounded-lg px-2 -mx-2 transition-all hover:bg-sky-50/60 active:scale-[0.99]'
-          : ''
-      }`}
-    >
-      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-red-50 text-red-600">
+    <div className="flex items-center gap-2.5 border-b border-gray-100 py-3">
+      <span className="grid size-8 place-items-center rounded-lg bg-red-50 text-red-600">
         <AlertTriangle className="size-4" />
       </span>
       <div className="grid flex-1">
-        <strong className="text-[11px] text-ink">{title}</strong>
-        <small className="mt-0.5 text-[9px] text-muted">{subtitle}</small>
+        <strong className="text-[11px]">{title}</strong>
+        <small className="mt-1 text-[9px] text-gray-400">{subtitle}</small>
       </div>
-      {onClick && <ArrowRight className="size-3.5 text-muted opacity-50 shrink-0" />}
     </div>
   )
 }

@@ -17,15 +17,11 @@ import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
-import { useToast } from '../../hooks/useToast'
-import { useDialog } from '../../hooks/useDialog'
 
 const emptyForm = { name: '', address: '', phone: '' }
 
 export default function BranchesPage() {
   const navigate = useNavigate()
-  const toast = useToast()
-  const { confirm } = useDialog()
   const [branches, setBranches] = useState([])
   const [employees, setEmployees] = useState([])
   const [query, setQuery] = useState('')
@@ -66,42 +62,26 @@ export default function BranchesPage() {
   async function submit(event) {
     event.preventDefault()
     try {
-      if (editingId) {
-        await updateBranch(editingId, form)
-        toast.success(`Branch "${form.name}" updated successfully.`)
-      } else {
-        await createBranch(form)
-        toast.success(`Branch "${form.name}" created successfully.`)
-      }
+      if (editingId) await updateBranch(editingId, form)
+      else await createBranch(form)
       setOpen(false)
       setEditingId('')
       setForm(emptyForm)
       setMessage('')
       load()
     } catch (error) {
-      const errMsg = error.response?.data?.message ?? 'Unable to save branch.'
-      setMessage(errMsg)
-      toast.error(errMsg)
+      setMessage(error.response?.data?.message ?? 'Unable to save branch.')
     }
   }
 
   async function remove(branch, event) {
     event.stopPropagation()
-    const confirmed = await confirm({
-      title: 'Delete Branch',
-      message: `Are you sure you want to delete branch "${branch.name}"? This action cannot be undone.`,
-      confirmText: 'Delete Branch',
-      tone: 'danger',
-    })
-    if (!confirmed) return
+    if (!window.confirm(`Delete ${branch.name}?`)) return
     try {
       await deleteBranch(branch._id)
-      toast.success(`Branch "${branch.name}" deleted.`)
       load()
     } catch (error) {
-      const errMsg = error.response?.data?.message ?? 'Unable to delete branch.'
-      setMessage(errMsg)
-      toast.error(errMsg)
+      setMessage(error.response?.data?.message ?? 'Unable to delete branch.')
     }
   }
 

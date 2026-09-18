@@ -24,13 +24,9 @@ const router = Router()
 router.use(authenticate)
 router.get('/me', getMyProfile)
 router.patch('/me', updateMyProfile)
-
-// Admin, Branch Manager, and Front Desk can query users (non-admins scoped to customers)
-router.get('/', authorize('admin', 'branch_manager', 'front_desk'), getAllUsers)
-
-// Admin-only user management routes
 router.use(authorize('admin'))
 
+router.get('/', getAllUsers)
 router.post('/', createUser)
 router.get('/:id/customer-report', getCustomerReport)
 router.get('/:id', getUserById)

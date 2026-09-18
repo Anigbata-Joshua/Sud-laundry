@@ -1,6 +1,5 @@
 import apiClient from './client'
 import { getOrders } from './orders.api'
-import { getLeaveRequests } from './leaveRequests.api'
 import {
   getOrderVolume,
   getRevenueComparison,
@@ -12,15 +11,6 @@ function startOfDay(date) {
   const result = new Date(date)
   result.setHours(0, 0, 0, 0)
   return result
-}
-
-async function safeFetch(requestPromise, fallback) {
-  try {
-    const response = await requestPromise
-    return response.data?.data ?? fallback
-  } catch {
-    return fallback
-  }
 }
 
 export async function getDashboardOverview(branchId = '') {
@@ -48,54 +38,42 @@ export async function getDashboardOverview(branchId = '') {
     products,
     leaveRequests,
   ] = await Promise.all([
-    safeFetch(getOrders({ limit: 100, ...branchParams }), []),
-    safeFetch(
-      getRevenueSummary({
-        startDate: toApiDate(today),
-        endDate: toApiDate(tomorrow),
-        ...branchParams,
-      }),
-      { totalRevenue: 0, count: 0, averageOrderValue: 0 },
-    ),
-    safeFetch(
-      getRevenueTrend({
-        startDate: toApiDate(currentStart),
-        endDate: toApiDate(tomorrow),
-        ...branchParams,
-      }),
-      [],
-    ),
-    safeFetch(
-      getRevenueComparison({
-        currentStart: toApiDate(currentStart),
-        currentEnd: toApiDate(tomorrow),
-        previousStart: toApiDate(previousStart),
-        previousEnd: toApiDate(previousEnd),
-        ...branchParams,
-      }),
-      { currentRevenue: 0, previousRevenue: 0, percentChange: null },
-    ),
-    safeFetch(
-      getOrderVolume({
-        startDate: toApiDate(today),
-        endDate: toApiDate(tomorrow),
-        ...branchParams,
-      }),
-      [],
-    ),
-    safeFetch(getOrderVolume(branchParams), []),
-    safeFetch(apiClient.get('/products', { params: branchParams }), []),
-    safeFetch(getLeaveRequests(branchParams), []),
+    getOrders({ limit: 100, ...branchParams }),
+    getRevenueSummary({
+      startDate: toApiDate(today),
+      endDate: toApiDate(tomorrow),
+      ...branchParams,
+    }),
+    getRevenueTrend({
+      startDate: toApiDate(currentStart),
+      endDate: toApiDate(tomorrow),
+      ...branchParams,
+    }),
+    getRevenueComparison({
+      currentStart: toApiDate(currentStart),
+      currentEnd: toApiDate(tomorrow),
+      previousStart: toApiDate(previousStart),
+      previousEnd: toApiDate(previousEnd),
+      ...branchParams,
+    }),
+    getOrderVolume({
+      startDate: toApiDate(today),
+      endDate: toApiDate(tomorrow),
+      ...branchParams,
+    }),
+    getOrderVolume(branchParams),
+    apiClient.get('/products', { params: branchParams }),
+    apiClient.get('/leave-requests'),
   ])
 
   return {
-    orders,
-    todayRevenue,
-    revenueTrend,
-    revenueComparison,
-    todayOrderVolume,
-    allOrderVolume,
-    products,
-    leaveRequests,
+    orders: orders.data.data,
+    todayRevenue: todayRevenue.data.data,
+    revenueTrend: revenueTrend.data.data,
+    revenueComparison: revenueComparison.data.data,
+    todayOrderVolume: todayOrderVolume.data.data,
+    allOrderVolume: allOrderVolume.data.data,
+    products: products.data.data,
+    leaveRequests: leaveRequests.data.data,
   }
 }

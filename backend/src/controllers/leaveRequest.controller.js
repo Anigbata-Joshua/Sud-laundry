@@ -12,9 +12,9 @@ export const submitLeaveRequest = asyncHandler(async (req, res, next) => {
     let { employee_id } = req.body;
     const currentUser = req.user;
 
-    // Staff roles can submit leave requests
-    if (!['employee', 'front_desk', 'inventory_officer'].includes(currentUser.role)) {
-        throw new ApiError(403, 'Only staff members can submit leave requests');
+    // Only employees can submit leave requests
+    if (currentUser.role !== 'employee') {
+        throw new ApiError(403, 'Only employees can submit leave requests');
     }
 
     if (!start_date || !end_date || !reason) {
@@ -62,42 +62,26 @@ export const getLeaveRequests = asyncHandler(async (req, res, next) => {
     const currentUser = req.user;
     let query = {};
 
-    // Customers don't have leave requests
-    if (currentUser.role === 'customer') {
-        return apiResponse(res, 200, [], 'Leave requests retrieved successfully');
-    }
-
-    // Employees and front-line staff see only their own requests
-    if (['employee', 'front_desk', 'inventory_officer'].includes(currentUser.role)) {
+    // Employees see only their own requests
+    if (currentUser.role === 'employee') {
+        // Get employee record for this user
         const employee = await Employee.findOne({ user_id: currentUser.id });
         if (!employee) {
-            // Return empty array instead of 404 to avoid breaking dashboard and overview widgets
-            return apiResponse(res, 200, [], 'Leave requests retrieved successfully');
+            throw new ApiError(404, 'Employee record not found');
         }
         query.employee_id = employee._id;
     }
     // Branch managers see requests for employees in their branch
     else if (currentUser.role === 'branch_manager') {
-        const branchId = req.query.branch_id || currentUser.branch_id;
-        if (branchId) {
-            const employees = await Employee.find({ branch_id: branchId });
-            const employeeIds = employees.map((e) => e._id);
-            query.employee_id = { $in: employeeIds };
-        }
+        const employees = await Employee.find({ branch_id: currentUser.branch_id });
+        const employeeIds = employees.map(e => e._id);
+        query.employee_id = { $in: employeeIds };
     }
-    // Admins see all requests (or filtered by branch if branch_id is provided)
-    else if (currentUser.role === 'admin') {
-        if (req.query.branch_id) {
-            const employees = await Employee.find({ branch_id: req.query.branch_id });
-            const employeeIds = employees.map((e) => e._id);
-            query.employee_id = { $in: employeeIds };
-        }
-    }
+    // Admins see all requests
 
     const leaveRequests = await LeaveRequest.find(query)
         .populate('employee_id')
-        .populate('approved_by', 'name email')
-        .sort({ createdAt: -1 });
+        .populate('approved_by', 'name email');
 
     return apiResponse(res, 200, leaveRequests, 'Leave requests retrieved successfully');
 });
