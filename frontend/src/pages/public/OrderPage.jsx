@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock,
   Minus,
+  Phone,
   Plus,
   ShieldCheck,
   Zap,
@@ -191,35 +192,56 @@ export default function OrderPage() {
               {/* Step 1: branch */}
               <div>
                 <StepLabel index="01" title="Choose a branch" />
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {branches.map((branch) => {
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {branches.map((branch, index) => {
                     const selected = branch._id === branchId
                     return (
                       <button
                         type="button"
                         key={branch._id}
                         onClick={() => selectBranch(branch._id)}
-                        className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                        style={{ animationDelay: `${index * 60}ms` }}
+                        className={`animate-fade-up relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                           selected
-                            ? 'border-brand bg-sky-50/60 ring-1 ring-brand'
+                            ? 'border-brand bg-sky-50/70 shadow-xs ring-2 ring-brand'
                             : 'border-line bg-white hover:border-slate-300'
                         }`}
                       >
+                        {/* Animated checkmark badge scaling in 0 -> 1 on selection */}
                         <span
-                          className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                            selected ? 'bg-brand text-white' : 'bg-gray-50 text-slate-500'
+                          className={`absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-brand text-white shadow-xs transition-transform duration-200 ease-out ${
+                            selected
+                              ? 'scale-100 opacity-100'
+                              : 'scale-0 opacity-0 pointer-events-none'
                           }`}
+                          aria-hidden="true"
                         >
-                          <Building2 className="size-4" />
+                          <Check className="size-3 stroke-[2.5]" />
                         </span>
-                        <span>
-                          <span className="block text-[13px] font-extrabold text-ink">
+
+                        <div>
+                          <span
+                            className={`grid size-9 shrink-0 place-items-center rounded-xl transition-colors duration-200 ${
+                              selected ? 'bg-brand text-white' : 'bg-slate-50 text-slate-500'
+                            }`}
+                          >
+                            <Building2 className="size-4" />
+                          </span>
+                          <span className="mt-3 block text-[13px] font-extrabold text-ink">
                             {branch.name}
                           </span>
-                          <span className="mt-0.5 block text-[12px] text-muted">
+                          <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">
                             {branch.address}
                           </span>
-                        </span>
+                        </div>
+
+                        {/* Real data only: render phone when available */}
+                        {branch.phone && (
+                          <span className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-2 font-mono text-[11px] text-slate-500">
+                            <Phone className="size-3 shrink-0 text-slate-400" />
+                            {branch.phone}
+                          </span>
+                        )}
                       </button>
                     )
                   })}
@@ -341,11 +363,23 @@ export default function OrderPage() {
                 Order summary
               </p>
               {cartItems.length === 0 ? (
-                <p className="mt-3 text-[12.5px] text-muted">Your order is empty — add a service to get started.</p>
+                <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                  <img
+                    src="/images/laundry-basket.png"
+                    alt="Laundry basket"
+                    className="size-12 shrink-0 object-contain"
+                  />
+                  <p className="text-[12.5px] text-muted">
+                    Your order is empty — select your branch and add a service.
+                  </p>
+                </div>
               ) : (
                 <ul className="mt-3 grid gap-2.5">
                   {cartItems.map((item) => (
-                    <li key={item.service._id} className="flex items-center justify-between text-[12.5px]">
+                    <li
+                      key={item.service._id}
+                      className="flex items-center justify-between text-[12.5px]"
+                    >
                       <span className="text-slate-600">
                         {item.quantity} × {item.service.name}
                       </span>
@@ -358,7 +392,9 @@ export default function OrderPage() {
               )}
               <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
                 <span className="text-[13px] font-bold text-ink">Total</span>
-                <span className="font-mono text-lg font-extrabold text-ink">{formatNaira(total)}</span>
+                <span className="font-mono text-lg font-extrabold text-ink">
+                  {formatNaira(total)}
+                </span>
               </div>
               {formError && (
                 <p className="mt-4 rounded-lg bg-red-50 p-3 text-[12px] font-semibold text-red-700">
@@ -459,47 +495,66 @@ function Confirmation({ order }) {
 
   return (
     <section className="grid min-h-[70vh] place-items-center px-4 py-16">
-      <div className="w-full max-w-md rounded-3xl border border-line bg-white p-8 shadow-sm">
-        <span className="grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
-          <Check className="size-5" />
-        </span>
-        <h1 className="mt-5 text-lg font-extrabold text-ink">Order placed</h1>
-        <p className="mt-1 font-mono text-[13px] font-semibold text-brand">{reference}</p>
-        <p className="mt-3 text-[13px] leading-relaxed text-muted">
-          We've notified our team at your branch. You'll get a notification here and in your
-          inbox at every step, from pickup to delivery.
-        </p>
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-line bg-white shadow-sm">
+        {/* Animated clean clothes hero header */}
+        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+          <img
+            src="/images/laundry-hero-clean.gif"
+            alt="Clean laundry processing"
+            className="size-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute bottom-3 left-4 flex items-center gap-2">
+            <span className="grid size-8 place-items-center rounded-xl bg-emerald-500 text-white shadow-sm">
+              <Check className="size-4.5 stroke-[2.5]" />
+            </span>
+            <div>
+              <p className="text-[11px] font-bold text-emerald-300 uppercase tracking-wide">
+                Confirmed
+              </p>
+              <p className="font-mono text-sm font-bold text-white">{reference}</p>
+            </div>
+          </div>
+        </div>
 
-        <ul className="mt-6 grid gap-3 border-t border-line pt-5">
-          {timeline.map((step) => (
-            <li key={step.label} className="flex items-center gap-3 text-[13px]">
-              <span
-                className={`grid size-5 shrink-0 place-items-center rounded-full ${
-                  step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
-                }`}
-              >
-                {step.done && <Check className="size-3" />}
-              </span>
-              <span className={step.done ? 'font-semibold text-ink' : 'text-slate-400'}>
-                {step.label}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="p-6 sm:p-8">
+          <h1 className="text-xl font-extrabold text-ink">Order placed successfully!</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">
+            We've notified our team at your branch. You'll get a notification here and in your inbox
+            at every step, from pickup to delivery.
+          </p>
 
-        <div className="mt-7 grid gap-2.5">
-          <Link
-            to={`/orders/${order._id}`}
-            className="rounded-xl bg-brand py-3 text-center text-[13px] font-bold text-white transition hover:bg-sky-700"
-          >
-            View order details
-          </Link>
-          <Link
-            to="/home"
-            className="rounded-xl border border-line py-3 text-center text-[13px] font-bold text-ink transition hover:border-slate-300"
-          >
-            Back to home
-          </Link>
+          <ul className="mt-6 grid gap-3 border-t border-line pt-5">
+            {timeline.map((step) => (
+              <li key={step.label} className="flex items-center gap-3 text-[13px]">
+                <span
+                  className={`grid size-5 shrink-0 place-items-center rounded-full ${
+                    step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
+                  }`}
+                >
+                  {step.done && <Check className="size-3 stroke-[2.5]" />}
+                </span>
+                <span className={step.done ? 'font-semibold text-ink' : 'text-slate-400'}>
+                  {step.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-7 grid gap-2.5">
+            <Link
+              to={`/orders/${order._id}`}
+              className="rounded-xl bg-brand py-3 text-center text-[13px] font-bold text-white shadow-sm transition hover:bg-sky-700"
+            >
+              View order details
+            </Link>
+            <Link
+              to="/home"
+              className="rounded-xl border border-line py-3 text-center text-[13px] font-bold text-ink transition hover:border-slate-300"
+            >
+              Back to home
+            </Link>
+          </div>
         </div>
       </div>
     </section>

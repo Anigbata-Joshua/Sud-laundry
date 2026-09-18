@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -7,8 +7,11 @@ import {
   Clock,
   Droplets,
   Flame,
+  Layers,
   MapPin,
+  Package,
   ShieldCheck,
+  Shuffle,
   Sparkles,
   Star,
 } from 'lucide-react'
@@ -16,55 +19,147 @@ import { getServices } from '../../api/services.api'
 import { getBranches } from '../../api/branches.api'
 import { formatNaira } from '../../utils/formatters'
 
-// Shown while the live catalog loads, and as a graceful fallback if the
-// API can't be reached — keeps the page useful rather than empty.
-const FALLBACK_SERVICES = [
+// All available services from backend seeder (backend/src/seeders/service.seeder.js)
+const SEEDER_SERVICES = [
+  {
+    _id: 'washing',
+    name: 'Washing',
+    category: 'Laundry',
+    price: 1000,
+    turnaround_hours: 72,
+    blurb: 'Deep wash cycle for everyday clothing, bed linens and towels.',
+  },
+  {
+    _id: 'wash-iron',
+    name: 'Washing & Ironing',
+    category: 'Laundry',
+    price: 1500,
+    turnaround_hours: 72,
+    blurb: 'Full wash cycle finished with crisp steam ironing ready for your closet.',
+  },
   {
     _id: 'wash-fold',
-    name: 'Wash & Fold',
-    category: 'Everyday laundry',
-    price: 1200,
-    turnaround_hours: 24,
-    icon: Droplets,
-    blurb: 'Everyday clothes and linens, washed, dried and folded per kilogram.',
-    featured: true,
+    name: 'Washing & Folding',
+    category: 'Laundry',
+    price: 1300,
+    turnaround_hours: 72,
+    blurb: 'Washed, dried, and neatly bundled into stacked folded packs.',
   },
   {
-    _id: 'dry-clean',
-    name: 'Dry Cleaning',
-    category: 'Delicate care',
-    price: 3500,
-    turnaround_hours: 48,
-    icon: Sparkles,
-    blurb: 'Suits, gowns and delicate fabrics, hand-finished by garment.',
-  },
-  {
-    _id: 'iron-press',
-    name: 'Ironing & Press',
-    category: 'Finishing',
+    _id: 'ironing',
+    name: 'Ironing',
+    category: 'Laundry',
     price: 800,
-    turnaround_hours: 12,
-    icon: Flame,
-    blurb: 'A crisp, pressed finish for shirts, trousers and uniforms.',
+    turnaround_hours: 24,
+    blurb: 'Wrinkle-free hand steam pressing for shirts, trousers and suits.',
   },
   {
-    _id: 'express',
-    name: 'Express Same-Day',
-    category: 'Priority',
+    _id: 'dry-cleaning',
+    name: 'Dry Cleaning',
+    category: 'Dry Cleaning',
+    price: 2500,
+    turnaround_hours: 48,
+    blurb: 'Gentle solvent care for blazers, gowns, silks and delicate fabrics.',
+  },
+  {
+    _id: 'dry-clean-press',
+    name: 'Dry Cleaning & Pressing',
+    category: 'Dry Cleaning',
+    price: 3000,
+    turnaround_hours: 48,
+    blurb: 'Delicate dry cleaning followed by structured hand pressing.',
+  },
+  {
+    _id: 'stain-removal',
+    name: 'Stain Removal',
+    category: 'Treatment',
+    price: 500,
+    turnaround_hours: 24,
+    blurb: 'Targeted enzyme pre-treatment for tough food, wine and grease marks.',
+  },
+  {
+    _id: 'duvet-cleaning',
+    name: 'Duvet Cleaning',
+    category: 'Household',
+    price: 3000,
+    turnaround_hours: 72,
+    blurb: 'Sanitizing large-drum hygiene wash and fluff drying for heavy duvets.',
+  },
+  {
+    _id: 'curtain-cleaning',
+    name: 'Curtain Cleaning',
+    category: 'Household',
+    price: 3500,
+    turnaround_hours: 72,
+    blurb: 'Dust mite removal and fabric-safe steam revitalization for drapes.',
+  },
+  {
+    _id: 'carpet-rug',
+    name: 'Carpet & Rug Cleaning',
+    category: 'Household',
+    price: 4000,
+    turnaround_hours: 72,
+    blurb: 'Deep fiber washing, spot treatment and fresh odor neutralizer.',
+  },
+  {
+    _id: 'shoe-cleaning',
+    name: 'Shoe Cleaning',
+    category: 'Specialty',
     price: 2000,
-    turnaround_hours: 8,
-    icon: Clock,
-    blurb: 'Drop off in the morning, wear it again by evening.',
+    turnaround_hours: 48,
+    blurb: 'Detailed sneaker and leather footwear cleansing and conditioning.',
+  },
+  {
+    _id: 'perfume-fragrance',
+    name: 'Perfume / Fragrance',
+    category: 'Finishing',
+    price: 300,
+    turnaround_hours: 12,
+    blurb: 'Long-lasting luxury fabric mist infused into your clean textiles.',
+  },
+  {
+    _id: 'special-packaging',
+    name: 'Special Packaging',
+    category: 'Finishing',
+    price: 500,
+    turnaround_hours: 12,
+    blurb: 'Protective dust-proof garment bags and hanger boxes for travel.',
   },
 ]
 
-function iconForCategory(category = '') {
-  const value = category.toLowerCase()
-  if (value.includes('dry') || value.includes('suit') || value.includes('gown')) return Sparkles
-  if (value.includes('iron') || value.includes('press') || value.includes('steam')) return Flame
-  if (value.includes('express') || value.includes('priority')) return Clock
-  if (value.includes('stain') || value.includes('care') || value.includes('luxury')) return ShieldCheck
+function iconForService(service = {}) {
+  const name = (service.name || '').toLowerCase()
+  const category = (service.category || '').toLowerCase()
+  if (name.includes('iron') || name.includes('press')) return Flame
+  if (name.includes('dry') || name.includes('silk') || name.includes('suit')) return Sparkles
+  if (name.includes('stain') || category.includes('treatment')) return ShieldCheck
+  if (
+    category.includes('house') ||
+    name.includes('duvet') ||
+    name.includes('curtain') ||
+    name.includes('carpet') ||
+    name.includes('rug')
+  ) {
+    return Layers
+  }
+  if (name.includes('package') || name.includes('box')) return Package
+  if (name.includes('shoe') || name.includes('perfume') || name.includes('fragrance')) {
+    return Sparkles
+  }
   return Droplets
+}
+
+function getRandomShuffle(list, count = 4) {
+  if (!list || list.length === 0) return []
+  const shuffled = [...list].sort(() => 0.5 - Math.random())
+  return shuffled.slice(0, count).map((item, index) => ({
+    ...item,
+    icon: iconForService(item),
+    blurb:
+      item.blurb ||
+      `${item.category || 'Professional service'} handled with dedicated attention to detail.`,
+    featured: index === 0,
+  }))
 }
 
 const STATUS_PREVIEW = [
@@ -93,27 +188,38 @@ const STEPS = [
 ]
 
 export default function HomePage() {
-  const [services, setServices] = useState(FALLBACK_SERVICES)
+  const [allServices, setAllServices] = useState(SEEDER_SERVICES)
+  const [services, setServices] = useState(() => getRandomShuffle(SEEDER_SERVICES, 4))
   const [branchCount, setBranchCount] = useState(null)
+  const [shuffleKey, setShuffleKey] = useState(0)
+
+  const shuffleCards = useCallback(() => {
+    setServices(getRandomShuffle(allServices, 4))
+    setShuffleKey((prev) => prev + 1)
+  }, [allServices])
 
   useEffect(() => {
     let active = true
     getServices({ is_active: true })
       .then((response) => {
         const items = response.data?.data ?? []
-        if (active && items.length) {
-          setServices(
-            items.slice(0, 4).map((service, index) => ({
-              ...service,
-              icon: iconForCategory(service.category),
-              blurb: service.category || 'Handled by our care team, start to finish.',
-              featured: index === 0,
-            })),
-          )
+        if (active && items.length > 0) {
+          // Merge with seeder blurbs if backend service matches
+          const enriched = items.map((item) => {
+            const match = SEEDER_SERVICES.find(
+              (s) => s.name.toLowerCase() === item.name.toLowerCase(),
+            )
+            return {
+              ...item,
+              blurb: item.blurb || match?.blurb || `${item.category} care by our team.`,
+            }
+          })
+          setAllServices(enriched)
+          setServices(getRandomShuffle(enriched, 4))
         }
       })
       .catch(() => {
-        /* keep fallback content */
+        /* keep default seeder fallback content */
       })
     getBranches()
       .then((response) => {
@@ -126,6 +232,14 @@ export default function HomePage() {
       active = false
     }
   }, [])
+
+  // Auto-shuffle cards periodically every 7 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      shuffleCards()
+    }, 7000)
+    return () => clearInterval(timer)
+  }, [shuffleCards])
 
   return (
     <>
@@ -182,39 +296,61 @@ export default function HomePage() {
             </dl>
           </div>
 
-          {/* Live order-status preview card — previews the real tracking feature */}
-          <div className="relative mx-auto w-full max-w-sm">
-            <div className="absolute -bottom-4 -right-4 -z-10 size-full rounded-3xl bg-sky-600/10" />
-            <div className="rounded-3xl border border-line bg-white p-5 shadow-xl shadow-slate-900/5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">
-                    Order
-                  </p>
-                  <p className="font-mono text-sm font-semibold text-ink">ORD-A93F2C</p>
+          {/* Hero visual column with full high-res image, smooth gradient overlay, and live status preview */}
+          <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+            <div className="animate-float-slow relative w-full">
+              {/* Full hero image container with smooth layered gradient */}
+              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-sky-100/60 bg-slate-900 shadow-2xl shadow-slate-900/15">
+                <img
+                  src="/images/hero-laundry-full.jpg"
+                  alt="Crisp folded shirts, plush linens and laundry basket in a modern sunlit laundry space"
+                  loading="eager"
+                  fetchPriority="high"
+                  className="size-full object-cover object-center transition-transform duration-700 ease-out hover:scale-105"
+                />
+                {/* Smooth multi-stop gradient overlays */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/25 to-transparent" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-sky-950/40 via-transparent to-black/10" />
+
+                {/* Floating brand pill */}
+                <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-slate-950/50 px-3.5 py-1.5 text-[11px] font-bold text-white shadow-xs backdrop-blur-md">
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  Suds Fabric Care • 100% Eco-Pure
                 </div>
-                <span className="grid size-9 place-items-center rounded-xl bg-sky-50 text-brand">
-                  <BellRing className="size-4" />
-                </span>
               </div>
-              <ul className="mt-5 grid gap-3.5">
-                {STATUS_PREVIEW.map((step) => (
-                  <li key={step.label} className="flex items-center gap-3 text-[13px]">
-                    <span
-                      className={`grid size-5 shrink-0 place-items-center rounded-full ${
-                        step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
-                      }`}
-                    >
-                      {step.done && <Check className="size-3" />}
-                    </span>
-                    <span className={step.done ? 'font-semibold text-ink' : 'text-slate-400'}>
-                      {step.label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-5 rounded-xl bg-sky-50 p-3 text-[11px] font-semibold text-brand">
-                You'll get a notification the moment this order is ready.
+
+              {/* Live order-status preview card — floating in front to create depth */}
+              <div className="relative mt-4 w-full rounded-2xl border border-line bg-white/95 p-4.5 shadow-xl shadow-slate-900/10 backdrop-blur-md sm:absolute sm:-bottom-6 sm:-left-6 sm:mt-0 sm:max-w-[18.5rem]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                      Order
+                    </p>
+                    <p className="font-mono text-sm font-semibold text-ink">ORD-A93F2C</p>
+                  </div>
+                  <span className="grid size-8.5 place-items-center rounded-xl bg-sky-50 text-brand">
+                    <BellRing className="size-4" />
+                  </span>
+                </div>
+                <ul className="mt-4 grid gap-2.5">
+                  {STATUS_PREVIEW.map((step) => (
+                    <li key={step.label} className="flex items-center gap-2.5 text-[12.5px]">
+                      <span
+                        className={`grid size-4.5 shrink-0 place-items-center rounded-full ${
+                          step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
+                        }`}
+                      >
+                        {step.done && <Check className="size-2.5 stroke-[3]" />}
+                      </span>
+                      <span className={step.done ? 'font-semibold text-ink' : 'text-slate-400'}>
+                        {step.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 rounded-xl bg-sky-50 p-2.5 text-[11px] font-semibold text-brand">
+                  You'll get a notification the moment this order is ready.
+                </div>
               </div>
             </div>
           </div>
@@ -224,30 +360,55 @@ export default function HomePage() {
       {/* ---------- Services ---------- */}
       <section id="services" className="border-t border-line bg-cream py-16 sm:py-24">
         <div className="mx-auto w-[92%] max-w-6xl">
-          <div className="max-w-md">
-            <h2 className="text-[26px] font-extrabold tracking-tight text-ink sm:text-3xl">
-              Every fabric, one drop-off.
-            </h2>
-            <p className="mt-3 text-[14px] leading-relaxed text-muted">
-              Choose from our core services when you book — pricing and turnaround shown up
-              front, so there's nothing to work out later.
-            </p>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div className="max-w-md">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
+                Featured Catalog
+              </p>
+              <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-3xl">
+                Every fabric, one drop-off.
+              </h2>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-muted">
+                Explore our full catalog from standard wash to luxury duvets, rugs and specialty
+                care — services randomly rotate to showcase what's available.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-semibold text-slate-500">
+                Showing 4 of {allServices.length} services
+              </span>
+              <button
+                type="button"
+                onClick={shuffleCards}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3.5 py-2 text-[12.5px] font-bold text-slate-700 shadow-2xs transition hover:border-sky-300 hover:text-brand active:scale-95"
+                title="Shuffle services"
+              >
+                <Shuffle className="size-3.5 text-brand" />
+                Shuffle
+              </button>
+            </div>
           </div>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {services.map((service) => {
+          <div key={shuffleKey} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {services.map((service, index) => {
               const Icon = service.icon ?? Droplets
               return (
                 <article
-                  key={service._id}
-                  className={`flex flex-col justify-between rounded-2xl border border-line bg-white p-6 transition hover:border-sky-300 hover:shadow-md ${
+                  key={`${service._id}-${index}`}
+                  style={{ animationDelay: `${index * 80}ms` }}
+                  className={`animate-fade-up flex flex-col justify-between rounded-2xl border border-line bg-white p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md ${
                     service.featured ? 'sm:col-span-2 sm:row-span-2 lg:col-span-2' : ''
                   }`}
                 >
                   <div>
-                    <span className="grid size-10 place-items-center rounded-xl bg-sky-50 text-brand">
-                      <Icon className="size-4.5" />
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="grid size-10 place-items-center rounded-xl bg-sky-50 text-brand">
+                        <Icon className="size-4.5" />
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold tracking-wide text-slate-600">
+                        {service.category}
+                      </span>
+                    </div>
                     <h3 className="mt-4 text-base font-extrabold text-ink">{service.name}</h3>
                     <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
                       {service.blurb}
@@ -257,10 +418,12 @@ export default function HomePage() {
                     <span className="font-mono text-sm font-semibold text-ink">
                       from {formatNaira(service.price)}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      <Clock className="size-3.5" />
-                      {service.turnaround_hours}hr
-                    </span>
+                    {service.turnaround_hours && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                        <Clock className="size-3.5" />
+                        {service.turnaround_hours}hr
+                      </span>
+                    )}
                   </div>
                 </article>
               )
