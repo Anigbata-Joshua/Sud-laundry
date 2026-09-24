@@ -13,7 +13,7 @@ const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
 
 // Maximum active orders an attendant can have at a time
 const MAX_ACTIVE_ORDERS_PER_EMPLOYEE = 5
-const NON_ACTIVE_ORDER_STATUSES = ['ready', 'delivered', 'cancelled']
+const NON_ACTIVE_ORDER_STATUSES = ['ready', 'sent_out', 'delivered', 'cancelled']
 
 // Count active orders for an employee
 async function countActiveOrdersForEmployee(employeeId) {

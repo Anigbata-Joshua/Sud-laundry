@@ -3,6 +3,7 @@ import { connectDatabase, closeDatabase } from './config/db.js';
 import app from './app.js';
 import logger from './utils/logger.js';
 import './jobs/lowStockCheck.job.js';
+import { startAutoPickupJob } from './jobs/autoPickup.job.js';
 
 // Server entry point
 
@@ -22,6 +23,7 @@ process.on('unhandledRejection', (err) => handleFatalError(err, 'UNHANDLED REJEC
 
 // Connect to database
 await connectDatabase();
+const autoPickupJob = startAutoPickupJob();
 
 const PORT = env.port;
 const server = app.listen(PORT, () => {
@@ -37,6 +39,7 @@ const server = app.listen(PORT, () => {
 // Graceful shutdown — handles both a local Ctrl+C (SIGINT) and a
 // hosting platform's stop/restart signal (SIGTERM).
 const gracefulShutdown = async (signal) => {
+    autoPickupJob.stop();
     logger.info(`🛑 Received ${signal}. Shutting down gracefully...`);
     try {
         await closeDatabase();

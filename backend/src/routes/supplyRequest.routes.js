@@ -17,9 +17,9 @@ const router = express.Router()
 router.use(authenticate)
 
 router.post('/', authorize('employee'), createRequest)
-router.get('/', authorize('admin', 'branch_manager', 'inventory_officer'), listRequests)
-router.get('/order/:orderId', authorize('admin', 'branch_manager', 'inventory_officer'), getOrderRequests)
-router.patch('/:id/approve', authorize('admin', 'inventory_officer'), approveRequest)
-router.patch('/:id/reject', authorize('admin', 'inventory_officer'), rejectRequest)
+router.get('/', authorize('admin', 'branch_manager', 'inventory_officer', 'inventory_manager'), listRequests)
+router.get('/order/:orderId', authorize('admin', 'branch_manager', 'inventory_officer', 'inventory_manager'), getOrderRequests)
+router.patch('/:id/approve', authorize('admin', 'inventory_officer', 'inventory_manager'), approveRequest)
+router.patch('/:id/reject', authorize('admin', 'inventory_officer', 'inventory_manager'), rejectRequest)
 
 export default router

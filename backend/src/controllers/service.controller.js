@@ -2,30 +2,71 @@
 // Purpose: service catalog CRUD with branch-scoping and cache management.
 
 import Service from '../models/service.model.js';
+import mongoose from 'mongoose';
+import ServiceCategory from '../models/serviceCategory.model.js';
+import { textQuery, literalSearch } from '../utils/listQuery.js';
 import Branch from '../models/branch.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
-import { withCache, deleteCached } from '../services/cache.service.js';
+import { deleteCached } from '../services/cache.service.js';
+
+async function resolveCategory({ category_id, category, branch_id }) {
+    if (category_id !== undefined) {
+        if (typeof category_id !== 'string' || !mongoose.isObjectIdOrHexString(category_id)) throw new ApiError(400, 'Invalid category_id');
+        const record = await ServiceCategory.findOne({ _id: category_id, branch_id, is_active: true });
+        if (!record) throw new ApiError(400, 'Choose an active category from this branch');
+        return { category_id: record._id, category: record.name };
+    }
+    // Legacy clients can continue sending category names; these become reusable records.
+    const name = category === undefined ? 'general' : category;
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) throw new ApiError(400, 'Category must contain 1 to 100 characters');
+    const key = name.trim().toLowerCase();
+    const record = await ServiceCategory.findOneAndUpdate(
+        { branch_id, name_key: key },
+        { $setOnInsert: { branch_id, name: name.trim(), name_key: key } },
+        { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
+    );
+    if (!record.is_active) throw new ApiError(400, 'This category is inactive');
+    return { category_id: record._id, category: record.name };
+}
+
+async function invalidateServices(branchId) {
+    await Promise.all([deleteCached('services:all'), deleteCached(`services:branch:${branchId}`)]);
+}
 
 
 // GET /services
 // Public service listing.
 // Only active services are shown. Optional ?branch_id= filters to one branch.
 export const getAllServices = asyncHandler(async (req, res) => {
-    const { branch_id } = req.query;
+    const { branch_id, category_id, type } = req.query;
     const filter = { is_active: true };
     if (branch_id) {
+        if (typeof branch_id !== 'string' || !mongoose.isObjectIdOrHexString(branch_id)) throw new ApiError(400, 'Invalid branch_id');
         filter.branch_id = branch_id;
     }
+    if (category_id !== undefined) {
+        if (typeof category_id !== 'string' || !mongoose.isObjectIdOrHexString(category_id)) throw new ApiError(400, 'Invalid category_id');
+        filter.category_id = category_id;
+    }
+    if (type !== undefined) {
+        if (!['service', 'add-on'].includes(type)) throw new ApiError(400, 'Invalid service type');
+        filter.type = type;
+    }
+    const category = textQuery(req.query.category, 'category');
+    if (category) filter.category = category;
+    const search = textQuery(req.query.q, 'q');
+    if (search) filter.name = literalSearch(search);
 
-    // Get services from cache base on branchId or get all
-    const cacheKey = branch_id ? `services:branch:${branch_id}` : 'services:all';
-    const services = await withCache(cacheKey, async () => {
+    const fetchServices = async () => {
         return await Service.find(filter)
-            .select('branch_id name type category price turnaround_hours is_active')
+            .select('branch_id name type category category_id price turnaround_hours is_active')
+            .populate('category_id', 'name description is_active')
             .sort({ name: 1 });
-    });
+    };
+    // Category names can change independently of services, so return populated data live.
+    const services = await fetchServices();
 
     return apiResponse(res, 200, services, 'Service list fetched successfully');
 });
@@ -34,7 +75,7 @@ export const getAllServices = asyncHandler(async (req, res) => {
 // GET /services/:id
 export const getServiceById = asyncHandler(async (req, res) => {
     const service = await Service.findById(req.params.id).select(
-        'branch_id name type category price turnaround_hours is_active');
+        'branch_id name type category category_id price turnaround_hours is_active').populate('category_id', 'name description is_active');
 
     if (!service) {
         throw new ApiError(404, 'Service not found');
@@ -48,7 +89,7 @@ export const getServiceById = asyncHandler(async (req, res) => {
 // Admin can create for any branch.
 // Branch manager can create only for their own branch.
 export const createService = asyncHandler(async (req, res) => {
-    const { branch_id, name, category, price, type = 'service', turnaround_hours, } = req.body;
+    const { branch_id, name, category, category_id, price, type = 'service', turnaround_hours, } = req.body;
 
     const currentUser = req.user;
 
@@ -58,7 +99,7 @@ export const createService = asyncHandler(async (req, res) => {
     }
 
     // Required fields
-    if (!branch_id || !name || price === undefined) {
+    if ((!branch_id && currentUser.role === 'admin') || !name || price === undefined) {
         throw new ApiError(400, 'branch_id, name and price are required');
     }
 
@@ -95,7 +136,10 @@ export const createService = asyncHandler(async (req, res) => {
         }
 
         serviceBranchId = currentUser.branch_id;
+        if (branch_id && String(branch_id) !== String(serviceBranchId)) throw new ApiError(403, 'You can only create services in your branch');
     }
+
+    if (!mongoose.isObjectIdOrHexString(serviceBranchId)) throw new ApiError(400, 'Invalid branch_id');
 
     // Verify branch exists.
     const branch = await Branch.findById(serviceBranchId);
@@ -114,17 +158,18 @@ export const createService = asyncHandler(async (req, res) => {
         throw new ApiError(409, 'A service with this name already exists at this branch');
     }
 
+    const categoryFields = await resolveCategory({ category_id, category, branch_id: serviceBranchId });
     const service = await Service.create({
         branch_id: serviceBranchId,
         name: trimmedName,
         type,
-        category: category?.trim() || 'general',
+        ...categoryFields,
         price,
         turnaround_hours: type === 'service' ? turnaround_hours : undefined,
         is_active: true,
     });
 
-    await deleteCached('services:all');
+    await invalidateServices(service.branch_id);
 
     return apiResponse(res, 201, service, 'Service created successfully');
 });
@@ -132,7 +177,7 @@ export const createService = asyncHandler(async (req, res) => {
 
 // PATCH /services/:id
 export const updateService = asyncHandler(async (req, res) => {
-    const { name, category, price, type, turnaround_hours, is_active, } = req.body;
+    const { name, category, category_id, price, type, turnaround_hours, is_active, } = req.body;
 
     const currentUser = req.user;
 
@@ -149,7 +194,7 @@ export const updateService = asyncHandler(async (req, res) => {
 
     // Branch manager can only update services in their branch.
     if (currentUser.role === 'branch_manager' &&
-        service.branch_id.toString() !== currentUser.branch_id.toString()
+        service.branch_id.toString() !== String(currentUser.branch_id)
     ) {
         throw new ApiError(403, 'You can only update services in your branch');
     }
@@ -183,15 +228,6 @@ export const updateService = asyncHandler(async (req, res) => {
         }
 
         service.name = trimmedName;
-    }
-
-    // Validate category.
-    if (category !== undefined) {
-        if (typeof category !== 'string' || !category.trim()) {
-            throw new ApiError(400, 'Category must be a valid non-empty string');
-        }
-
-        service.category = category.trim();
     }
 
     // Validate price.
@@ -232,9 +268,12 @@ export const updateService = asyncHandler(async (req, res) => {
         service.is_active = is_active;
     }
 
+    if (category !== undefined || category_id !== undefined) {
+        Object.assign(service, await resolveCategory({ category_id, category, branch_id: service.branch_id }));
+    }
     await service.save();
 
-    await deleteCached('services:all');
+    await invalidateServices(service.branch_id);
 
     return apiResponse(res, 200, service, 'Service updated successfully');
 });
@@ -258,7 +297,7 @@ export const removeService = asyncHandler(async (req, res) => {
 
     // Branch manager can only deactivate services in their branch.
     if (currentUser.role === 'branch_manager' &&
-        service.branch_id.toString() !== currentUser.branch_id.toString()
+        service.branch_id.toString() !== String(currentUser.branch_id)
     ) {
         throw new ApiError(403, 'You can only delete services in your branch');
     }
@@ -268,7 +307,7 @@ export const removeService = asyncHandler(async (req, res) => {
 
     await service.save();
 
-    await deleteCached('services:all');
+    await invalidateServices(service.branch_id);
 
     return apiResponse(res, 200, null, 'Service deactivated successfully');
 });

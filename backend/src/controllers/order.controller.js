@@ -12,6 +12,17 @@ import asyncHandler from '../utils/asyncHandler.js'
 import apiResponse from '../utils/apiResponse.js'
 import createNotification from '../services/notification.service.js'
 import { env } from '../config/env.js'
+import { transitionPickup } from '../services/orderPickup.service.js'
+
+export const confirmPickup = asyncHandler(async (req, res) => {
+  const order = await transitionPickup({ orderId: req.params.id, actor: req.user, action: 'confirm' })
+  return apiResponse(res, 200, order, 'Order marked as picked up')
+})
+
+export const sendOutOrder = asyncHandler(async (req, res) => {
+  const order = await transitionPickup({ orderId: req.params.id, actor: req.user, action: 'send' })
+  return apiResponse(res, 200, order, 'Order sent out; pickup confirmation is due in 2 days')
+})
 
 const DUPLICATE_ORDER_WINDOW_SECONDS = 10
 
@@ -256,7 +267,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
     ? order.branch_id._id.toString()
     : order.branch_id?.toString()
   if (
-    ['branch_manager', 'employee', 'front_desk'].includes(req.user.role) &&
+    ['branch_manager', 'employee', 'front_desk', 'inventory_manager', 'inventory_officer'].includes(req.user.role) &&
     branchId !== req.user.branch_id
   ) {
     throw new ApiError(403, 'Cannot view an order outside your branch')
@@ -267,6 +278,11 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
 // PATCH /orders/:id
 export const updateOrder = asyncHandler(async (req, res) => {
+  if (['sent_out', 'delivered'].includes(req.body.status)) {
+    if (Object.keys(req.body).length !== 1) throw new ApiError(400, 'Send pickup status changes separately from other order updates')
+    const updated = await transitionPickup({ orderId: req.params.id, actor: req.user, action: req.body.status === 'sent_out' ? 'send' : 'confirm' })
+    return apiResponse(res, 200, updated, 'Order updated successfully')
+  }
   const order = await Order.findById(req.params.id)
 
   if (!order) {
@@ -324,7 +340,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
 
   // STATUS
   if (status !== undefined) {
-    const allowedTransition = (order.status === 'placed' && status === 'received') || (order.status === 'ready' && status === 'delivered')
+    const allowedTransition = order.status === 'placed' && status === 'received'
     if (!allowedTransition) {
       throw new ApiError(409, 'Order status is controlled by its workflow')
     }

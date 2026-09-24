@@ -18,6 +18,7 @@ const serviceSchema = new mongoose.Schema(
         name: {type: String,required: true,trim: true,},
         type: {type: String,enum: ['service', 'add-on'],default: 'service',required: true,},
         category: {type: String,trim: true,},
+        category_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' },
         price: {type: Number,min: 0,required: true,},
         turnaround_hours: {type: Number,min: 1,},
 
@@ -32,6 +33,7 @@ const serviceSchema = new mongoose.Schema(
 
 // General branch lookup
 serviceSchema.index({ branch_id: 1 });
+serviceSchema.index({ branch_id: 1, category_id: 1, is_active: 1 });
 
 // Prevent duplicate service/add-on names within the same branch
 serviceSchema.index(

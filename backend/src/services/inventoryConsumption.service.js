@@ -4,6 +4,9 @@ import Product from '../models/product.model.js';
 import StockMovement from '../models/stockMovement.model.js';
 import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
+import Order from '../models/order.model.js';
+import SupplyRequest from '../models/supplyRequest.model.js';
+import ApiError from '../utils/apiError.js';
 import createNotification from './notification.service.js';
 import { SERVICE_SUPPLIES_RECIPE, DEFAULT_PACKAGING_PER_UNIT, STAGE_SERVICE_CATEGORIES, getTier } from '../config/serviceSupplies.config.js';
 import logger from '../utils/logger.js';
@@ -97,14 +100,27 @@ export async function disburseApprovedSupplies({ order, supplyRequest }) {
 
     try {
         await session.withTransaction(async () => {
+            lowStockAlerts.length = 0;
+            const claimed = await SupplyRequest.findOneAndUpdate(
+                { _id: supplyRequest._id, status: 'pending' },
+                { $set: { status: 'approved', reviewed_by: supplyRequest.reviewed_by, reviewed_at: supplyRequest.reviewed_at } },
+                { new: true, session },
+            );
+            if (!claimed) throw new ApiError(409, 'This request has already been reviewed');
+            // Reload for each transaction attempt so retries never duplicate usage entries.
+            const currentOrder = await Order.findById(order._id).session(session);
+            if (!currentOrder || String(currentOrder.branch_id) !== String(supplyRequest.branch_id)) throw new ApiError(409, 'Request order or branch is invalid');
             for (const line of supplyRequest.approved_items) {
                 const product = await Product.findById(line.product_id).session(session);
                 if (!product) {
-                    throw new Error(`Product not found: ${line.product_id}`);
+                    throw new ApiError(404, `Product not found: ${line.product_id}`);
                 }
+                if (!product.is_active || String(product.branch_id) !== String(supplyRequest.branch_id)) throw new ApiError(400, 'Approved items must be active products in the request branch');
+                line.product_name = product.name;
+                line.unit = product.unit;
 
                 if (product.quantity < line.quantity) {
-                    throw new Error(
+                    throw new ApiError(409,
                         `Insufficient stock for "${product.name}": have ${product.quantity} ${product.unit || 'units'}, tried to disburse ${line.quantity}`,
                     );
                 }
@@ -129,7 +145,7 @@ export async function disburseApprovedSupplies({ order, supplyRequest }) {
                     { session },
                 );
 
-                order.supplies_used.push({
+                currentOrder.supplies_used.push({
                     product_id: product._id,
                     name: product.name,
                     quantity_used: line.quantity,
@@ -148,7 +164,9 @@ export async function disburseApprovedSupplies({ order, supplyRequest }) {
                 }
             }
 
-            await order.save({ session });
+            await currentOrder.save({ session });
+            await SupplyRequest.updateOne({ _id: supplyRequest._id },
+                { $set: { approved_items: supplyRequest.approved_items } }, { session, runValidators: true });
         });
     } finally {
         await session.endSession();
@@ -178,7 +196,7 @@ export const notifyBranchManagersOfLowStock = async ({
 
         const managers = await User.find({
             _id: { $in: userIds },
-            role: 'branch_manager',
+            role: { $in: ['branch_manager', 'inventory_manager', 'inventory_officer'] },
             is_active: true,
         }).select('_id');
 

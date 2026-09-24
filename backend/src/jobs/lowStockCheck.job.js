@@ -63,7 +63,7 @@ export const checkLowStock = async () => {
         // Find active users who are branch managers
         const managers = await User.find({
             _id: { $in: employeeUserIds },
-            role: 'branch_manager',
+            role: { $in: ['branch_manager', 'inventory_manager', 'inventory_officer'] },
             is_active: true,
         }).select('_id');
 

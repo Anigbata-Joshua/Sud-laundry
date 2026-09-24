@@ -76,7 +76,7 @@ export const login = asyncHandler(async (req, res, next) => {
 
     // Retrieve branch_id if user is employee or branch_manager to include in JWT
     let branch_id = undefined;
-    if (['employee', 'branch_manager', 'front_desk','inventory_officer'].includes(user.role)) {
+    if (['employee', 'branch_manager', 'front_desk','inventory_officer', 'inventory_manager'].includes(user.role)) {
         const employee = await Employee.findOne({ user_id: user._id });
         if (employee) {
             branch_id = employee.branch_id.toString();
