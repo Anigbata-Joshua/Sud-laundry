@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 
 // Keep this the single source of truth for who sees what.
-export const ALL_STAFF_ROLES = ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer']
+export { STAFF_ROLES as ALL_STAFF_ROLES } from './roles'
 
 export const navigationGroups = [
   {
@@ -45,7 +45,7 @@ export const navigationGroups = [
         ],
         ['admin', 'branch_manager'],
       ],
-      ['Leave requests', '/leave-requests', CalendarDays], // all roles (default)
+      ['Leave requests', '/leave-requests', CalendarDays, null, null, ['admin', 'branch_manager', 'employee']],
     ],
   },
   {

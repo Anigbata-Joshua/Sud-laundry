@@ -4,6 +4,7 @@ import app from './app.js';
 import logger from './utils/logger.js';
 import './jobs/lowStockCheck.job.js';
 import { startAutoPickupJob } from './jobs/autoPickup.job.js';
+import { migrateInventoryRoles } from './services/inventoryRoleMigration.service.js';
 
 // Server entry point
 
@@ -23,6 +24,7 @@ process.on('unhandledRejection', (err) => handleFatalError(err, 'UNHANDLED REJEC
 
 // Connect to database
 await connectDatabase();
+await migrateInventoryRoles();
 const autoPickupJob = startAutoPickupJob();
 
 const PORT = env.port;

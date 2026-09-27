@@ -23,7 +23,7 @@ const userSchema = new Schema(
         },
           role: {
             type: String,
-            enum: ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer', 'inventory_manager', 'customer'],
+            enum: ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer', 'customer'],
             default: 'customer',
         },
         // Required for customers so the laundry can actually reach them

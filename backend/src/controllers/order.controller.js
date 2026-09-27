@@ -31,6 +31,9 @@ const FORCE_CANCEL_FEE_PERCENT = 30
 // POST /orders
 // Customer places an order
 export const createOrder = asyncHandler(async (req, res) => {
+  if (!['admin', 'customer'].includes(req.user.role)) {
+    throw new ApiError(403, 'Only customers and admins can create orders')
+  }
   const { branch_id, customer_id, items, pickup_time, priority = 'normal' } = req.body
   const customerId = req.user.role === 'admin' ? customer_id : req.user.id
 
@@ -267,7 +270,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
     ? order.branch_id._id.toString()
     : order.branch_id?.toString()
   if (
-    ['branch_manager', 'employee', 'front_desk', 'inventory_manager', 'inventory_officer'].includes(req.user.role) &&
+    ['branch_manager', 'employee', 'front_desk', 'inventory_officer'].includes(req.user.role) &&
     branchId !== req.user.branch_id
   ) {
     throw new ApiError(403, 'Cannot view an order outside your branch')

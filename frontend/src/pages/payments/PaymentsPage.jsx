@@ -1,3 +1,4 @@
+import { isWithinRefundWindow } from '../../utils/refundEligibility'
 import { useEffect, useMemo, useState } from 'react'
 import { CircleDollarSign, Plus, RotateCcw, WalletCards, X } from 'lucide-react'
 import { getOrders } from '../../api/orders.api'
@@ -209,6 +210,7 @@ export default function PaymentsPage() {
                     <td className="px-4 py-3">
                       {!isRefund &&
                         payment.status === 'completed' &&
+                        isWithinRefundWindow(payment.orderId) &&
                         !refundedPaymentIds.has(payment._id) && (
                           <Button
                             onClick={() => setRefundForm({ payment, amount: '', reason: '' })}

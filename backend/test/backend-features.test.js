@@ -37,7 +37,7 @@ const id = () => new mongoose.Types.ObjectId().toString();
 const branchId = id(), otherBranchId = id(), customerId = id(), orderId = id();
 const customer = { id: customerId, role: 'customer' };
 const manager = { id: id(), role: 'branch_manager', branch_id: branchId };
-const inventory = { id: id(), role: 'inventory_manager', branch_id: branchId };
+const inventory = { id: id(), role: 'inventory_officer', branch_id: branchId };
 const now = new Date('2026-09-24T12:00:00Z');
 const readyOrder = () => ({ _id: orderId, customer_id: customerId, branch_id: branchId, status: 'ready', received_at: new Date('2026-09-22T12:00:00Z') });
 
@@ -87,7 +87,7 @@ for (const [name, actor, action] of [
     ['another customer', { ...customer, id: id() }, 'confirm'],
     ['customer dispatch', customer, 'send'],
     ['another branch manager', { ...manager, branch_id: otherBranchId }, 'send'],
-    ['inventory manager dispatch', inventory, 'send'],
+    ['inventory officer dispatch', inventory, 'send'],
 ]) test(`pickup rejects ${name}`, async () => {
     const { update } = pickupMocks(readyOrder());
     await rejectsStatus(transitionPickup({ orderId, actor, action, now }), 403);
@@ -211,18 +211,18 @@ test('legacy category names become reusable categories on service creation', asy
     assert.equal(upsert.mock.calls[0].arguments[0].name_key, 'laundry');
 });
 
-test('inventory_manager is a valid user role', () => {
-    const user = new User({ name: 'Inventory', email: 'inventory@example.com', password_hash: 'hash', role: 'inventory_manager' });
+test('inventory_officer is a valid user role', () => {
+    const user = new User({ name: 'Inventory', email: 'inventory@example.com', password_hash: 'hash', role: 'inventory_officer' });
     assert.equal(user.validateSync(), undefined);
 });
-test('authentication attaches the inventory manager branch', async () => {
+test('authentication attaches the inventory officer branch', async () => {
     mock.method(User, 'findById', () => chain({ _id: inventory.id, role: inventory.role, is_active: true }));
     mock.method(Employee, 'findOne', async () => ({ branch_id: branchId, is_active: true }));
     const req = { headers: { authorization: `Bearer ${jwt.sign({ id: inventory.id }, process.env.JWT_SECRET)}` } };
     await new Promise((resolve, reject) => authenticate(req, {}, error => error ? reject(error) : resolve()));
     assert.equal(req.user.branch_id, branchId);
 });
-test('inventory manager product creation ignores a supplied foreign branch', async () => {
+test('inventory officer product creation ignores a supplied foreign branch', async () => {
     mock.method(Branch, 'findById', async () => ({}));
     mock.method(Product, 'findOne', async () => null);
     mock.method(Product, 'create', async fields => fields);
@@ -230,7 +230,7 @@ test('inventory manager product creation ignores a supplied foreign branch', asy
     assert.equal(result.data.branch_id, branchId);
     assert.equal(result.data.quantity, 0);
 });
-test('inventory manager cannot edit or deactivate another branch product', async () => {
+test('inventory officer cannot edit or deactivate another branch product', async () => {
     mock.method(Product, 'findById', async () => ({ branch_id: otherBranchId }));
     for (const handler of [products.updateProduct, products.deleteProduct]) {
         await rejectsStatus(invoke(handler, { user: inventory, params: { id: id() }, body: { name: 'Changed' } }), 403);
@@ -241,12 +241,12 @@ test('ordinary staff cannot bypass inventory approval with direct movements', as
         await rejectsStatus(invoke(stock.createStock, { user: { role }, body: { type: 'usage' } }), 403);
     }
 });
-test('inventory manager request queue is scoped to own branch', async () => {
+test('inventory officer request queue is scoped to own branch', async () => {
     const find = mock.method(SupplyRequest, 'find', () => chain([]));
     await invoke(requests.listRequests, { user: inventory, query: { branch_id: otherBranchId } });
     assert.equal(find.mock.calls[0].arguments[0].branch_id, branchId);
 });
-test('inventory manager cannot approve requests in another branch', async () => {
+test('inventory officer cannot approve requests in another branch', async () => {
     mock.method(SupplyRequest, 'findById', async () => ({ status: 'pending', branch_id: otherBranchId }));
     await rejectsStatus(invoke(requests.approveRequest, { user: inventory, params: { id: id() } }), 403);
 });
@@ -291,7 +291,7 @@ test('successful inventory approval commits stock, ledger, usage, and request in
     assert.equal(order.save.mock.calls[0].arguments[0].session, session);
 });
 
-test('new supply requests notify active branch inventory managers as well as legacy officers', async () => {
+test('new supply requests notify active branch inventory officers', async () => {
     const employeeId = id(), stepId = id(), workflowId = id();
     mock.method(ProcessingWorkflow, 'findById', async () => ({
         _id: workflowId, branch_id: branchId, order_id: orderId,
@@ -307,12 +307,12 @@ test('new supply requests notify active branch inventory managers as well as leg
     const result = await invoke(requests.createRequest, { user: { id: id(), role: 'employee' }, body: { workflow_id: workflowId, step_id: stepId } });
     assert.equal(result.code, 201);
     assert.equal(recipients.mock.calls[0].arguments[0].branch_id, branchId);
-    assert.ok(capture.populate.match.role.$in.includes('inventory_manager'));
+    assert.ok(capture.populate.match.role.$in.includes('inventory_officer'));
     assert.equal(notice.mock.calls[0].arguments[0].user_id, inventory.id);
     assert.equal(notice.mock.calls[0].arguments[0].type, 'supply_requested');
 });
 
-test('inventory manager can reject a pending request and notify its requester', async () => {
+test('inventory officer can reject a pending request and notify its requester', async () => {
     const requesterId = id();
     const request = { _id: id(), branch_id: branchId, order_id: orderId, requested_by: id(), status: 'pending', populate: async () => {} };
     mock.method(SupplyRequest, 'findById', async () => request);
@@ -341,4 +341,125 @@ test('ready schema records ready time without starting an automatic confirmation
     await order.validate();
     assert.ok(order.ready_at instanceof Date);
     assert.equal(order.auto_pickup_at, undefined);
+});
+
+const leave = await import('../src/controllers/leaveRequest.controller.js');
+const payments = await import('../src/controllers/payment.controller.js');
+const workflows = await import('../src/controllers/processingWorkflow.controller.js');
+const orders = await import('../src/controllers/order.controller.js');
+const { default: LeaveRequest } = await import('../src/models/leaveRequest.model.js');
+const { default: Payment } = await import('../src/models/payment.model.js');
+
+for (const role of ['customer', 'front_desk', 'inventory_officer']) {
+    test(`${role} cannot list leave requests`, async () => {
+        const read = mock.method(LeaveRequest, 'find', () => chain([]));
+        await rejectsStatus(invoke(leave.getLeaveRequests, { user: { role, id: id(), branch_id: branchId } }), 403);
+        assert.equal(read.mock.callCount(), 0);
+    });
+}
+for (const role of ['employee', 'branch_manager', 'front_desk', 'inventory_officer']) {
+    test(`${role} payment lists cannot escape its branch using an order filter`, async () => {
+        const branchOrders = mock.method(Order, 'find', () => chain([{ _id: orderId }]));
+        mock.method(Payment, 'countDocuments', async () => 0);
+        const read = mock.method(Payment, 'find', () => chain([]));
+        await invoke(payments.listPayments, { user: { role, branch_id: branchId }, query: { orderId: id() } });
+        assert.deepEqual(branchOrders.mock.calls[0].arguments[0], { branch_id: branchId });
+        assert.deepEqual(read.mock.calls[0].arguments[0].orderId, { $in: [orderId] });
+    });
+    test(`${role} cannot read payments for another branch`, async () => {
+        mock.method(Order, 'findById', async () => ({ branch_id: otherBranchId }));
+        await rejectsStatus(invoke(payments.getPaymentByOrder, { user: { role, branch_id: branchId }, params: { orderId } }), 403);
+    });
+    test(`${role} cannot create orders under its own staff identity`, async () => {
+        await rejectsStatus(invoke(orders.createOrder, { user: { role, id: id() } }), 403);
+    });
+}
+for (const role of ['branch_manager', 'front_desk', 'inventory_officer']) {
+    test(`${role} workflow list ignores a foreign branch filter`, async () => {
+        const read = mock.method(ProcessingWorkflow, 'find', () => chain([]));
+        await invoke(workflows.getWorkflows, { user: { role, branch_id: branchId }, query: { branch_id: otherBranchId } });
+        assert.deepEqual(read.mock.calls[0].arguments[0], { branch_id: branchId });
+    });
+    test(`${role} cannot read another branch order workflows`, async () => {
+        mock.method(Order, 'findById', async () => ({ branch_id: otherBranchId }));
+        await rejectsStatus(invoke(workflows.getOrderWorkflows, { user: { role, branch_id: branchId }, params: { orderId } }), 403);
+    });
+}
+for (const role of ['front_desk', 'inventory_officer']) {
+    test(`${role} cannot initialize or record electronic payments outside its branch`, async () => {
+        mock.method(Order, 'findById', async () => ({ branch_id: otherBranchId }));
+        for (const handler of [payments.initializePayment, payments.makePayment]) {
+            await rejectsStatus(invoke(handler, { user: { role, branch_id: branchId }, body: { orderId, email: 'test@example.com', paymentMethod: 'card' } }), 403);
+        }
+    });
+}
+test('frontend role and order enums match the database schemas', async () => {
+    const { ROLES } = await import('../../frontend/src/constants/roles.js');
+    const { ORDER_STATUSES } = await import('../../frontend/src/constants/orderStatuses.js');
+    assert.deepEqual(Object.values(ROLES).sort(), [...User.schema.path('role').enumValues].sort());
+    assert.deepEqual(Object.values(ORDER_STATUSES).sort(), [...Order.schema.path('status').enumValues].sort());
+});
+test('role landing pages avoid reports for operational staff', async () => {
+    const { getRoleHome } = await import('../../frontend/src/constants/roles.js');
+    assert.equal(getRoleHome('front_desk'), '/orders');
+    assert.equal(getRoleHome('inventory_officer'), '/inventory');
+    assert.equal(getRoleHome('employee'), '/processing');
+    assert.equal(getRoleHome('branch_manager'), '/');
+});
+
+for (const role of ['employee', 'branch_manager', 'admin']) {
+    test(`${role} retains its intended leave visibility`, async () => {
+        const employeeId = id();
+        mock.method(Employee, 'findOne', async () => ({ _id: employeeId }));
+        mock.method(Employee, 'find', async () => [{ _id: employeeId }]);
+        const read = mock.method(LeaveRequest, 'find', () => chain([]));
+        await invoke(leave.getLeaveRequests, { user: { role, id: id(), branch_id: branchId } });
+        const expected = role === 'admin' ? {} : { employee_id: role === 'employee' ? employeeId : { $in: [employeeId] } };
+        assert.deepEqual(read.mock.calls[0].arguments[0], expected);
+    });
+}
+for (const role of ['front_desk', 'inventory_officer']) {
+    test(`${role} can still view workflows in its own branch`, async () => {
+        mock.method(Order, 'findById', async () => ({ _id: orderId, branch_id: branchId }));
+        mock.method(ProcessingWorkflow, 'find', () => chain([]));
+        assert.equal((await invoke(workflows.getOrderWorkflows, { user: { role, branch_id: branchId }, params: { orderId } })).code, 200);
+    });
+}
+
+for (const role of ['admin', 'branch_manager']) {
+    for (const elapsed of [48 * 3600000, 48 * 3600000 + 1]) {
+        test(`${role} cannot refund at or after the delivery deadline (${elapsed})`, async () => {
+            mock.method(Date, 'now', () => now.getTime());
+            mock.method(Payment, 'findById', async () => ({ _id: id(), orderId, status: 'completed', amount: 500 }));
+            mock.method(Order, 'findById', async () => ({ status: 'delivered', delivered_at: new Date(now.getTime() - elapsed), branch_id: branchId }));
+            const write = mock.method(Payment, 'create', async () => ({}));
+            await rejectsStatus(invoke(payments.refundPayment, { user: { role, branch_id: branchId }, params: { id: id() }, body: { amount: 100, reason: 'Return' } }), 409);
+            assert.equal(write.mock.callCount(), 0);
+        });
+    }
+}
+for (const status of ['delivered', 'ready']) {
+    test(`refund remains available for ${status} order within the deadline`, async () => {
+        mock.method(Date, 'now', () => now.getTime());
+        mock.method(Payment, 'findById', async () => ({ _id: id(), orderId, status: 'completed', amount: 500 }));
+        mock.method(Order, 'findById', async () => ({ _id: orderId, status, delivered_at: new Date(now.getTime() - 48 * 3600000 + 1), branch_id: branchId, amount_due: 500, save: async () => {} }));
+        mock.method(Payment, 'aggregate', async () => []);
+        const write = mock.method(Payment, 'create', async fields => fields);
+        const result = await invoke(payments.refundPayment, { user: { role: 'admin', id: id() }, params: { id: id() }, body: { amount: 100, reason: 'Return' } });
+        assert.equal(result.code, 201);
+        assert.equal(write.mock.callCount(), 1);
+    });
+}
+test('delivered orders without a timestamp cannot bypass the refund deadline', async () => {
+    mock.method(Payment, 'findById', async () => ({ orderId, status: 'completed' }));
+    mock.method(Order, 'findById', async () => ({ status: 'delivered' }));
+    await rejectsStatus(invoke(payments.refundPayment, { user: { role: 'admin' }, body: { amount: 100, reason: 'Return' } }), 409);
+});
+test('frontend refund eligibility follows the delivery deadline', async () => {
+    const { isWithinRefundWindow } = await import('../../frontend/src/utils/refundEligibility.js');
+    const order = { status: 'delivered', delivered_at: now.toISOString() };
+    assert.equal(isWithinRefundWindow(order, now.getTime() + 48 * 3600000 - 1), true);
+    assert.equal(isWithinRefundWindow(order, now.getTime() + 48 * 3600000), false);
+    assert.equal(isWithinRefundWindow({ status: 'delivered' }), false);
+    assert.equal(isWithinRefundWindow({ status: 'ready' }), true);
 });

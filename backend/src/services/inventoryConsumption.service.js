@@ -196,7 +196,7 @@ export const notifyBranchManagersOfLowStock = async ({
 
         const managers = await User.find({
             _id: { $in: userIds },
-            role: { $in: ['branch_manager', 'inventory_manager', 'inventory_officer'] },
+            role: { $in: ['branch_manager', 'inventory_officer'] },
             is_active: true,
         }).select('_id');
 

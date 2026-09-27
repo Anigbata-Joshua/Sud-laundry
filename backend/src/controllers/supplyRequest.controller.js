@@ -97,7 +97,7 @@ export const createRequest = asyncHandler(async (req, res) => {
     is_active: true,
   }).populate({
     path: 'user_id',
-    match: { role: { $in: ['inventory_officer', 'inventory_manager'] }, is_active: true },
+    match: { role: { $in: ['inventory_officer'] }, is_active: true },
     select: '_id',
   })
 
@@ -121,7 +121,7 @@ export const createRequest = asyncHandler(async (req, res) => {
 
 // GET /supply-requests — inventory officer's queue (or admin/branch_manager oversight)
 export const listRequests = asyncHandler(async (req, res) => {
-  if (!['admin', 'branch_manager', 'inventory_officer', 'inventory_manager'].includes(req.user.role)) {
+  if (!['admin', 'branch_manager', 'inventory_officer'].includes(req.user.role)) {
     throw new ApiError(403, 'You do not have permission to view supply requests')
   }
 
@@ -150,7 +150,7 @@ export const getOrderRequests = asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, 'Order not found')
 
   if (
-    ['branch_manager', 'inventory_officer', 'inventory_manager'].includes(req.user.role) &&
+    ['branch_manager', 'inventory_officer'].includes(req.user.role) &&
     req.user.branch_id !== order.branch_id.toString()
   ) {
     throw new ApiError(403, 'You can only view requests for your branch')
@@ -167,10 +167,10 @@ export const getOrderRequests = asyncHandler(async (req, res) => {
 })
 
 async function assertOfficerScope(user, branchId) {
-  if (!['admin', 'inventory_officer', 'inventory_manager'].includes(user.role)) {
+  if (!['admin', 'inventory_officer'].includes(user.role)) {
     throw new ApiError(403, 'Only admins and inventory staff can review supply requests')
   }
-  if (['inventory_officer', 'inventory_manager'].includes(user.role) && user.branch_id !== branchId.toString()) {
+  if (['inventory_officer'].includes(user.role) && user.branch_id !== branchId.toString()) {
     throw new ApiError(403, 'You can only review requests for your branch')
   }
 }

@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -21,6 +22,8 @@ function isAvailableAt(service, branchId) {
 }
 
 export default function CreateOrderPage() {
+  const { user } = useAuth()
+  const isAdmin = user.role === 'admin'
   const navigate = useNavigate()
   const [options, setOptions] = useState({ branches: [], services: [], customers: [] })
   const [form, setForm] = useState({
@@ -34,7 +37,7 @@ export default function CreateOrderPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    Promise.all([getBranches(), getServices(), getUsers()])
+    Promise.all([getBranches(), getServices(), isAdmin ? getUsers() : Promise.resolve({ data: { data: [] } })])
       .then(([branches, services, users]) => {
         setOptions({
           branches: branches.data.data,
@@ -43,7 +46,7 @@ export default function CreateOrderPage() {
         })
       })
       .catch(() => setMessage('Unable to load order options.'))
-  }, [])
+  }, [isAdmin])
 
   const availableServices = useMemo(
     () => options.services.filter((service) => isAvailableAt(service, form.branch_id)),
@@ -112,7 +115,7 @@ export default function CreateOrderPage() {
       <Panel className="mx-auto max-w-3xl p-6">
         <form className="grid gap-5" onSubmit={submit}>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Customer">
+            {isAdmin && <Field label="Customer">
               <select required name="customer_id" value={form.customer_id} onChange={updateForm}>
                 <option value="">Select customer</option>
                 {options.customers.map((customer) => (
@@ -121,7 +124,7 @@ export default function CreateOrderPage() {
                   </option>
                 ))}
               </select>
-            </Field>
+            </Field>}
             <Field label="Branch">
               <select required name="branch_id" value={form.branch_id} onChange={updateForm}>
                 <option value="">Select branch</option>

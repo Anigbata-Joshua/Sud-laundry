@@ -101,7 +101,7 @@ export const createStock = asyncHandler(async (req, res) => {
     const { product_id, type, quantity, order_id, employee_id, } = req.body;
 
     // Only inventory staff can create movements.
-    if (!['admin', 'inventory_officer', 'inventory_manager'].includes(req.user.role)) {
+    if (!['admin', 'inventory_officer'].includes(req.user.role)) {
         throw new ApiError(403, 'You do not have permission to create stock movements');
     }
 

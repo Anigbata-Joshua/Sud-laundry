@@ -1,3 +1,4 @@
+import { STAFF_ROLE_OPTIONS } from '../../constants/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Eye, Plus, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -289,9 +290,7 @@ export default function EmployeesPage() {
                         onChange={(event) => setForm({ ...form, role: event.target.value })}
                         className="rounded-xl border border-line p-3 font-normal"
                       >
-                        <option value="employee">Employee</option>
-                        <option value="branch_manager">Branch manager</option>
-                        <option value="admin">Administrator</option>
+                        {STAFF_ROLE_OPTIONS.map(([role, label]) => <option key={role} value={role}>{label}</option>)}
                       </select>
                     </label>
                   )}

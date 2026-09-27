@@ -46,16 +46,17 @@ not been run against a live database as part of the code changes.
 `pagination: { page, limit, total, pages }`. Omitting pagination preserves the
 existing complete-list behavior for current clients.
 
-## Inventory manager
+## Inventory officer
 
-Admins can assign `inventory_manager` through employee creation or role updates.
+Admins can assign `inventory_officer` through employee creation or role updates.
 The account needs an active employee record and branch assignment. Login includes
 the branch context, and subsequent API requests enforce that branch.
 
-Inventory managers can create, update, and deactivate branch inventory products,
+Inventory officers can create, update, and deactivate branch inventory products,
 record stock movements, view supply requests, and approve or reject them. They
-receive new-request and low-stock notifications. Existing `inventory_officer`
-accounts continue working. Admins retain access; branch managers retain inventory
+receive new-request and low-stock notifications. Existing `inventory_manager` accounts are automatically migrated to
+`inventory_officer` at backend startup, before requests are accepted. The migration
+preserves account IDs and branch assignments and is safe to run repeatedly. Admins retain access; branch managers retain inventory
 catalog management and request oversight. Only admins and inventory staff can
 record stock movements; ordinary employees request supplies through their assigned
 workflow step instead of deducting stock directly.

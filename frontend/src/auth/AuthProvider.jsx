@@ -1,8 +1,9 @@
+import { ROLES } from '../constants/roles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentUser, login as loginRequest, logout as logoutRequest } from '../api/auth.api'
 import AuthContext from './auth.context'
 
-const ALLOWED_ROLES = ['admin', 'branch_manager', 'employee', 'front_desk', 'inventory_officer', 'customer']
+const ALLOWED_ROLES = Object.values(ROLES)
 
 // The session token itself lives only in an httpOnly cookie set by the
 // backend — it is never stored here, in localStorage, or anywhere else

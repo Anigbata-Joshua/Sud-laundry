@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
@@ -17,6 +18,7 @@ const tabs = [
   'Processing',
   'Quality check',
   'Ready',
+  'Sent out',
   'Delivered',
   'Cancelled',
 ]
@@ -46,6 +48,7 @@ function formatOrder(order, index) {
 }
 
 export default function OrdersPage() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { branchId } = useOutletContext()
   const [searchParams] = useSearchParams()
@@ -112,9 +115,9 @@ export default function OrdersPage() {
           columns={exportColumns}
           rows={exportRows}
         />
-        <Button primary onClick={() => navigate('/orders/new')}>
+        {user.role === 'admin' && <Button primary onClick={() => navigate('/orders/new')}>
           <Plus className="size-4" /> New order
-        </Button>
+        </Button>}
       </PageHeading>
       <Panel className="mb-3 flex flex-col justify-between gap-3 p-2 md:flex-row md:items-center">
         <div className="flex overflow-x-auto">

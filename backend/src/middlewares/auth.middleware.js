@@ -51,7 +51,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     };
 
     // Attach branch context for staff roles
-    if (['employee', 'branch_manager', 'front_desk', 'inventory_officer', 'inventory_manager'].includes(user.role)) {
+    if (['employee', 'branch_manager', 'front_desk', 'inventory_officer'].includes(user.role)) {
         const employee = await Employee.findOne({ user_id: user._id });
 
         if (!employee || !employee.branch_id || !employee.is_active) {

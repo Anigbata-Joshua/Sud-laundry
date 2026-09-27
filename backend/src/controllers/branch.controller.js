@@ -129,7 +129,6 @@ export const getBranchStats = asyncHandler(async (req, res) => {
         total: employees.length,
         active: employees.filter((e) => e.is_active && e.user_id?.is_active !== false).length,
         frontDesk: employees.filter((e) => e.user_id?.role === 'front_desk').length,
-        inventoryManagers: employees.filter((e) => e.user_id?.role === 'inventory_manager').length,
         inventoryOfficers: employees.filter((e) => e.user_id?.role === 'inventory_officer').length,
         attendants: employees.filter((e) => e.user_id?.role === 'employee').length,
         branchManagers: employees.filter((e) => e.user_id?.role === 'branch_manager').length,

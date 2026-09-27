@@ -136,7 +136,8 @@ export const getWorkflows = asyncHandler(async (req, res) => {
     const employee = await Employee.findOne({ user_id: req.user.id })
     if (!employee) throw new ApiError(404, 'Employee record not found')
     query['steps.employee_id'] = employee._id
-  } else if (req.user.role === 'branch_manager') {
+  } else if (req.user.role !== 'admin') {
+    if (!req.user.branch_id) throw new ApiError(403, 'You are not assigned to a branch')
     query.branch_id = req.user.branch_id
   } else if (req.query.branch_id) {
     query.branch_id = req.query.branch_id
@@ -160,14 +161,7 @@ export const getOrderWorkflows = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.orderId)
   if (!order) throw new ApiError(404, 'Order not found')
   
-  // Branch manager can only view workflows for their branch
-  if (req.user.role === 'branch_manager' && req.user.branch_id !== order.branch_id.toString()) {
-    throw new ApiError(403, 'You can only view workflows for your branch')
-  }
-
-  // Employee can only view workflows for their branch
-  if (!order) throw new ApiError(404, 'Order not found')
-  if (req.user.role === 'branch_manager' && req.user.branch_id !== order.branch_id.toString()) {
+  if (req.user.role !== 'admin' && req.user.branch_id !== order.branch_id.toString()) {
     throw new ApiError(403, 'You can only view workflows for your branch')
   }
 

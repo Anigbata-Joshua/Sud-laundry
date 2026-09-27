@@ -1,3 +1,4 @@
+import { getRoleHome } from '../constants/roles'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import LoginPage from '../auth/LoginPage'
 import ForgotPasswordPage from '../auth/ForgotPasswordPage'
@@ -73,7 +74,7 @@ export default function AppRoutes() {
             <Route
               index
               element={
-                user?.role === 'employee' ? <Navigate to="/processing" replace /> : <DashboardPage />
+                getRoleHome(user?.role) !== '/' ? <Navigate to={getRoleHome(user?.role)} replace /> : <DashboardPage />
 
               }
             />

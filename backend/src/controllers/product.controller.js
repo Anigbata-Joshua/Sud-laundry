@@ -123,7 +123,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     }
 
     // Branch manager and inventory officer are restricted to their own branch.
-    if (['branch_manager', 'inventory_officer', 'inventory_manager'].includes(req.user.role)) {
+    if (['branch_manager', 'inventory_officer'].includes(req.user.role)) {
         if (!req.user.branch_id) {
             throw new ApiError(403, 'You are not assigned to any branch');
         }
@@ -198,7 +198,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
     }
 
     // Branch manager and inventory officer can only update products in their branch.
-    if (['branch_manager', 'inventory_officer', 'inventory_manager'].includes(req.user.role)) {
+    if (['branch_manager', 'inventory_officer'].includes(req.user.role)) {
         if (!req.user.branch_id) {
             throw new ApiError(403,'You are not assigned to any branch');
         }
