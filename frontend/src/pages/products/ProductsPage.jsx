@@ -47,7 +47,7 @@ export default function ProductsPage() {
   const [message, setMessage] = useState('')
   const [showAnalytics, setShowAnalytics] = useState(true)
 
-  const canManage = ['admin', 'branch_manager'].includes(user.role)
+  const canManage = ['admin', 'branch_manager', 'inventory_officer'].includes(user.role)
 
   const effectiveBranchId = user.role === 'admin' ? selectedBranch : contextBranchId
 

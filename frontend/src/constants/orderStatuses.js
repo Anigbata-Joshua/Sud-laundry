@@ -1,8 +1,10 @@
-// Backend order vocabulary: keep UI labels and transitions based on these canonical values.
 export const ORDER_STATUSES = {
-  PENDING: 'pending',
+  PLACED: 'placed',
+  RECEIVED: 'received',
   PROCESSING: 'processing',
+  QUALITY_CHECK: 'quality_check',
   READY: 'ready',
-  COMPLETED: 'completed',
+  SENT_OUT: 'sent_out',
+  DELIVERED: 'delivered',
   CANCELLED: 'cancelled',
 }

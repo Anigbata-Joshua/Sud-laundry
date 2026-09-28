@@ -1,3 +1,4 @@
+import { getRoleHome } from '../constants/roles'
 import { useState } from 'react'
 import { Droplets, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
@@ -42,7 +43,7 @@ export default function LoginPage() {
 
     try {
       const user = await login(credentials)
-      navigate(user.role === 'employee' ? '/processing' : destination, { replace: true })
+      navigate(destination === '/' ? getRoleHome(user.role) : destination, { replace: true })
     } catch (requestError) {
       setError(getErrorMessage(requestError))
     } finally {

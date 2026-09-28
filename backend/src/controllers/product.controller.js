@@ -303,7 +303,7 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     }
 
     // Branch manager can only deactivate products in their branch.
-    if (req.user.role === 'branch_manager') {
+    if (req.user.role !== 'admin') {
         if (!req.user.branch_id) {
             throw new ApiError(403,'You are not assigned to any branch');
         }

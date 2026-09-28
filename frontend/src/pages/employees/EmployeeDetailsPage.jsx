@@ -1,3 +1,4 @@
+import { STAFF_ROLE_OPTIONS } from '../../constants/roles'
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Edit3 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -105,9 +106,7 @@ export default function EmployeeDetailsPage() {
                     value={form.role}
                     onChange={(event) => setForm({ ...form, role: event.target.value })}
                   >
-                    <option value="employee">Employee</option>
-                    <option value="branch_manager">Branch manager</option>
-                    <option value="admin">Administrator</option>
+                    {STAFF_ROLE_OPTIONS.map(([role, label]) => <option key={role} value={role}>{label}</option>)}
                   </select>
                 </label>
               )}

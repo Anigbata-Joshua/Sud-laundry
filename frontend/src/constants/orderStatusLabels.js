@@ -7,6 +7,7 @@ export const ORDER_STATUS_LABELS = {
   processing: 'Being processed',
   quality_check: 'Being inspected',
   ready: 'Ready for pickup',
+  sent_out: 'Sent out',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
 }

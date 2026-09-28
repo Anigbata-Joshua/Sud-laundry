@@ -60,6 +60,9 @@ export const submitLeaveRequest = asyncHandler(async (req, res, next) => {
 
 export const getLeaveRequests = asyncHandler(async (req, res, next) => {
     const currentUser = req.user;
+    if (!['admin', 'branch_manager', 'employee'].includes(currentUser.role)) {
+        throw new ApiError(403, 'You cannot view leave requests');
+    }
     let query = {};
 
     // Employees see only their own requests

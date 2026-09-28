@@ -21,15 +21,38 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import { withCache, deleteCached } from '../services/cache.service.js';
+import { textQuery, literalSearch, paginationQuery } from '../utils/listQuery.js';
 
 // GET /branches
 // Public branch listing.
 // Only expose fields required by the frontend/public API.
 export const getAllBranches = asyncHandler(async (req, res) => {
-    const branches = await withCache('branches:all', async () => {
-        return await Branch.find().select('name address phone').sort({ name: 1 });
-    });
-    apiResponse(res, 200, branches, 'Branches retrieved successfully');
+    const filter = {};
+    const search = textQuery(req.query.q ?? req.query.search, 'search');
+    if (search) filter.$or = ['name', 'address', 'phone'].map(field => ({ [field]: literalSearch(search) }));
+    for (const field of ['name', 'address', 'phone']) {
+        const value = textQuery(req.query[field], field);
+        if (value) filter[field] = literalSearch(value);
+    }
+    const sortBy = req.query.sort_by ?? 'name';
+    const sortOrder = req.query.sort_order ?? 'asc';
+    if (!['name', 'createdAt'].includes(sortBy) || !['asc', 'desc'].includes(sortOrder)) {
+        throw new ApiError(400, 'Use sort_by=name|createdAt and sort_order=asc|desc');
+    }
+    const pagination = paginationQuery(req.query);
+    const fetchBranches = () => {
+        const query = Branch.find(filter).select('name address phone')
+            .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1, _id: 1 });
+        return pagination ? query.skip(pagination.skip).limit(pagination.limit) : query;
+    };
+    if (pagination) {
+        const [branches, total] = await Promise.all([fetchBranches(), Branch.countDocuments(filter)]);
+        return res.status(200).json({ success: true, message: 'Branches retrieved successfully', data: branches,
+            pagination: { page: pagination.page, limit: pagination.limit, total, pages: Math.ceil(total / pagination.limit) } });
+    }
+    const branches = Object.keys(req.query).length === 0
+        ? await withCache('branches:all', fetchBranches) : await fetchBranches();
+    return apiResponse(res, 200, branches, 'Branches retrieved successfully');
 });
 
 // GET /branches/:id
@@ -148,6 +171,7 @@ export const getBranchStats = asyncHandler(async (req, res) => {
         processing: orders.filter((o) => o.status === 'processing').length,
         quality_check: orders.filter((o) => o.status === 'quality_check').length,
         ready: readyOrders.length,
+        sent_out: orders.filter((o) => o.status === 'sent_out').length,
         delivered: deliveredOrders.length,
         cancelled: orders.filter((o) => o.status === 'cancelled').length,
     };

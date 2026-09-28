@@ -3,6 +3,7 @@
 // Stock is only ever deducted from approveRequest() — never automatically.
 
 import Employee from '../models/employee.model.js'
+import mongoose from 'mongoose'
 import Order from '../models/order.model.js'
 import ProcessingWorkflow from '../models/processingWorkflow.model.js'
 import SupplyRequest from '../models/supplyRequest.model.js'
@@ -32,7 +33,7 @@ const requestPopulate = [
 ]
 
 async function getEmployeeForUser(userId) {
-  const employee = await Employee.findOne({ user_id: userId })
+  const employee = await Employee.findOne({ user_id: userId, is_active: true })
   if (!employee) throw new ApiError(404, 'Employee record not found')
   return employee
 }
@@ -51,7 +52,7 @@ export const createRequest = asyncHandler(async (req, res) => {
   if (!step) throw new ApiError(404, 'Workflow step not found')
 
   const employee = await getEmployeeForUser(req.user.id)
-  if (step.employee_id.toString() !== employee._id.toString()) {
+  if (String(workflow.branch_id) !== String(employee.branch_id) || String(step.employee_id) !== String(employee._id)) {
     throw new ApiError(403, 'Only the assigned employee can request supplies for this step')
   }
 
@@ -96,7 +97,7 @@ export const createRequest = asyncHandler(async (req, res) => {
     is_active: true,
   }).populate({
     path: 'user_id',
-    match: { role: 'inventory_officer', is_active: true },
+    match: { role: { $in: ['inventory_officer'] }, is_active: true },
     select: '_id',
   })
 
@@ -126,11 +127,13 @@ export const listRequests = asyncHandler(async (req, res) => {
 
   const filter = {}
   if (req.user.role !== 'admin') {
+    if (!req.user.branch_id) throw new ApiError(403, 'You are not assigned to a branch')
     filter.branch_id = req.user.branch_id
   } else if (req.query.branch_id) {
     filter.branch_id = req.query.branch_id
   }
   if (req.query.status) {
+    if (!['pending', 'approved', 'rejected'].includes(req.query.status)) throw new ApiError(400, 'Invalid request status')
     filter.status = req.query.status
   }
 
@@ -165,9 +168,9 @@ export const getOrderRequests = asyncHandler(async (req, res) => {
 
 async function assertOfficerScope(user, branchId) {
   if (!['admin', 'inventory_officer'].includes(user.role)) {
-    throw new ApiError(403, 'Only inventory officers can review supply requests')
+    throw new ApiError(403, 'Only admins and inventory staff can review supply requests')
   }
-  if (user.role === 'inventory_officer' && user.branch_id !== branchId.toString()) {
+  if (['inventory_officer'].includes(user.role) && user.branch_id !== branchId.toString()) {
     throw new ApiError(403, 'You can only review requests for your branch')
   }
 }
@@ -186,10 +189,14 @@ export const approveRequest = asyncHandler(async (req, res) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw new ApiError(400, 'Provide at least one approved item')
   }
+  const productIds = new Set()
   for (const item of items) {
-    if (!item.product_id || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+    if (!item || typeof item.product_id !== 'string' || !mongoose.isObjectIdOrHexString(item.product_id) || !Number.isFinite(item.quantity) || item.quantity <= 0) {
       throw new ApiError(400, 'Each item needs a valid product_id and positive quantity')
     }
+    const productId = item.product_id.toLowerCase()
+    if (productIds.has(productId)) throw new ApiError(400, 'Each product may only appear once in an approval')
+    productIds.add(productId)
   }
 
   const order = await Order.findById(request.order_id)
@@ -210,7 +217,6 @@ export const approveRequest = asyncHandler(async (req, res) => {
   // Disburse happens against the officer's final decision, atomically,
   // before the request itself is saved as approved.
   await disburseApprovedSupplies({ order, supplyRequest: request })
-  await request.save()
 
   const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`
   const attendant = await Employee.findById(request.requested_by).populate('user_id', '_id')
@@ -237,7 +243,7 @@ export const rejectRequest = asyncHandler(async (req, res) => {
 
   await assertOfficerScope(req.user, request.branch_id)
 
-  const reason = req.body.reason?.trim()
+  const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : ''
   if (!reason) throw new ApiError(400, 'A rejection reason is required')
 
   const officer = await getEmployeeForUser(req.user.id)
@@ -246,7 +252,12 @@ export const rejectRequest = asyncHandler(async (req, res) => {
   request.reviewed_by = officer._id
   request.reviewed_at = new Date()
   request.rejection_reason = reason
-  await request.save()
+  const rejected = await SupplyRequest.findOneAndUpdate(
+    { _id: request._id, status: 'pending' },
+    { $set: { status: 'rejected', reviewed_by: officer._id, reviewed_at: request.reviewed_at, rejection_reason: reason } },
+    { new: true, runValidators: true },
+  )
+  if (!rejected) throw new ApiError(409, 'This request has already been reviewed')
 
   const attendant = await Employee.findById(request.requested_by).populate('user_id', '_id')
   const order = await Order.findById(request.order_id)

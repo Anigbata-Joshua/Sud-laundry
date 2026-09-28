@@ -12,7 +12,7 @@ router.use(authenticate, authorize('admin', 'branch_manager', 'employee', 'inven
 
 router.get('/', stockMovementController.getAllStock);
 router.get('/:id', stockMovementController.getById);
-router.post('/', stockMovementController.createStock);
+router.post('/', authorize('admin', 'inventory_officer'), stockMovementController.createStock);
 router.patch('/:id', stockMovementController.updateStock);
 router.delete('/:id', stockMovementController.removeStock);
 

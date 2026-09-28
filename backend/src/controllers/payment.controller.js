@@ -98,9 +98,9 @@ export const initializePayment = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You do not have permission to pay for this order')
   }
 
-  // Branch manager and employee can initialize payment for their branch orders
+  // Staff can initialize payment only for their branch orders
   if (
-    ['branch_manager', 'employee'].includes(req.user.role) &&
+    ['branch_manager', 'employee', 'front_desk', 'inventory_officer'].includes(req.user.role) &&
     order.branch_id.toString() !== req.user.branch_id
   ) {
     throw new ApiError(403, 'You do not have permission to initialize payment for this order')
@@ -174,9 +174,9 @@ export const makePayment = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You do not have permission to pay for this order')
   }
 
-  // Branch manager and employee can only pay for their branch orders
+  // Staff can only pay for their branch orders
   if (
-    ['branch_manager', 'employee'].includes(req.user.role) &&
+    ['branch_manager', 'employee', 'front_desk', 'inventory_officer'].includes(req.user.role) &&
     order.branch_id.toString() !== req.user.branch_id
   ) {
     throw new ApiError(403, 'You do not have permission to pay for this order')
@@ -306,6 +306,15 @@ export const refundPayment = asyncHandler(async (req, res) => {
   if (req.user.role === 'branch_manager' && order.branch_id.toString() !== req.user.branch_id) {
     throw new ApiError(403, 'You can only refund payments from your branch')
   }
+  if (order.status === 'delivered') {
+    const deliveredAt = order.delivered_at ? new Date(order.delivered_at).getTime() : NaN
+    if (!Number.isFinite(deliveredAt)) {
+      throw new ApiError(409, 'Cannot refund a delivered order without a delivery timestamp')
+    }
+    if (Date.now() >= deliveredAt + 48 * 60 * 60 * 1000) {
+      throw new ApiError(409, 'Refunds are unavailable 48 hours after delivery')
+    }
+  }
   const [refunded] = await Payment.aggregate([
     {
       $match: {
@@ -355,8 +364,8 @@ export const getPaymentByOrder = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'You do not have permission to view this payment')
   }
 
-  // Branch managers can only view payments for their branch
-  if (req.user.role === 'branch_manager' && order.branch_id.toString() !== req.user.branch_id) {
+  // Staff can only view payments for their branch
+  if (req.user.role !== 'admin' && req.user.role !== 'customer' && order.branch_id.toString() !== req.user.branch_id) {
     throw new ApiError(403, 'You do not have permission to view this payment')
   }
 
@@ -394,8 +403,9 @@ export const listPayments = asyncHandler(async (req, res) => {
     const customerOrders = await Order.find({ customer_id: getUserId(req) }).select('_id')
     filter.orderId = { $in: customerOrders.map((order) => order._id) }
   }
-  // Branch managers are scoped to their branch
-  else if (req.user.role === 'branch_manager') {
+  // All non-admin staff are scoped to their branch
+  else if (req.user.role !== 'admin') {
+    if (!req.user.branch_id) throw new ApiError(403, 'You are not assigned to a branch')
     const branchOrders = await Order.find({ branch_id: req.user.branch_id }).select('_id')
     filter.orderId = { $in: branchOrders.map((order) => order._id) }
   }

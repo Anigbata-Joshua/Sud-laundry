@@ -201,9 +201,9 @@ export default function DashboardPage() {
           ]}
           rows={exportRows}
         />
-        <Button primary onClick={() => navigate('/orders/new')}>
+        {user.role === 'admin' && <Button primary onClick={() => navigate('/orders/new')}>
           <Plus className="size-4" /> New order
-        </Button>
+        </Button>}
       </PageHeading>
 
       <section className="mb-4 grid gap-3 sm:grid-cols-3">

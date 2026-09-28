@@ -21,6 +21,8 @@ router.get( '/', authorize('admin', 'branch_manager', 'employee', 'front_desk'),
 
 // Shared — customer (own order) or staff/admin (branch-scoped), checked inside the controller
 router.get('/:id', orderController.getOrderById);
+router.patch('/:id/pickup', authorize('customer', 'admin', 'branch_manager', 'front_desk'), orderController.confirmPickup);
+router.patch('/:id/send-out', authorize('admin', 'branch_manager', 'front_desk'), orderController.sendOutOrder);
 
 // Shared — customer cancellation or staff/admin update, both branch/ownership-checked inside the controller
 router.patch('/:id', orderController.updateOrder);

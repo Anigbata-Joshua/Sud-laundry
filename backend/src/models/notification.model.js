@@ -30,6 +30,7 @@ const notificationSchema = new mongoose.Schema(
         'payment_overpaid',
         'payment_refunded',
         'order_ready',
+        'order_sent_out',
         'order_delivered',
         'task_assigned',
         'welcome',

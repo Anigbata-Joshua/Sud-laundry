@@ -57,7 +57,7 @@ const orderSchema = new mongoose.Schema(
     branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
     status: {
       type: String,
-      enum: ['placed','received','processing','quality_check','ready','delivered','cancelled',],
+      enum: ['placed','received','processing','quality_check','ready','sent_out','delivered','cancelled',],
       default: 'placed',
     },
     fulfillment: {
@@ -69,6 +69,12 @@ const orderSchema = new mongoose.Schema(
 
     // Actual fulfillment timestamps
     picked_up_at: { type: Date },
+    ready_at: { type: Date },
+    sent_out_at: { type: Date },
+    auto_pickup_at: { type: Date },
+    pickup_confirmed_at: { type: Date },
+    pickup_confirmation_source: { type: String, enum: ['customer', 'staff', 'automatic'] },
+    pickup_confirmed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     received_at: { type: Date },
     processing_started_at: { type: Date },
     delivered_at: { type: Date },
@@ -98,6 +104,7 @@ const orderSchema = new mongoose.Schema(
 
 // Pre-validation hook to update actual fulfillment times
 orderSchema.pre('validate', function updateActualFulfillmentTimes() {
+  if (this.isModified('status') && this.status === 'ready' && !this.ready_at) this.ready_at = new Date()
   if (this.isModified('status') && this.status === 'received' && !this.received_at) {
     this.received_at = new Date()
   }
@@ -116,6 +123,7 @@ orderSchema.pre('validate', function updateActualFulfillmentTimes() {
 
 // Index for customer lookup
 orderSchema.index({ customer_id: 1 })
+orderSchema.index({ status: 1, auto_pickup_at: 1 })
 
 // Index for branch status
 orderSchema.index({ branch_id: 1, status: 1 })
