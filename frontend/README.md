@@ -1,39 +1,51 @@
 # Laundry App Frontend
 
-This is the React client for the Laundry App backend. The folder is scaffolded by domain so new work can be added without mixing API calls, screens, shared UI, and application state.
+React/Vite client for customer and staff laundry workflows. API calls use Axios with credentials for the backend's httpOnly authentication cookie.
 
-## What Is Template Code?
+See the [full-stack README](../README.md) for the complete change history for this work, permission matrix, refund policy, backend migration, and local setup.
 
-Most files under `src/` are starter templates. They establish the intended location, public component name, and backend feature boundary, but they do not yet implement production workflows. A template is significant because it is the agreed starting contract for the team: extend it in place, keep its responsibility focused, and connect it to the matching backend route.
+## Setup and commands
 
-The dashboard shell in `src/App.jsx`, its responsive styles, the Axios client, route configuration, constants, and the API starter functions are working foundations. Authentication, forms, tables, charts, detailed pages, and persistence still need real validation, loading states, error handling, permissions, and tests.
+Copy `.env.example` to `.env` and set `VITE_API_URL` to the actual backend API address, for example:
+
+```dotenv
+VITE_API_URL=http://localhost:3573/api/v1
+```
+
+The URL must match backend `PORT`. Restart Vite after changing `.env`. Do not put secrets in `VITE_` variables: they are available to browser code.
+
+```sh
+npm install
+npm run dev
+npm run build
+npm run lint
+```
+
+## Updated behavior
+
+- Role constants use `branch_manager`, not `manager`, and include all six backend roles. The login allowlist derives from those constants; employee forms share the complete staff-role options.
+- Inventory officers land on Inventory, front desk on Orders, employees on Processing, and admins/branch managers on Dashboard. Customers retain their orders home page.
+- Exact navigation-linked paths with explicit role restrictions are checked by `ProtectedRoute`. Staff `/orders/new` is admin-only. Backend authorization still controls actual data access.
+- Leave requests appear only for employees, branch managers, and admins.
+- Inventory officers have product-management controls. Record movement is shown only to admins and inventory officers.
+- New order on the staff Dashboard and Orders pages is admin-only. Customer order creation loads branches/services without calling the admin-only users endpoint; the customer selector is admin-only.
+- Order status constants match the backend: `placed`, `received`, `processing`, `quality_check`, `ready`, `sent_out`, `delivered`, `cancelled`. Sent out has a customer label and a staff filter.
+- Refund buttons require the existing payment eligibility conditions and `isWithinRefundWindow(payment.orderId)`. Delivered orders become ineligible at 48 hours after `delivered_at`. Missing/invalid timestamps also hide the action. The API checks the cutoff again when submitted; the UI does not run a dedicated expiry timer.
+- The customer profile page was not changed.
 
 ## Structure
 
-- `src/api/`: Axios modules matching backend route groups under `/api/v1`.
-- `src/auth/`: Login flows, auth context, and protected-route behavior.
-- `src/components/`: Reusable navigation, forms, tables, charts, and feedback UI.
-- `src/constants/`: Shared role and order-status values.
-- `src/hooks/`: Reusable stateful behavior and API lifecycle helpers.
-- `src/layouts/`: Page chrome for auth, customer, and staff experiences.
-- `src/pages/`: Feature screens grouped by backend domain.
-- `src/routes/`: URL-to-screen mapping and navigation metadata.
-- `src/store/`: Shared client-side state; replace placeholders with the chosen state strategy.
-- `src/utils/`: Formatting, browser storage, and API error helpers.
-- `src/styles/`: Shared design tokens and global styles.
+- `src/api/`: Domain API functions and shared Axios client.
+- `src/auth/`: Login, session state, and protected routes.
+- `src/components/`: Reusable forms, navigation, tables, and display components.
+- `src/constants/`: Role options, navigation metadata, and order statuses.
+- `src/hooks/` and `src/layouts/`: Shared hooks and customer/staff page layouts.
+- `src/pages/`: Domain screens.
+- `src/routes/`: Application route configuration.
+- `src/utils/`: Formatting and refund-eligibility helpers.
 
-## Expectations For Contributors
+## Verification and limitations
 
-When implementing a feature, start with the corresponding backend route and validator. Add API functions in `src/api/`, screen behavior in the matching `src/pages/` area, reusable pieces in `src/components/`, and route access rules in `src/routes/`. Keep secrets out of source control and use `VITE_API_URL` from `.env`.
+The latest implementation build succeeded with a bundle-size warning. Backend tests import the frontend role/status constants and refund helper to verify schema agreement and cutoff behavior. All 82 backend tests passed at the last implementation check.
 
-Every completed workflow should cover loading, empty, error, success, and unauthorized states. Match backend response shapes instead of inventing client-only contracts, and add tests when behavior or permissions are non-trivial.
-
-## Commands
-
-```bash
-npm run dev
-npm run lint
-npm run build
-```
-
-The backend currently mounts routes at `http://localhost:5000/api/v1` by default. Copy `.env.example` to `.env` and adjust `VITE_API_URL` when the backend runs elsewhere.
+The last full lint run reported 10 existing errors and 4 warnings involving unused imports and React effects/dependencies. These were not addressed by the role/refund changes. The build and unit tests do not replace browser testing of account-specific workflows.
