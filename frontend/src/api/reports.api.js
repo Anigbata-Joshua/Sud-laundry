@@ -14,3 +14,6 @@ export const getOrderVolume = (params) => apiClient.get('/reports/order-volume',
 export const getTopCustomers = (params) => apiClient.get('/reports/top-customers', { params })
 
 export const getTopServices = (params) => apiClient.get('/reports/top-services', { params })
+
+export const getBranchLeaderboard = (params) =>
+  apiClient.get('/reports/branch-leaderboard', { params })

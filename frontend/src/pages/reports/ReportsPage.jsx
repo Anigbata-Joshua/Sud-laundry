@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, CircleDollarSign, ShoppingBag, Users } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  BarChart3,
+  CircleDollarSign,
+  ShoppingBag,
+  Trophy,
+  Users,
+} from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import {
+  getBranchLeaderboard,
   getOrderVolume,
   getPaymentMethods,
   getRevenueSummary,
@@ -13,6 +23,7 @@ import ExportMenu from '../../components/common/ExportMenu'
 import PageHeading from '../../components/common/PageHeading'
 import Panel, { PanelTitle } from '../../components/common/Panel'
 import MetricCard from '../../components/dashboard/MetricCard'
+import { useAuth } from '../../hooks/useAuth'
 import { formatNaira } from '../../utils/formatters'
 
 function defaultDates() {
@@ -24,6 +35,8 @@ function defaultDates() {
 
 export default function ReportsPage() {
   const { branchId } = useOutletContext()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [dates, setDates] = useState(defaultDates)
   const [data, setData] = useState(null)
   const [message, setMessage] = useState('')
@@ -31,14 +44,20 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     const params = { ...dates, ...(branchId && { branch_id: branchId }) }
     try {
-      const responses = await Promise.all([
+      const requests = [
         getRevenueSummary(params),
         getRevenueTrend(params),
         getPaymentMethods(params),
         getOrderVolume(params),
         getTopCustomers(params),
         getTopServices(params),
-      ])
+      ]
+
+      if (isAdmin) {
+        requests.push(getBranchLeaderboard(dates))
+      }
+
+      const responses = await Promise.all(requests)
       setData({
         revenue: responses[0].data.data,
         trend: responses[1].data.data ?? [],
@@ -46,12 +65,13 @@ export default function ReportsPage() {
         volume: responses[3].data.data ?? [],
         customers: responses[4].data.data ?? [],
         services: responses[5].data.data ?? [],
+        leaderboard: isAdmin ? (responses[6]?.data?.data ?? []) : [],
       })
       setMessage('')
     } catch (error) {
       setMessage(error.response?.data?.message ?? 'Unable to load reports.')
     }
-  }, [branchId, dates])
+  }, [branchId, dates, isAdmin])
 
   useEffect(() => {
     const timer = setTimeout(load, 0)
@@ -77,6 +97,12 @@ export default function ReportsPage() {
         name: row.customerName,
         value: row.totalSpent,
         count: row.orders,
+      })),
+      ...(data?.leaderboard ?? []).map((row) => ({
+        section: 'Branch leaderboard',
+        name: row.branch_name,
+        value: row.totalRevenue,
+        count: row.orderCount,
       })),
     ],
     [data],
@@ -155,6 +181,9 @@ export default function ReportsPage() {
           note="Ranked by net spend"
         />
       </section>
+
+      {isAdmin && data?.leaderboard && <BranchLeaderboard data={data.leaderboard} />}
+
       <Panel className="mb-4 p-5">
         <PanelTitle eyebrow="Performance" title="Revenue over time" />
         <div className="mt-5 flex h-48 items-end gap-2 border-b border-line">
@@ -217,6 +246,183 @@ export default function ReportsPage() {
         />
       </div>
     </>
+  )
+}
+
+function BranchLeaderboard({ data = [] }) {
+  const [sortKey, setSortKey] = useState('totalRevenue')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortAsc(!sortAsc)
+    } else {
+      setSortKey(key)
+      setSortAsc(false)
+    }
+  }
+
+  const sortedData = useMemo(() => {
+    return [...data].sort((a, b) => {
+      let valA = a[sortKey] ?? 0
+      let valB = b[sortKey] ?? 0
+      if (typeof valA === 'string') valA = valA.toLowerCase()
+      if (typeof valB === 'string') valB = valB.toLowerCase()
+
+      if (valA < valB) return sortAsc ? -1 : 1
+      if (valA > valB) return sortAsc ? 1 : -1
+      return 0
+    })
+  }, [data, sortKey, sortAsc])
+
+  const sortColumns = [
+    { key: 'branch_name', label: 'Branch', align: 'left' },
+    { key: 'totalRevenue', label: 'Revenue', align: 'right' },
+    { key: 'orderCount', label: 'Orders', align: 'right' },
+    { key: 'onTimeRate', label: 'On-Time Rate', align: 'right' },
+    { key: 'avgTurnaroundHours', label: 'Avg Turnaround', align: 'right' },
+    { key: 'completedWorkflowSteps', label: 'Completed Steps', align: 'right' },
+  ]
+
+  return (
+    <Panel className="mb-4 p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-2 border-b border-line mb-4">
+        <div>
+          <PanelTitle eyebrow="Admin Intelligence" title="Branch Performance Leaderboard" />
+          <p className="text-xs text-gray-500 mt-1">
+            Comparative performance across revenue, operational throughput, and turnaround
+            efficiency.
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-line self-start sm:self-auto">
+          <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+          <span>Click any column header to sort</span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left">
+          <thead>
+            <tr className="border-b border-line text-gray-500 font-semibold bg-gray-50/75">
+              <th className="py-2.5 px-3 w-14 text-center">Rank</th>
+              {sortColumns.map((col) => {
+                const isActive = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={`py-2.5 px-3 cursor-pointer select-none transition-colors hover:text-sky-600 ${
+                      col.align === 'right' ? 'text-right' : 'text-left'
+                    } ${isActive ? 'text-sky-600 font-bold' : ''}`}
+                  >
+                    <div
+                      className={`inline-flex items-center gap-1.5 ${
+                        col.align === 'right' ? 'flex-row-reverse' : 'flex-row'
+                      }`}
+                    >
+                      <span>{col.label}</span>
+                      {isActive ? (
+                        sortAsc ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-sky-600" />
+                        ) : (
+                          <ArrowDown className="w-3.5 h-3.5 text-sky-600" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {sortedData.map((branch, index) => {
+              const rank = index + 1
+              let rankBadge = (
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-600 font-semibold text-[11px]">
+                  {rank}
+                </span>
+              )
+              if (rank === 1 && !sortAsc && sortKey === 'totalRevenue') {
+                rankBadge = (
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 font-bold text-[11px] shadow-sm ring-1 ring-amber-300">
+                    🥇
+                  </span>
+                )
+              } else if (rank === 2 && !sortAsc && sortKey === 'totalRevenue') {
+                rankBadge = (
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] shadow-sm ring-1 ring-slate-300">
+                    🥈
+                  </span>
+                )
+              } else if (rank === 3 && !sortAsc && sortKey === 'totalRevenue') {
+                rankBadge = (
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 font-bold text-[11px] shadow-sm ring-1 ring-orange-300">
+                    🥉
+                  </span>
+                )
+              }
+
+              return (
+                <tr key={branch.branch_id} className="hover:bg-sky-50/40 transition-colors group">
+                  <td className="py-3 px-3 text-center">{rankBadge}</td>
+                  <td className="py-3 px-3">
+                    <div className="font-semibold text-gray-900 group-hover:text-sky-700">
+                      {branch.branch_name}
+                    </div>
+                    {branch.address && (
+                      <div className="text-[10px] text-gray-400 truncate max-w-xs">
+                        {branch.address}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-right font-medium text-gray-900">
+                    {formatNaira(branch.totalRevenue)}
+                  </td>
+                  <td className="py-3 px-3 text-right text-gray-700">
+                    {branch.orderCount.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    {branch.onTimeRate !== null ? (
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                          branch.onTimeRate >= 90
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : branch.onTimeRate >= 75
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        {branch.onTimeRate}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 italic">No deliveries</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-right text-gray-700">
+                    {branch.avgTurnaroundHours > 0 ? (
+                      <span className="font-medium">{branch.avgTurnaroundHours} hrs</span>
+                    ) : (
+                      <span className="text-gray-400 italic">N/A</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-right font-medium text-sky-700">
+                    {branch.completedWorkflowSteps.toLocaleString()}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {sortedData.length === 0 && (
+        <div className="py-10 text-center text-xs text-gray-400">
+          No branch activity recorded for this period.
+        </div>
+      )}
+    </Panel>
   )
 }
 
