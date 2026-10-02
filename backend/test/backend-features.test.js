@@ -691,6 +691,11 @@ const payments = await import("../src/controllers/payment.controller.js");
 const workflows =
   await import("../src/controllers/processingWorkflow.controller.js");
 const orders = await import("../src/controllers/order.controller.js");
+const reportService = await import("../src/services/report.service.js");
+const reportController =
+  await import("../src/controllers/report.controller.js");
+const { default: reportRoutes } =
+  await import("../src/routes/report.routes.js");
 const { default: LeaveRequest } =
   await import("../src/models/leaveRequest.model.js");
 const { default: Payment } = await import("../src/models/payment.model.js");
@@ -1747,4 +1752,112 @@ test("createOrder notifies only branch_manager and front_desk staff alongside th
   assert(recipientIds.includes(managerUserId.toString()));
   assert(recipientIds.includes(frontDeskUserId.toString()));
   assert(!recipientIds.includes(attendantUserId.toString()));
+});
+
+test("getBranchLeaderboard calculates orders, revenue, on-time rate, avg turnaround, and completed steps", async () => {
+  const branch1Id = id(),
+    branch2Id = id();
+
+  mock.method(Branch, "find", () =>
+    chain([
+      {
+        _id: branch1Id,
+        name: "Lekki Branch",
+        address: "Lekki Phase 1",
+        phone: "08011111111",
+      },
+      {
+        _id: branch2Id,
+        name: "Ikeja Branch",
+        address: "Allen Avenue",
+        phone: "08022222222",
+      },
+    ]),
+  );
+
+  mock.method(Order, "aggregate", async () => [
+    {
+      _id: branch1Id,
+      orderCount: 2,
+      deliveredCount: 2,
+      onTimeCount: 1,
+      totalTurnaroundHours: 46,
+      turnaroundCount: 2,
+    },
+  ]);
+
+  mock.method(Payment, "aggregate", async () => [
+    {
+      _id: branch1Id,
+      totalRevenue: 15000,
+    },
+  ]);
+
+  mock.method(ProcessingWorkflow, "aggregate", async () => [
+    {
+      _id: branch1Id,
+      completedSteps: 4,
+    },
+  ]);
+
+  const result = await reportService.getBranchLeaderboard({
+    startDate: "2026-10-01",
+    endDate: "2026-10-31",
+  });
+
+  assert.equal(result.length, 2);
+
+  const lekki = result.find((b) => b.branch_id === branch1Id);
+  assert(lekki);
+  assert.equal(lekki.branch_name, "Lekki Branch");
+  assert.equal(lekki.orderCount, 2);
+  assert.equal(lekki.totalRevenue, 15000);
+  assert.equal(lekki.avgTurnaroundHours, 23);
+  assert.equal(lekki.onTimeRate, 50);
+  assert.equal(lekki.completedWorkflowSteps, 4);
+
+  const ikeja = result.find((b) => b.branch_id === branch2Id);
+  assert(ikeja);
+  assert.equal(ikeja.branch_name, "Ikeja Branch");
+  assert.equal(ikeja.orderCount, 0);
+  assert.equal(ikeja.totalRevenue, 0);
+  assert.equal(ikeja.avgTurnaroundHours, 0);
+  assert.equal(ikeja.onTimeRate, null);
+  assert.equal(ikeja.completedWorkflowSteps, 0);
+});
+
+test("getBranchLeaderboard rejects invalid date ranges", async () => {
+  await assert.rejects(
+    reportService.getBranchLeaderboard({
+      startDate: "2026-10-31",
+      endDate: "2026-10-01",
+    }),
+    /startDate must be before endDate/,
+  );
+});
+
+test("getBranchLeaderboardReport endpoint returns 200 with leaderboard data", async () => {
+  const branchIdVal = id();
+  mock.method(Branch, "find", () =>
+    chain([
+      {
+        _id: branchIdVal,
+        name: "Victoria Island",
+        address: "Adeola Odeku",
+        phone: "08033333333",
+      },
+    ]),
+  );
+  mock.method(Order, "aggregate", async () => []);
+  mock.method(Payment, "aggregate", async () => []);
+  mock.method(ProcessingWorkflow, "aggregate", async () => []);
+
+  const res = await invoke(reportController.getBranchLeaderboardReport, {
+    user: { role: "admin", id: id() },
+    query: { startDate: "2026-10-01", endDate: "2026-10-10" },
+  });
+
+  assert.equal(res.code, 200);
+  assert.equal(res.data.length, 1);
+  assert.equal(res.data[0].branch_name, "Victoria Island");
 });
