@@ -1,14 +1,14 @@
 // Shared foundation.
 // Purpose: load and export environment variables in one place.
 
-import crypto from 'crypto';
-import dotenv from 'dotenv';
-import logger from '../utils/logger.js';
+import crypto from "crypto";
+import dotenv from "dotenv";
+import logger from "../utils/logger.js";
 
 dotenv.config();
 
-const nodeEnv = process.env.NODE_ENV || 'development';
-const isProduction = nodeEnv === 'production';
+const nodeEnv = process.env.NODE_ENV || "development";
+const isProduction = nodeEnv === "production";
 
 // A missing JWT secret must never fall back to a fixed, known string —
 // that effectively lets anyone forge admin tokens. In production we fail
@@ -17,58 +17,71 @@ const isProduction = nodeEnv === 'production';
 // invalidates existing tokens, which makes the missing config obvious
 // immediately instead of shipping a guessable secret.
 function resolveJwtSecret() {
-    if (process.env.JWT_SECRET) {
-        return process.env.JWT_SECRET;
-    }
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
 
-    if (isProduction) {
-        throw new Error('JWT_SECRET must be set in production. Refusing to start.');
-    }
+  if (isProduction) {
+    throw new Error("JWT_SECRET must be set in production. Refusing to start.");
+  }
 
-    logger.warn(
-        '⚠️  JWT_SECRET is not set — using a random secret for this process only. ' +
-        'Set JWT_SECRET in backend/.env so tokens survive a restart.'
-    );
-    return crypto.randomBytes(48).toString('hex');
+  logger.warn(
+    "⚠️  JWT_SECRET is not set — using a random secret for this process only. " +
+      "Set JWT_SECRET in backend/.env so tokens survive a restart.",
+  );
+  return crypto.randomBytes(48).toString("hex");
 }
 
 export const env = {
-    port: parseInt(process.env.PORT, 10) || 3573,
-    databaseUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/laundry',
+  port: parseInt(process.env.PORT, 10) || 3573,
+  databaseUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/laundry",
 
+  mongoUri: process.env.MONGODB_URI || "mongodb://localhost:27017/laundry",
+  redisUrl: process.env.REDIS_URL,
 
-    mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/laundry',
-    redisUrl: process.env.REDIS_URL,
+  jwtSecret: resolveJwtSecret(),
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "1d",
 
+  nodeEnv,
+  isProduction,
+  logLevel: process.env.LOG_LEVEL || (isProduction ? "info" : "debug"),
 
-    jwtSecret: resolveJwtSecret(),
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  corsOrigins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",")
+    : [],
+  frontendURI:
+    process.env.FRONTEND_URI ||
+    process.env.CLIENT_URL ||
+    "http://localhost:5173",
 
-    nodeEnv,
-    isProduction,
-    logLevel: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
+  rateLimit:
+    parseInt(
+      process.env.RATE_LIMIT_WINDOW_MS || process.env.RATE_LIMIT_WINDOW,
+      10,
+    ) || 15 * 60 * 1000, // 15 mins default
+  generalRateLimitMax:
+    parseInt(
+      process.env.GENERAL_RATE_LIMIT_MAX || process.env.RATE_LIMIT_MAX,
+      10,
+    ) || 300,
+  rateLimitMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 20, // strict limiter max
+  cancellationWindowMinutes:
+    parseInt(process.env.CANCELLATION_WINDOW_MINUTES, 10) || 30,
+  expressSurchargePercent: Number(process.env.EXPRESS_SURCHARGE_PERCENT) || 30,
+  adminDigestSchedule: process.env.ADMIN_DIGEST_SCHEDULE || "0 8 * * 1",
 
-    corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [],
-    frontendURI: process.env.FRONTEND_URI || process.env.CLIENT_URL || 'http://localhost:5173',
+  // Email settings
+  useMockEmail: process.env.USE_MOCK_EMAIL === "true",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  resendFromDomain: process.env.RESEND_FROM_DOMAIN || "resend.dev",
 
-    rateLimit: parseInt(process.env.RATE_LIMIT_WINDOW_MS || process.env.RATE_LIMIT_WINDOW, 10) || 15 * 60 * 1000, // 15 mins default
-    generalRateLimitMax: parseInt(process.env.GENERAL_RATE_LIMIT_MAX || process.env.RATE_LIMIT_MAX, 10) || 300,
-    rateLimitMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 20, // strict limiter max
-    cancellationWindowMinutes: parseInt(process.env.CANCELLATION_WINDOW_MINUTES, 10) || 30,
-    expressSurchargePercent: Number(process.env.EXPRESS_SURCHARGE_PERCENT) || 30,
+  // Payment settings
+  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY || "",
 
-    // Email settings
-    useMockEmail: process.env.USE_MOCK_EMAIL === 'true',
-    resendApiKey: process.env.RESEND_API_KEY || '',
-    resendFromDomain: process.env.RESEND_FROM_DOMAIN || 'resend.dev',
-
-    // Payment settings
-    paystackSecretKey: process.env.PAYSTACK_SECRET_KEY || '',
-
-    // Explicit opt-in for the "test_" reference bypass in makePayment.
-    // Deliberately separate from NODE_ENV so it can never be accidentally
-    // true in a real deployment just because NODE_ENV was left unset.
-    allowTestPayments: process.env.ALLOW_TEST_PAYMENTS === 'true',
+  // Explicit opt-in for the "test_" reference bypass in makePayment.
+  // Deliberately separate from NODE_ENV so it can never be accidentally
+  // true in a real deployment just because NODE_ENV was left unset.
+  allowTestPayments: process.env.ALLOW_TEST_PAYMENTS === "true",
 };
 
 export default env;

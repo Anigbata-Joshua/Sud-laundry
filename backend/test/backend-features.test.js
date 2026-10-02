@@ -36,6 +36,7 @@ const inventoryService =
 const { disburseApprovedSupplies } =
   await import("../src/services/inventoryConsumption.service.js");
 const { confirmOverduePickups } = await import("../src/jobs/autoPickup.job.js");
+const { generateAdminDigests } = await import("../src/jobs/adminDigest.job.js");
 const { default: authenticate } =
   await import("../src/middlewares/auth.middleware.js");
 const { default: jwt } = await import("jsonwebtoken");
@@ -1580,4 +1581,170 @@ test("adjustReservedSuppliesForIntake modifies reservations when item counts cha
   assert.deepEqual(detergentCall.arguments[1], {
     $inc: { reserved_quantity: 1 },
   });
+});
+
+test("generateAdminDigests aggregates orders per branch and sends branch_digest notifications to active admins", async () => {
+  const admin1Id = id(),
+    admin2Id = id(),
+    branch1Id = id(),
+    branch2Id = id();
+
+  mock.method(User, "find", () =>
+    chain([
+      { _id: admin1Id, role: "admin", is_active: true },
+      { _id: admin2Id, role: "admin", is_active: true },
+    ]),
+  );
+  mock.method(Branch, "find", () =>
+    chain([
+      { _id: branch1Id, name: "Ikeja Main", is_active: true },
+      { _id: branch2Id, name: "VI Branch", is_active: true },
+    ]),
+  );
+  mock.method(Order, "aggregate", async () => [
+    { _id: branch1Id, orderCount: 5, totalRevenue: 25000 },
+  ]);
+
+  const createdNotifs = [];
+  mock.method(Notification, "create", async (payload) => {
+    createdNotifs.push(payload);
+    return payload;
+  });
+
+  const result = await generateAdminDigests({
+    now: new Date("2026-10-01T08:00:00Z"),
+  });
+
+  assert.equal(result.adminCount, 2);
+  assert.equal(result.branchCount, 2);
+  assert.equal(result.notificationsSent, 4); // 2 admins * 2 branches
+  assert.equal(createdNotifs.length, 4);
+
+  const ikejaForAdmin1 = createdNotifs.find(
+    (n) => n.user_id === admin1Id && n.message.includes("Ikeja Main"),
+  );
+  assert(ikejaForAdmin1);
+  assert.equal(ikejaForAdmin1.type, "branch_digest");
+  assert(ikejaForAdmin1.message.includes("5 orders"));
+  assert(ikejaForAdmin1.message.includes("25,000"));
+
+  const viForAdmin1 = createdNotifs.find(
+    (n) => n.user_id === admin1Id && n.message.includes("VI Branch"),
+  );
+  assert(viForAdmin1);
+  assert.equal(viForAdmin1.type, "branch_digest");
+  assert(viForAdmin1.message.includes("0 orders"));
+});
+
+test("generateAdminDigests skips processing when no active admins or branches exist", async () => {
+  mock.method(User, "find", () => chain([]));
+  mock.method(Branch, "find", () => chain([]));
+  const createdNotifs = [];
+  mock.method(Notification, "create", async (payload) => {
+    createdNotifs.push(payload);
+    return payload;
+  });
+
+  const result = await generateAdminDigests();
+  assert.equal(result.adminCount, 0);
+  assert.equal(result.branchCount, 0);
+  assert.equal(result.notificationsSent, 0);
+  assert.equal(createdNotifs.length, 0);
+});
+
+test("createOrder notifies only branch_manager and front_desk staff alongside the customer", async () => {
+  const serviceId = id(),
+    customerUserId = id(),
+    managerUserId = id(),
+    frontDeskUserId = id(),
+    attendantUserId = id(),
+    orderBranchId = id();
+
+  mock.method(Order, "findOne", () => chain(null));
+  mock.method(Service, "findById", async () => ({
+    _id: serviceId,
+    name: "Ironing",
+    price: 1000,
+    is_active: true,
+    branch_id: orderBranchId,
+    type: "service",
+    turnaround_hours: 12,
+  }));
+  mock.method(Product, "findOne", async () => ({
+    _id: id(),
+    name: "Packaging Nylon",
+    quantity: 100,
+    reserved_quantity: 0,
+    is_active: true,
+    unit: "pieces",
+  }));
+  mock.method(Product, "findOneAndUpdate", async () => ({
+    _id: id(),
+    quantity: 100,
+    reserved_quantity: 1,
+  }));
+  const createdOrderDoc = {
+    _id: id(),
+    customer_id: customerUserId,
+    branch_id: orderBranchId,
+    items: [
+      { service_id: serviceId, quantity: 1, unit_price: 1000, subtotal: 1000 },
+    ],
+    total_price: 1000,
+  };
+  mock.method(Order, "create", async () => createdOrderDoc);
+  mock.method(Branch, "findById", () =>
+    chain({ _id: orderBranchId, name: "Lekki Branch" }),
+  );
+
+  mock.method(Employee, "find", () => ({
+    populate: async ({ match }) => {
+      const allowedRoles = match?.role?.$in || [];
+      const employees = [
+        {
+          _id: id(),
+          branch_id: orderBranchId,
+          user_id: allowedRoles.includes("branch_manager")
+            ? { _id: managerUserId, role: "branch_manager" }
+            : null,
+        },
+        {
+          _id: id(),
+          branch_id: orderBranchId,
+          user_id: allowedRoles.includes("front_desk")
+            ? { _id: frontDeskUserId, role: "front_desk" }
+            : null,
+        },
+        {
+          _id: id(),
+          branch_id: orderBranchId,
+          user_id: null,
+        },
+      ];
+      return employees;
+    },
+  }));
+
+  const sentNotifications = [];
+  mock.method(Notification, "create", async (payload) => {
+    sentNotifications.push(payload);
+    return payload;
+  });
+
+  const res = await invoke(orders.createOrder, {
+    user: { role: "customer", id: customerUserId },
+    body: {
+      branch_id: orderBranchId,
+      items: [{ service_id: serviceId, quantity: 1 }],
+      pickup_time: new Date(Date.now() + 86400000).toISOString(),
+    },
+  });
+
+  assert.equal(res.code, 201);
+  assert.equal(sentNotifications.length, 3);
+  const recipientIds = sentNotifications.map((n) => n.user_id.toString());
+  assert(recipientIds.includes(customerUserId.toString()));
+  assert(recipientIds.includes(managerUserId.toString()));
+  assert(recipientIds.includes(frontDeskUserId.toString()));
+  assert(!recipientIds.includes(attendantUserId.toString()));
 });

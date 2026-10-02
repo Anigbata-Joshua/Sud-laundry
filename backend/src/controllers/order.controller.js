@@ -6,7 +6,6 @@ import Order from "../models/order.model.js";
 import Service from "../models/service.model.js";
 import Branch from "../models/branch.model.js";
 import Employee from "../models/employee.model.js";
-import User from "../models/user.model.js";
 import ApiError from "../utils/apiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import apiResponse from "../utils/apiResponse.js";
@@ -229,24 +228,22 @@ export const createOrder = asyncHandler(async (req, res) => {
     message: `Your order has been placed. You can cancel it until we begin processing it, or within ${env.cancellationWindowMinutes} minutes — whichever comes first.`,
   });
 
-  const [admins, branchEmployees, branch] = await Promise.all([
-    User.find({ role: "admin", is_active: true }).select("_id"),
+  const [branchEmployees, branch] = await Promise.all([
     Employee.find({ branch_id, is_active: true }).populate({
       path: "user_id",
       match: {
-        role: { $in: ["branch_manager", "employee"] },
+        role: { $in: ["branch_manager", "front_desk"] },
         is_active: true,
       },
       select: "_id",
     }),
     Branch.findById(branch_id).select("name"),
   ]);
-  const staffRecipients = new Set([
-    ...admins.map((admin) => admin._id.toString()),
-    ...branchEmployees
+  const staffRecipients = new Set(
+    branchEmployees
       .filter((employee) => employee.user_id)
       .map((employee) => employee.user_id._id.toString()),
-  ]);
+  );
   staffRecipients.delete(customerId.toString());
   const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
   await Promise.all(
