@@ -37,7 +37,11 @@ export default function CreateOrderPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    Promise.all([getBranches(), getServices(), isAdmin ? getUsers() : Promise.resolve({ data: { data: [] } })])
+    Promise.all([
+      getBranches(),
+      getServices(),
+      isAdmin ? getUsers() : Promise.resolve({ data: { data: [] } }),
+    ])
       .then(([branches, services, users]) => {
         setOptions({
           branches: branches.data.data,
@@ -115,16 +119,18 @@ export default function CreateOrderPage() {
       <Panel className="mx-auto max-w-3xl p-6">
         <form className="grid gap-5" onSubmit={submit}>
           <div className="grid gap-4 md:grid-cols-2">
-            {isAdmin && <Field label="Customer">
-              <select required name="customer_id" value={form.customer_id} onChange={updateForm}>
-                <option value="">Select customer</option>
-                {options.customers.map((customer) => (
-                  <option key={customer._id ?? customer.id} value={customer._id ?? customer.id}>
-                    {customer.name} · {customer.email}
-                  </option>
-                ))}
-              </select>
-            </Field>}
+            {isAdmin && (
+              <Field label="Customer">
+                <select required name="customer_id" value={form.customer_id} onChange={updateForm}>
+                  <option value="">Select customer</option>
+                  {options.customers.map((customer) => (
+                    <option key={customer._id ?? customer.id} value={customer._id ?? customer.id}>
+                      {customer.name} · {customer.email}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Branch">
               <select required name="branch_id" value={form.branch_id} onChange={updateForm}>
                 <option value="">Select branch</option>

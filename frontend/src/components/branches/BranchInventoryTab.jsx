@@ -20,7 +20,8 @@ export default function BranchInventoryTab({ inventory }) {
                 {inventory.lowStockCount} Product(s) Below Reorder Point at this Branch
               </h3>
               <p className="text-xs text-red-700">
-                Restock immediately through stock movements or supplier orders to avoid workflow delays.
+                Restock immediately through stock movements or supplier orders to avoid workflow
+                delays.
               </p>
             </div>
           </div>
@@ -113,8 +114,8 @@ export default function BranchInventoryTab({ inventory }) {
                         movement.type === 'purchase'
                           ? 'bg-emerald-50 text-emerald-700'
                           : movement.type === 'usage'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-blue-50 text-blue-700'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-blue-50 text-blue-700'
                       }`}
                     >
                       {movement.type}

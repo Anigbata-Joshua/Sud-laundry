@@ -1,5 +1,5 @@
 import { STAFF_ROLE_OPTIONS } from '../../constants/roles'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Eye, Plus, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getBranches } from '../../api/branches.api'
@@ -17,6 +17,8 @@ import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
+import { useToast } from '../../hooks/useToast'
 
 const emptyForm = {
   name: '',
@@ -41,8 +43,10 @@ export default function EmployeesPage() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [message, setMessage] = useState('')
+  const { confirm } = useDialog()
+  const { notify } = useToast()
 
-  function load() {
+  const load = useCallback(() => {
     const isAdmin = currentUser.role === 'admin'
     Promise.all([
       getEmployees(),
@@ -50,14 +54,19 @@ export default function EmployeesPage() {
       getBranches(),
     ])
       .then(([employees, users, branches]) =>
-        setData({ employees: employees.data.data, users: users.data.data, branches: branches.data.data }),
+        setData({
+          employees: employees.data.data,
+          users: users.data.data,
+          branches: branches.data.data,
+        }),
       )
       .catch(() => setMessage('Unable to load people.'))
-  }
-  useEffect(() =>{
-    load()
-  }, [])
+  }, [currentUser.role])
 
+  useEffect(() => {
+    const timer = setTimeout(load, 0)
+    return () => clearTimeout(timer)
+  }, [load])
 
   const rows = useMemo(() => {
     if (view === 'clients')
@@ -79,18 +88,21 @@ export default function EmployeesPage() {
   async function submit(event) {
     event.preventDefault()
     try {
-      const userResponse = await createUser({
-        ...form,
-        role: view === 'employees' ? form.role : 'customer',
-      })
-      if (view === 'employees')
+      if (view === 'employees') {
         await createEmployee({
-          user_id: userResponse.data.data._id,
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          phone: form.phone,
+          address: form.address,
           branch_id: form.branch_id,
           job_title: form.job_title,
           hired_at: form.hired_at,
-          role: form.role,
+          role: currentUser.role === 'admin' ? form.role : undefined,
         })
+      } else {
+        await createUser({ ...form, role: 'customer' })
+      }
       setOpen(false)
       setForm(emptyForm)
       setMessage('')
@@ -101,7 +113,14 @@ export default function EmployeesPage() {
   }
 
   async function customerAction(action, user) {
-    if (action === 'delete' && !window.confirm(`Delete ${user.name}?`)) return
+    if (action === 'delete') {
+      const ok = await confirm(`This permanently deletes ${user.name}'s account.`, {
+        title: 'Delete user?',
+        tone: 'error',
+        confirmLabel: 'Delete',
+      })
+      if (!ok) return
+    }
     try {
       if (action === 'delete') await deleteUser(user._id)
       else if (user.is_active) await deactivateUser(user._id)
@@ -111,14 +130,27 @@ export default function EmployeesPage() {
       setMessage(error.response?.data?.message ?? 'Action failed.')
     }
   }
-
   async function removeEmployee(employee) {
-    if (!window.confirm(`Remove ${employee.user_id?.name} as an employee?`)) return
+    const ok = await confirm(`${employee.user_id?.name} will lose employee access immediately.`, {
+      title: 'Remove employee?',
+      tone: 'warning',
+      confirmLabel: 'Remove',
+    })
+    if (!ok) return
     try {
       await deleteEmployee(employee._id)
+      notify({
+        tone: 'success',
+        title: 'Employee removed',
+        message: `${employee.user_id?.name} no longer has employee access.`,
+      })
       load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to remove employee.')
+      notify({
+        tone: 'error',
+        title: 'Failed to remove employee',
+        message: error.response?.data?.message ?? 'Unable to remove employee.',
+      })
     }
   }
 
@@ -290,7 +322,11 @@ export default function EmployeesPage() {
                         onChange={(event) => setForm({ ...form, role: event.target.value })}
                         className="rounded-xl border border-line p-3 font-normal"
                       >
-                        {STAFF_ROLE_OPTIONS.map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+                        {STAFF_ROLE_OPTIONS.map(([role, label]) => (
+                          <option key={role} value={role}>
+                            {label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   )}
@@ -314,8 +350,8 @@ export default function EmployeesPage() {
                       <input
                         disabled
                         value={
-                          data.branches.find((item) => item._id === currentUser.branch_id)
-                            ?.name ?? 'Your branch'
+                          data.branches.find((item) => item._id === currentUser.branch_id)?.name ??
+                          'Your branch'
                         }
                         className="rounded-xl border border-line bg-gray-50 p-3 font-normal text-gray-500"
                       />

@@ -106,7 +106,11 @@ export default function EmployeeDetailsPage() {
                     value={form.role}
                     onChange={(event) => setForm({ ...form, role: event.target.value })}
                   >
-                    {STAFF_ROLE_OPTIONS.map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+                    {STAFF_ROLE_OPTIONS.map(([role, label]) => (
+                      <option key={role} value={role}>
+                        {label}
+                      </option>
+                    ))}
                   </select>
                 </label>
               )}

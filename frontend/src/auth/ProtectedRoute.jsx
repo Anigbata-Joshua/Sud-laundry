@@ -20,12 +20,10 @@ export default function ProtectedRoute() {
   }
 
   if (user.role !== 'customer') {
-    const page = navigationGroups.flatMap((group) => group.items).find(
-      ([, path]) => path.split('?')[0] === location.pathname,
-    )
-    const allowedRoles = location.pathname === '/orders/new'
-      ? ['admin']
-      : page?.[5]
+    const page = navigationGroups
+      .flatMap((group) => group.items)
+      .find(([, path]) => path.split('?')[0] === location.pathname)
+    const allowedRoles = location.pathname === '/orders/new' ? ['admin'] : page?.[5]
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       return <Navigate to={getRoleHome(user.role)} replace />
     }

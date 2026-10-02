@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  ArrowRight,
   BarChart3,
   Boxes,
   Building2,
@@ -9,11 +8,8 @@ import {
   History,
   Package,
   Plus,
-  RotateCcw,
-  ShoppingCart,
   Trash2,
   TrendingDown,
-  TrendingUp,
   X,
 } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
@@ -27,8 +23,17 @@ import Panel, { PanelTitle } from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
+import { useToast } from '../../hooks/useToast'
 
-const emptyProduct = { name: '', description: '', price: '', unit: 'pieces', reorder_point: '', branch_id: '' }
+const emptyProduct = {
+  name: '',
+  description: '',
+  price: '',
+  unit: 'pieces',
+  reorder_point: '',
+  branch_id: '',
+}
 
 export default function ProductsPage() {
   const { user } = useAuth()
@@ -46,6 +51,8 @@ export default function ProductsPage() {
   const [stock, setStock] = useState({ type: 'purchase', quantity: '', notes: '' })
   const [message, setMessage] = useState('')
   const [showAnalytics, setShowAnalytics] = useState(true)
+  const { confirm } = useDialog()
+  const { notify } = useToast()
 
   const canManage = ['admin', 'branch_manager', 'inventory_officer'].includes(user.role)
 
@@ -53,12 +60,13 @@ export default function ProductsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [productResponse, branchResponse, requestsResponse, movementsResponse] = await Promise.all([
-        getProducts(effectiveBranchId ? { branch_id: effectiveBranchId } : undefined),
-        getBranches(),
-        getSupplyRequests().catch(() => ({ data: { data: [] } })),
-        getStockMovements().catch(() => ({ data: { data: [] } })),
-      ])
+      const [productResponse, branchResponse, requestsResponse, movementsResponse] =
+        await Promise.all([
+          getProducts(effectiveBranchId ? { branch_id: effectiveBranchId } : undefined),
+          getBranches(),
+          getSupplyRequests().catch(() => ({ data: { data: [] } })),
+          getStockMovements().catch(() => ({ data: { data: [] } })),
+        ])
       setProducts(productResponse.data.data ?? [])
       setBranches(branchResponse.data.data ?? [])
       setSupplyRequests(requestsResponse.data.data ?? [])
@@ -133,8 +141,7 @@ export default function ProductsPage() {
         .toLowerCase()
         .includes(query.toLowerCase())
       const matchesBranch =
-        !effectiveBranchId ||
-        (product.branch_id?._id ?? product.branch_id) === effectiveBranchId
+        !effectiveBranchId || (product.branch_id?._id ?? product.branch_id) === effectiveBranchId
       return matchesQuery && matchesBranch
     })
   }, [products, query, effectiveBranchId])
@@ -174,15 +181,28 @@ export default function ProductsPage() {
   }
 
   async function remove(product) {
-    if (!window.confirm(`Deactivate ${product.name}?`)) return
+    const ok = await confirm(`"${product.name}" will no longer appear in the catalog.`, {
+      title: 'Deactivate product?',
+      tone: 'warning',
+      confirmLabel: 'Deactivate',
+    })
+    if (!ok) return
     try {
       await deleteProduct(product._id)
-      await load()
+      notify({
+        tone: 'success',
+        title: 'Product removed',
+        message: `${product.name} has been removed.`,
+      })
+      load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to deactivate product.')
+      notify({
+        tone: 'error',
+        title: 'Failed to remove product',
+        message: error.response?.data?.message ?? 'Unable to remove product.',
+      })
     }
   }
-
   async function recordStock(event) {
     event.preventDefault()
     const magnitude = Math.abs(Number(stock.quantity))
@@ -279,10 +299,7 @@ export default function ProductsPage() {
         <div className="mb-5 grid gap-4 lg:grid-cols-2">
           {/* Supply Requests entering each branch */}
           <Panel className="p-5">
-            <PanelTitle
-              eyebrow="Intelligence"
-              title="Supply Requests by Branch"
-            >
+            <PanelTitle eyebrow="Intelligence" title="Supply Requests by Branch">
               <span className="text-[10px] text-gray-400">Total volume</span>
             </PanelTitle>
 
@@ -311,10 +328,7 @@ export default function ProductsPage() {
 
           {/* Stock Consumption & Movement by Branch */}
           <Panel className="p-5">
-            <PanelTitle
-              eyebrow="Flow Audit"
-              title="Inventory Consumption & Usage"
-            >
+            <PanelTitle eyebrow="Flow Audit" title="Inventory Consumption & Usage">
               <span className="text-[10px] text-gray-400">Supplies used by branch</span>
             </PanelTitle>
 
@@ -405,7 +419,9 @@ export default function ProductsPage() {
                     <td className="px-4 py-3 font-bold text-ink">
                       {product.quantity} {product.unit}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{product.reorder_point} {product.unit}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {product.reorder_point} {product.unit}
+                    </td>
                     <td className="px-4 py-3 font-semibold">
                       ₦{Number(product.price ?? 0).toLocaleString()}
                     </td>
@@ -414,9 +430,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button onClick={() => setStockProduct(product)}>
-                          Stock
-                        </Button>
+                        <Button onClick={() => setStockProduct(product)}>Stock</Button>
                         {canManage && (
                           <>
                             <Button onClick={() => openProduct(product)}>

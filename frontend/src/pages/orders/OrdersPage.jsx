@@ -115,9 +115,11 @@ export default function OrdersPage() {
           columns={exportColumns}
           rows={exportRows}
         />
-        {user.role === 'admin' && <Button primary onClick={() => navigate('/orders/new')}>
-          <Plus className="size-4" /> New order
-        </Button>}
+        {user.role === 'admin' && (
+          <Button primary onClick={() => navigate('/orders/new')}>
+            <Plus className="size-4" /> New order
+          </Button>
+        )}
       </PageHeading>
       <Panel className="mb-3 flex flex-col justify-between gap-3 p-2 md:flex-row md:items-center">
         <div className="flex overflow-x-auto">

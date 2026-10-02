@@ -38,7 +38,9 @@ export default function Sidebar({ open, onClose }) {
         </span>
         <div className="grid flex-1">
           <strong className="text-sm font-black text-white tracking-wide">Suds</strong>
-          <small className="text-[9px] uppercase tracking-widest text-sky-400 font-semibold">Fabric Care & Ops</small>
+          <small className="text-[9px] uppercase tracking-widest text-sky-400 font-semibold">
+            Fabric Care & Ops
+          </small>
         </div>
         <button type="button" className="text-white lg:hidden" onClick={onClose}>
           <X className="size-5" />

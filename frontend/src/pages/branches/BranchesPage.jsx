@@ -1,15 +1,5 @@
-import { useEffect, useState } from 'react'
-import {
-  ArrowRight,
-  Building2,
-  Edit3,
-  MapPin,
-  Phone,
-  Plus,
-  Trash2,
-  Users,
-  X,
-} from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowRight, Building2, Edit3, MapPin, Phone, Plus, Trash2, Users, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createBranch, deleteBranch, getBranches, updateBranch } from '../../api/branches.api'
 import { getEmployees } from '../../api/employees.api'
@@ -17,6 +7,8 @@ import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
+import { useDialog } from '../../hooks/useDialog'
+import { useToast } from '../../hooks/useToast'
 
 const emptyForm = { name: '', address: '', phone: '' }
 
@@ -30,8 +22,10 @@ export default function BranchesPage() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const { confirm } = useDialog()
+  const { notify } = useToast()
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [branchesRes, employeesRes] = await Promise.all([
@@ -46,11 +40,12 @@ export default function BranchesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    load()
-  }, [])
+    const timer = setTimeout(load, 0)
+    return () => clearTimeout(timer)
+  }, [load])
 
   function beginEdit(branch, event) {
     event.stopPropagation()
@@ -76,12 +71,26 @@ export default function BranchesPage() {
 
   async function remove(branch, event) {
     event.stopPropagation()
-    if (!window.confirm(`Delete ${branch.name}?`)) return
+    const ok = await confirm(`Delete ${branch.name}?`, {
+      title: 'Delete branch',
+      description: 'This action cannot be undone.',
+      type: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteBranch(branch._id)
+      notify({
+        tone: 'success',
+        title: 'Branch deleted',
+        message: `${branch.name} has been deleted.`,
+      })
       load()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to delete branch.')
+      notify({
+        tone: 'error',
+        title: 'Failed to delete branch',
+        message: error.response?.data?.message ?? 'Unable to delete branch.',
+      })
     }
   }
 

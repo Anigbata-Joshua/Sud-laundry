@@ -5,11 +5,13 @@ import User from '../models/user.model.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
 import asyncHandler from '../utils/asyncHandler.js'
+import { getUserBranchId } from '../utils/getUserBranchId.js'
 
 export const getMyProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password_hash')
   if (!user) throw new ApiError(404, 'User not found')
-  return apiResponse(res, 200, user, 'Profile retrieved successfully')
+  const branch_id = await getUserBranchId(user)
+  return apiResponse(res, 200, { ...user.toObject(), branch_id }, 'Profile retrieved successfully')
 })
 
 export const getAllUsers = asyncHandler(async (req, res) => {
@@ -132,5 +134,6 @@ export const updateMyProfile = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(404, 'User not found')
 
-  return apiResponse(res, 200, user, 'Profile updated successfully')
+  const branch_id = await getUserBranchId(user)
+  return apiResponse(res, 200, { ...user.toObject(), branch_id }, 'Profile updated successfully')
 })

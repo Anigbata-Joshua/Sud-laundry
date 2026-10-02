@@ -1,14 +1,13 @@
 // Owner: Jasmine
 // Purpose: register, login, forgot-password, reset-password logic.
-
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
-import Employee from '../models/employee.model.js';
 import ApiError from '../utils/apiError.js';
 import apiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import generateToken, { AUTH_COOKIE_NAME, getAuthCookieOptions } from '../utils/generateToken.js';
+import { getUserBranchId } from '../utils/getUserBranchId.js';
 import { env } from '../config/env.js';
 import sendMail from '../services/email.service.js';
 
@@ -75,13 +74,7 @@ export const login = asyncHandler(async (req, res, next) => {
     }
 
     // Retrieve branch_id if user is employee or branch_manager to include in JWT
-    let branch_id = undefined;
-    if (['employee', 'branch_manager', 'front_desk','inventory_officer'].includes(user.role)) {
-        const employee = await Employee.findOne({ user_id: user._id });
-        if (employee) {
-            branch_id = employee.branch_id.toString();
-        }
-    }
+    const branch_id = await getUserBranchId(user);
 
     // Generate token
     const token = generateToken(user._id, branch_id ? { branch_id } : {});

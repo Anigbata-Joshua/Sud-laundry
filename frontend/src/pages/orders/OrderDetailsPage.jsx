@@ -9,6 +9,7 @@ import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { formatNaira } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
 import CountdownTimer from '../../components/orders/CountdownTimer'
 import { getCustomerStatusLabel } from '../../constants/orderStatusLabels'
 
@@ -26,6 +27,7 @@ export default function OrderDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { prompt } = useDialog()
   const [order, setOrder] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -38,15 +40,14 @@ export default function OrderDetailsPage() {
 
   useEffect(() => {
     let active = true
-    getOrder(id)
-      .then((response) => {
-        if (active) setOrder(response.data.data)
-      })
+    getOrder(id).then((response) => {
+      if (active) setOrder(response.data.data)
+    })
     getOrderPayments(id)
       .then((response) => {
         if (active) setPayments(response.data.data?.payments ?? response.data.data?.items ?? [])
       })
-      .catch(() => { })
+      .catch(() => {})
       .catch((requestError) => {
         if (active) setError(requestError.response?.data?.message ?? 'Unable to load order.')
       })
@@ -102,7 +103,14 @@ export default function OrderDetailsPage() {
   }
 
   async function cancelOrder() {
-    const reason = window.prompt('Enter reason for force-cancellation:')
+    const reason = await prompt('Enter reason for force-cancellation:', {
+      title: 'Force-cancel order',
+      label: 'Cancellation reason',
+      placeholder: 'e.g. Customer requested immediate refund / item damaged',
+      required: true,
+      confirmLabel: 'Cancel order',
+      tone: 'error',
+    })
     if (!reason || !reason.trim()) return
     setSaving(true)
     try {
@@ -235,13 +243,20 @@ export default function OrderDetailsPage() {
           <Panel className="overflow-hidden">
             <h2 className="border-b border-line p-5 text-sm font-extrabold">Payments</h2>
             {payments.map((payment) => (
-              <div key={payment._id} className="flex items-center gap-4 border-b border-line px-5 py-4 text-xs">
-                <span className="flex-1 capitalize">{payment.transaction_type ?? 'payment'} · {payment.paymentMethod}</span>
+              <div
+                key={payment._id}
+                className="flex items-center gap-4 border-b border-line px-5 py-4 text-xs"
+              >
+                <span className="flex-1 capitalize">
+                  {payment.transaction_type ?? 'payment'} · {payment.paymentMethod}
+                </span>
                 <StatusBadge status={payment.status} />
                 <strong>{formatNaira(payment.amount)}</strong>
               </div>
             ))}
-            {payments.length === 0 && <p className="p-5 text-xs text-gray-400">No payments recorded.</p>}
+            {payments.length === 0 && (
+              <p className="p-5 text-xs text-gray-400">No payments recorded.</p>
+            )}
           </Panel>
           <Panel className="overflow-hidden">
             <h2 className="border-b border-line p-5 text-sm font-extrabold">Order items</h2>
@@ -265,7 +280,9 @@ export default function OrderDetailsPage() {
               <div className="p-5 text-xs text-gray-600">
                 <p className="mb-2">
                   Customer originally declared:{' '}
-                  {order.intake.original_items.map((item) => `${item.name} × ${item.quantity}`).join(', ')}
+                  {order.intake.original_items
+                    .map((item) => `${item.name} × ${item.quantity}`)
+                    .join(', ')}
                 </p>
                 {order.intake.notes && <p className="mb-2 italic">"{order.intake.notes}"</p>}
                 <p className="text-gray-400">

@@ -1,12 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  Building2,
-  Grid,
-  List,
-  Plus,
-  Search,
-  Sparkles,
-} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Building2, Grid, List, Plus, Sparkles } from 'lucide-react'
 import { getBranches } from '../../api/branches.api'
 import { createService, deleteService, getServices, updateService } from '../../api/services.api'
 import Button from '../../components/common/Button'
@@ -18,6 +11,8 @@ import ServiceMetrics from '../../components/services/ServiceMetrics'
 import ServiceModal from '../../components/services/ServiceModal'
 import ServiceTable from '../../components/services/ServiceTable'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
+import { useToast } from '../../hooks/useToast'
 
 const emptyForm = {
   branch_id: '',
@@ -47,14 +42,16 @@ export default function ServicesPage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { confirm } = useDialog()
+  const { notify } = useToast()
 
-  function loadServices() {
+  const loadServices = useCallback(() => {
     setLoading(true)
     getServices()
       .then((response) => setServices(response.data.data || []))
       .catch(() => setMessage('Unable to load services.'))
       .finally(() => setLoading(false))
-  }
+  }, [])
 
   useEffect(() => {
     if (isAdmin) {
@@ -62,10 +59,14 @@ export default function ServicesPage() {
         .then((response) => setBranches(response.data.data || []))
         .catch(() => setMessage('Unable to load branches.'))
     }
-    loadServices()
-  }, [isAdmin])
+    const timer = setTimeout(loadServices, 0)
+    return () => clearTimeout(timer)
+  }, [isAdmin, loadServices])
 
-  const branchName = (id) => branches.find((branch) => branch._id === id)?.name ?? 'Branch'
+  const branchName = useCallback(
+    (id) => branches.find((branch) => branch._id === id)?.name ?? 'Branch',
+    [branches],
+  )
 
   // Extract all unique categories present in the active services
   const availableCategories = useMemo(() => {
@@ -80,21 +81,21 @@ export default function ServicesPage() {
       const matchesBranch = !branchId || serviceBranchId === branchId
       const matchesType = typeFilter === 'all' || service.type === typeFilter
       const matchesCategory =
-        categoryFilter === 'all' ||
-        service.category?.toLowerCase() === categoryFilter.toLowerCase()
+        categoryFilter === 'all' || service.category?.toLowerCase() === categoryFilter.toLowerCase()
 
-      const text = `${service.name} ${service.category ?? ''} ${branchName(serviceBranchId)}`.toLowerCase()
+      const text =
+        `${service.name} ${service.category ?? ''} ${branchName(serviceBranchId)}`.toLowerCase()
       const matchesQuery = text.includes(query.toLowerCase())
 
       return matchesBranch && matchesType && matchesCategory && matchesQuery
     })
-  }, [services, branchId, typeFilter, categoryFilter, query, branches])
+  }, [services, branchId, typeFilter, categoryFilter, query, branchName])
 
   function openCreate() {
     setEditingId('')
     setForm({
       ...emptyForm,
-      branch_id: isAdmin ? (branchId || branches[0]?._id || '') : user.branch_id,
+      branch_id: isAdmin ? branchId || branches[0]?._id || '' : user.branch_id,
     })
     setMessage('')
     setOpen(true)
@@ -155,12 +156,26 @@ export default function ServicesPage() {
   }
 
   async function remove(service) {
-    if (!window.confirm(`Deactivate "${service.name}" from catalog?`)) return
+    const ok = await confirm(`"${service.name}" will no longer appear in the catalog.`, {
+      title: 'Deactivate service?',
+      tone: 'warning',
+      confirmLabel: 'Deactivate',
+    })
+    if (!ok) return
     try {
       await deleteService(service._id)
+      notify({
+        tone: 'success',
+        title: 'Service deactivated',
+        message: `"${service.name}" has been deactivated.`,
+      })
       loadServices()
     } catch (error) {
-      setMessage(error.response?.data?.message ?? 'Unable to deactivate service.')
+      notify({
+        tone: 'error',
+        title: 'Failed to deactivate service',
+        message: error.response?.data?.message ?? 'Unable to deactivate service.',
+      })
     }
   }
 
@@ -248,7 +263,9 @@ export default function ServicesPage() {
                 title="Grid view"
                 onClick={() => setViewMode('grid')}
                 className={`rounded-md p-1.5 transition ${
-                  viewMode === 'grid' ? 'bg-white text-brand shadow-xs' : 'text-gray-400 hover:text-ink'
+                  viewMode === 'grid'
+                    ? 'bg-white text-brand shadow-xs'
+                    : 'text-gray-400 hover:text-ink'
                 }`}
               >
                 <Grid className="size-4" />
@@ -258,7 +275,9 @@ export default function ServicesPage() {
                 title="Table view"
                 onClick={() => setViewMode('table')}
                 className={`rounded-md p-1.5 transition ${
-                  viewMode === 'table' ? 'bg-white text-brand shadow-xs' : 'text-gray-400 hover:text-ink'
+                  viewMode === 'table'
+                    ? 'bg-white text-brand shadow-xs'
+                    : 'text-gray-400 hover:text-ink'
                 }`}
               >
                 <List className="size-4" />
@@ -303,7 +322,9 @@ export default function ServicesPage() {
 
         {/* Global Error Banner if any */}
         {message && !open && (
-          <p className="my-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 font-medium">{message}</p>
+          <p className="my-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 font-medium">
+            {message}
+          </p>
         )}
 
         {/* Content View: Grid or Table */}
@@ -338,7 +359,9 @@ export default function ServicesPage() {
           ) : (
             <div className="p-12 text-center">
               <Sparkles className="mx-auto size-8 text-gray-300" />
-              <h3 className="mt-3 text-sm font-extrabold text-ink">No services match your filters</h3>
+              <h3 className="mt-3 text-sm font-extrabold text-ink">
+                No services match your filters
+              </h3>
               <p className="mt-1 text-xs text-gray-400">
                 Try clearing your search query or selecting a different branch/category.
               </p>

@@ -31,7 +31,11 @@ export default function CustomerOrdersPage() {
 
   return (
     <>
-      <PageHeading eyebrow="Your account" title="My orders" subtitle="Track every order you've placed." />
+      <PageHeading
+        eyebrow="Your account"
+        title="My orders"
+        subtitle="Track every order you've placed."
+      />
       {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
       <Panel className="overflow-hidden">
         {loading && <p className="p-5 text-xs text-gray-400">Loading your orders…</p>}

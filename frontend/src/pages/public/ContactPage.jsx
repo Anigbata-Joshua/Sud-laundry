@@ -3,7 +3,13 @@ import { ChevronDown, Clock, Mail, MapPin, Phone, Send } from 'lucide-react'
 import { getBranches } from '../../api/branches.api'
 import { useToast } from '../../hooks/useToast'
 
-const SUBJECTS = ['General question', 'An existing order', 'Billing', 'Partnerships', 'Something else']
+const SUBJECTS = [
+  'General question',
+  'An existing order',
+  'Billing',
+  'Partnerships',
+  'Something else',
+]
 
 const FAQS = [
   {

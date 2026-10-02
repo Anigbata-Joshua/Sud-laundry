@@ -22,7 +22,10 @@ export default function ServiceTable({ services, branchName, isAdmin, onEdit, on
           {services.map((service) => {
             const isAddOn = service.type === 'add-on'
             return (
-              <tr key={service._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition">
+              <tr
+                key={service._id}
+                className="border-b border-gray-100 hover:bg-gray-50/60 transition"
+              >
                 <td className="px-4 py-3">
                   <strong className="font-extrabold text-ink text-sm block">{service.name}</strong>
                 </td>

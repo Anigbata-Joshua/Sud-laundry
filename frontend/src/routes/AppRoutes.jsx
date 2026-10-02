@@ -74,8 +74,11 @@ export default function AppRoutes() {
             <Route
               index
               element={
-                getRoleHome(user?.role) !== '/' ? <Navigate to={getRoleHome(user?.role)} replace /> : <DashboardPage />
-
+                getRoleHome(user?.role) !== '/' ? (
+                  <Navigate to={getRoleHome(user?.role)} replace />
+                ) : (
+                  <DashboardPage />
+                )
               }
             />
             <Route path="orders" element={<OrdersPage />} />
