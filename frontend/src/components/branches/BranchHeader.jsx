@@ -3,13 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Button from '../common/Button'
 import Panel from '../common/Panel'
 
-export default function BranchHeader({
-  branch,
-  health,
-  branches,
-  currentId,
-  onOpenEdit,
-}) {
+export default function BranchHeader({ branch, health, branches, currentId, onOpenEdit }) {
   const navigate = useNavigate()
 
   return (
@@ -55,8 +49,8 @@ export default function BranchHeader({
                     health.rating === 'High Performing'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : health.rating === 'Needs Attention'
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-sky-50 text-sky-700 border border-sky-200'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-sky-50 text-sky-700 border border-sky-200'
                   }`}
                 >
                   <span
@@ -64,8 +58,8 @@ export default function BranchHeader({
                       health.rating === 'High Performing'
                         ? 'bg-emerald-500'
                         : health.rating === 'Needs Attention'
-                        ? 'bg-amber-500'
-                        : 'bg-sky-500'
+                          ? 'bg-amber-500'
+                          : 'bg-sky-500'
                     }`}
                   />
                   {health.rating} ({health.score}% Health)
@@ -92,8 +86,8 @@ export default function BranchHeader({
                         health.rating === 'Needs Attention'
                           ? 'bg-amber-50 text-amber-800 border border-amber-200'
                           : health.rating === 'High Performing'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-600'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {health.rating === 'Needs Attention' ? '⚠️' : '✓'} {reason}

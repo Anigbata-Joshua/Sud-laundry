@@ -28,23 +28,31 @@ function formatDuration({ days, hours, minutes }) {
 const INACTIVE_STATUSES = ['delivered', 'cancelled']
 
 // Give an ETA to customer
-export default function CountdownTimer({ deliveryTime, processingStartedAt, turnaroundHours, status }) {
+export default function CountdownTimer({
+  deliveryTime,
+  processingStartedAt,
+  turnaroundHours,
+  status,
+}) {
   const isPrecise = Boolean(processingStartedAt && turnaroundHours)
-// If processing has started, countdown from the time processing started
-// Otherwise, countdown from the delivery time
-  const target = isPrecise ? new Date(new Date(processingStartedAt).getTime() + turnaroundHours * 60 * 60 * 1000)
-    : deliveryTime ? new Date(deliveryTime) : null
+  // If processing has started, countdown from the time processing started
+  // Otherwise, countdown from the delivery time
+  const target = isPrecise
+    ? new Date(new Date(processingStartedAt).getTime() + turnaroundHours * 60 * 60 * 1000)
+    : deliveryTime
+      ? new Date(deliveryTime)
+      : null
 
+  const targetTime = target ? target.getTime() : null
   const [remaining, setRemaining] = useState(() => (target ? getRemaining(target) : null))
 
   useEffect(() => {
-    if (!target) return
-    setRemaining(getRemaining(target))
+    if (!targetTime) return
     const interval = setInterval(() => {
-      setRemaining(getRemaining(target))
+      setRemaining(getRemaining(new Date(targetTime)))
     }, TICK_MS)
     return () => clearInterval(interval)
-  }, [target?.getTime()])
+  }, [targetTime])
 
   if (!target || !remaining || INACTIVE_STATUSES.includes(status)) return null
 
@@ -59,11 +67,7 @@ export default function CountdownTimer({ deliveryTime, processingStartedAt, turn
   return (
     <p
       className={`mt-2 flex items-center gap-2 text-xs font-semibold ${
-        !isPrecise
-          ? 'italic text-gray-400'
-          : remaining.isOverdue
-            ? 'text-red-600'
-            : 'text-brand'
+        !isPrecise ? 'italic text-gray-400' : remaining.isOverdue ? 'text-red-600' : 'text-brand'
       }`}
     >
       <Clock className="size-3.5" />

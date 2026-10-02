@@ -201,9 +201,11 @@ export default function DashboardPage() {
           ]}
           rows={exportRows}
         />
-        {user.role === 'admin' && <Button primary onClick={() => navigate('/orders/new')}>
-          <Plus className="size-4" /> New order
-        </Button>}
+        {user.role === 'admin' && (
+          <Button primary onClick={() => navigate('/orders/new')}>
+            <Plus className="size-4" /> New order
+          </Button>
+        )}
       </PageHeading>
 
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
@@ -236,7 +238,9 @@ export default function DashboardPage() {
             <span className="text-[10px] text-gray-400">Last 7 days</span>
           </PanelTitle>
           <div className="my-4 flex items-center gap-2">
-            <strong className="text-xl font-black text-ink">{formatNaira(dashboard.revenueTotal)}</strong>
+            <strong className="text-xl font-black text-ink">
+              {formatNaira(dashboard.revenueTotal)}
+            </strong>
             <span
               className={`rounded-full px-2 py-1 text-[9px] font-bold ${change !== null && change < 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
             >

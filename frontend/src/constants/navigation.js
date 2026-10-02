@@ -28,12 +28,33 @@ export const navigationGroups = [
   {
     label: 'Operations',
     items: [
-      ['Inventory', '/inventory', Boxes, null, null, ['admin', 'branch_manager', 'inventory_officer']],
-      ['Stock history', '/stock-movements', Boxes, null, null, ['admin', 'branch_manager', 'inventory_officer']],
+      [
+        'Inventory',
+        '/inventory',
+        Boxes,
+        null,
+        null,
+        ['admin', 'branch_manager', 'inventory_officer'],
+      ],
+      [
+        'Stock history',
+        '/stock-movements',
+        Boxes,
+        null,
+        null,
+        ['admin', 'branch_manager', 'inventory_officer'],
+      ],
       ['Suppliers', '/suppliers', Truck, null, null, ['admin']],
       ['Branches', '/branches', Building2, null, null, ['admin']],
       ['Services', '/services', Shirt, null, null, ['admin', 'branch_manager']],
-      ['Supply requests', '/supply-requests', Boxes, null, null, ['admin', 'branch_manager', 'inventory_officer']],
+      [
+        'Supply requests',
+        '/supply-requests',
+        Boxes,
+        null,
+        null,
+        ['admin', 'branch_manager', 'inventory_officer'],
+      ],
       [
         'People',
         '/people?view=employees',
@@ -45,7 +66,14 @@ export const navigationGroups = [
         ],
         ['admin', 'branch_manager'],
       ],
-      ['Leave requests', '/leave-requests', CalendarDays, null, null, ['admin', 'branch_manager', 'employee']],
+      [
+        'Leave requests',
+        '/leave-requests',
+        CalendarDays,
+        null,
+        null,
+        ['admin', 'branch_manager', 'employee'],
+      ],
     ],
   },
   {

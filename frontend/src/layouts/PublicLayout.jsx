@@ -34,11 +34,7 @@ export default function PublicLayout() {
 
           <nav className="hidden items-center gap-8 text-[13px] font-semibold text-slate-600 md:flex">
             {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.to}
-                className="transition hover:text-ink"
-              >
+              <a key={link.label} href={link.to} className="transition hover:text-ink">
                 {link.label}
               </a>
             ))}
@@ -47,10 +43,7 @@ export default function PublicLayout() {
           <div className="hidden items-center gap-3 md:flex">
             {isAuthenticated ? (
               <>
-                <Link
-                  to="/"
-                  className="text-[13px] font-bold text-slate-600 hover:text-ink"
-                >
+                <Link to="/" className="text-[13px] font-bold text-slate-600 hover:text-ink">
                   {user?.role === 'customer' ? 'My orders' : 'Dashboard'}
                 </Link>
                 <Link

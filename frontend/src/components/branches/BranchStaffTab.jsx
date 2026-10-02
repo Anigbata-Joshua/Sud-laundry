@@ -26,7 +26,8 @@ export default function BranchStaffTab({ staff }) {
   const topEmployee = staff?.topEmployee
 
   const filteredStaff = (staff?.list ?? []).filter((emp) => {
-    const text = `${emp.user_id?.name ?? ''} ${emp.user_id?.email ?? ''} ${emp.job_title ?? ''} ${emp.user_id?.role ?? ''}`.toLowerCase()
+    const text =
+      `${emp.user_id?.name ?? ''} ${emp.user_id?.email ?? ''} ${emp.job_title ?? ''} ${emp.user_id?.role ?? ''}`.toLowerCase()
     return text.includes(staffQuery.toLowerCase())
   })
 
@@ -94,11 +95,36 @@ export default function BranchStaffTab({ staff }) {
       {/* Role Breakdown Badges */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Total staff', count: staff.breakdown.total, icon: Users, color: 'text-sky-700 bg-sky-50' },
-          { label: 'Front desk', count: staff.breakdown.frontDesk, icon: UserCheck, color: 'text-teal-700 bg-teal-50' },
-          { label: 'Inventory officers', count: staff.breakdown.inventoryOfficers, icon: Boxes, color: 'text-blue-700 bg-blue-50' },
-          { label: 'Processing staff', count: staff.breakdown.attendants, icon: Shirt, color: 'text-amber-700 bg-amber-50' },
-          { label: 'Branch managers', count: staff.breakdown.branchManagers, icon: Award, color: 'text-indigo-700 bg-indigo-50' },
+          {
+            label: 'Total staff',
+            count: staff.breakdown.total,
+            icon: Users,
+            color: 'text-sky-700 bg-sky-50',
+          },
+          {
+            label: 'Front desk',
+            count: staff.breakdown.frontDesk,
+            icon: UserCheck,
+            color: 'text-teal-700 bg-teal-50',
+          },
+          {
+            label: 'Inventory officers',
+            count: staff.breakdown.inventoryOfficers,
+            icon: Boxes,
+            color: 'text-blue-700 bg-blue-50',
+          },
+          {
+            label: 'Processing staff',
+            count: staff.breakdown.attendants,
+            icon: Shirt,
+            color: 'text-amber-700 bg-amber-50',
+          },
+          {
+            label: 'Branch managers',
+            count: staff.breakdown.branchManagers,
+            icon: Award,
+            color: 'text-indigo-700 bg-indigo-50',
+          },
         ].map((role) => {
           const Icon = role.icon
           return (

@@ -257,8 +257,8 @@ export default function ServiceModal({
               {saving
                 ? 'Saving changes…'
                 : editingId
-                ? 'Save Service Changes'
-                : 'Create Service in Catalog'}
+                  ? 'Save Service Changes'
+                  : 'Create Service in Catalog'}
             </Button>
           </div>
         </form>

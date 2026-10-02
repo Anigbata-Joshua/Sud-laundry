@@ -31,7 +31,9 @@ export default function BranchOverviewTab({ financials, orders }) {
                 <span className="flex items-center gap-1.5">
                   <CreditCard className="size-3.5 text-sky-600" /> Card / POS
                 </span>
-                <span>{formatNaira(financials.paymentMethods.card || 0)} ({cardPct}%)</span>
+                <span>
+                  {formatNaira(financials.paymentMethods.card || 0)} ({cardPct}%)
+                </span>
               </div>
               <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
                 <div className="h-full bg-sky-600 rounded-full" style={{ width: `${cardPct}%` }} />
@@ -43,10 +45,15 @@ export default function BranchOverviewTab({ financials, orders }) {
                 <span className="flex items-center gap-1.5">
                   <TrendingUp className="size-3.5 text-emerald-500" /> Bank Transfer
                 </span>
-                <span>{formatNaira(financials.paymentMethods.transfer || 0)} ({transferPct}%)</span>
+                <span>
+                  {formatNaira(financials.paymentMethods.transfer || 0)} ({transferPct}%)
+                </span>
               </div>
               <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${transferPct}%` }} />
+                <div
+                  className="h-full bg-emerald-500 rounded-full"
+                  style={{ width: `${transferPct}%` }}
+                />
               </div>
             </div>
 
@@ -55,10 +62,15 @@ export default function BranchOverviewTab({ financials, orders }) {
                 <span className="flex items-center gap-1.5">
                   <Wallet className="size-3.5 text-amber-500" /> Cash
                 </span>
-                <span>{formatNaira(financials.paymentMethods.cash || 0)} ({cashPct}%)</span>
+                <span>
+                  {formatNaira(financials.paymentMethods.cash || 0)} ({cashPct}%)
+                </span>
               </div>
               <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${cashPct}%` }} />
+                <div
+                  className="h-full bg-amber-500 rounded-full"
+                  style={{ width: `${cashPct}%` }}
+                />
               </div>
             </div>
           </div>
@@ -79,16 +91,42 @@ export default function BranchOverviewTab({ financials, orders }) {
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
-              { label: 'Intake / Placed', count: orders.statusCounts.placed, color: 'text-sky-700 bg-sky-50' },
-              { label: 'Received', count: orders.statusCounts.received, color: 'text-teal-600 bg-teal-50' },
-              { label: 'Processing', count: orders.statusCounts.processing, color: 'text-amber-600 bg-amber-50' },
-              { label: 'Quality Check', count: orders.statusCounts.quality_check, color: 'text-blue-600 bg-blue-50' },
-              { label: 'Ready', count: orders.statusCounts.ready, color: 'text-emerald-600 bg-emerald-50' },
-              { label: 'Delivered', count: orders.statusCounts.delivered, color: 'text-gray-700 bg-gray-100' },
+              {
+                label: 'Intake / Placed',
+                count: orders.statusCounts.placed,
+                color: 'text-sky-700 bg-sky-50',
+              },
+              {
+                label: 'Received',
+                count: orders.statusCounts.received,
+                color: 'text-teal-600 bg-teal-50',
+              },
+              {
+                label: 'Processing',
+                count: orders.statusCounts.processing,
+                color: 'text-amber-600 bg-amber-50',
+              },
+              {
+                label: 'Quality Check',
+                count: orders.statusCounts.quality_check,
+                color: 'text-blue-600 bg-blue-50',
+              },
+              {
+                label: 'Ready',
+                count: orders.statusCounts.ready,
+                color: 'text-emerald-600 bg-emerald-50',
+              },
+              {
+                label: 'Delivered',
+                count: orders.statusCounts.delivered,
+                color: 'text-gray-700 bg-gray-100',
+              },
             ].map((item) => (
               <div key={item.label} className="rounded-xl border border-gray-100 p-3">
                 <span className="text-[10px] font-bold text-gray-400 block">{item.label}</span>
-                <strong className={`mt-1 inline-block rounded-md px-2 py-0.5 text-sm font-black ${item.color}`}>
+                <strong
+                  className={`mt-1 inline-block rounded-md px-2 py-0.5 text-sm font-black ${item.color}`}
+                >
                   {item.count}
                 </strong>
                 <span className="mt-1 block text-[9px] text-gray-400">
@@ -103,7 +141,10 @@ export default function BranchOverviewTab({ financials, orders }) {
       {/* Recent Orders Table */}
       <Panel className="overflow-hidden p-5">
         <PanelTitle eyebrow="Activity" title="Recent branch orders">
-          <Link to="/orders" className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1">
+          <Link
+            to="/orders"
+            className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
+          >
             View all orders <ExternalLink className="size-3" />
           </Link>
         </PanelTitle>
@@ -143,8 +184,8 @@ export default function BranchOverviewTab({ financials, orders }) {
                         order.payment_status === 'paid'
                           ? 'bg-emerald-50 text-emerald-700'
                           : order.payment_status === 'partially_paid'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-red-50 text-red-700'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-red-50 text-red-700'
                       }`}
                     >
                       {order.payment_status}

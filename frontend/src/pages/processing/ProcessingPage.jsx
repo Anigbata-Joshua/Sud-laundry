@@ -16,6 +16,7 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
 
 const emptyStep = { name: '', employee_id: '' }
 const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
@@ -35,6 +36,7 @@ export default function ProcessingPage() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [historyDate, setHistoryDate] = useState('')
   const canManage = ['admin', 'branch_manager'].includes(user.role)
+  const { prompt } = useDialog()
 
   function load() {
     const request = orderId ? getOrderProcessingWorkflows(orderId) : getProcessingWorkflows()
@@ -75,7 +77,8 @@ export default function ProcessingPage() {
       // order is 'quality_check' — that's an open action, not history.
       const awaitingQualityCheck =
         workflow.status === 'completed' && workflow.order_id?.status === 'quality_check'
-      const isHistory = ['completed', 'qc_failed'].includes(workflow.status) && !awaitingQualityCheck
+      const isHistory =
+        ['completed', 'qc_failed'].includes(workflow.status) && !awaitingQualityCheck
       if ((view === 'history') !== isHistory) return false
       const customer = workflow.order_id?.customer_id?.name ?? ''
       if (!customer.toLowerCase().includes(customerQuery.toLowerCase())) return false
@@ -123,8 +126,19 @@ export default function ProcessingPage() {
   }
 
   async function review(workflowId, result) {
-    const notes = result === 'fail' ? window.prompt('Why did quality control fail?') : ''
-    if (result === 'fail' && notes === null) return
+    let notes = ''
+    if (result === 'fail') {
+      const entered = await prompt('Why did quality control fail?', {
+        title: 'QC Failure Reason',
+        label: 'Inspection notes / rework reason',
+        placeholder: 'e.g. Stains remain on fabric, requires re-wash',
+        required: true,
+        confirmLabel: 'Record QC Fail',
+        tone: 'error',
+      })
+      if (entered === null) return
+      notes = entered
+    }
     setBusy(workflowId)
     setMessage('')
     try {
@@ -254,13 +268,18 @@ export default function ProcessingPage() {
                       onChange={(event) => updateStep(index, 'name', event.target.value)}
                     >
                       <option value="">Select stage</option>
-                      {['intake', 'washing', 'processing', 'quality_check', 'packaging', 'delivery_ready'].map(
-                        (stage) => (
-                          <option key={stage} value={stage}>
-                            {stage.replaceAll('_', ' ')}
-                          </option>
-                        ),
-                      )}
+                      {[
+                        'intake',
+                        'washing',
+                        'processing',
+                        'quality_check',
+                        'packaging',
+                        'delivery_ready',
+                      ].map((stage) => (
+                        <option key={stage} value={stage}>
+                          {stage.replaceAll('_', ' ')}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                   <Field label="Assigned employee">

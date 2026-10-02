@@ -1,4 +1,14 @@
-import { Building2, Clock, Droplets, Edit3, Flame, PlusCircle, ShieldCheck, Shirt, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Building2,
+  Clock,
+  Droplets,
+  Edit3,
+  Flame,
+  PlusCircle,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import Button from '../common/Button'
 import { formatNaira } from '../../utils/formatters'
 
@@ -50,11 +60,15 @@ export default function ServiceCard({ service, branchName, isAdmin, onEdit, onDe
         {/* Top bar: Category badge + Price */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className={`grid size-11 place-items-center rounded-xl transition ${meta.iconBg} group-hover:scale-105`}>
+            <span
+              className={`grid size-11 place-items-center rounded-xl transition ${meta.iconBg} group-hover:scale-105`}
+            >
               <Icon className="size-5" />
             </span>
             <div>
-              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.badgeColor}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.badgeColor}`}
+              >
                 {service.category || (isAddOn ? 'Add-on' : 'General')}
               </span>
               <h3 className="mt-1 text-base font-extrabold text-ink transition group-hover:text-sky-700">

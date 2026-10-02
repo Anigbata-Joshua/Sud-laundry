@@ -2,14 +2,7 @@ import { X } from 'lucide-react'
 import Button from '../common/Button'
 import Panel from '../common/Panel'
 
-export default function EditBranchModal({
-  open,
-  onClose,
-  form,
-  onChange,
-  onSubmit,
-  message,
-}) {
+export default function EditBranchModal({ open, onClose, form, onChange, onSubmit, message }) {
   if (!open) return null
 
   return (

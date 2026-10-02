@@ -3,6 +3,7 @@
 // scoped by role and branch.
 
 import Employee from '../models/employee.model.js'
+import bcrypt from 'bcrypt'
 import User from '../models/user.model.js'
 import ApiError from '../utils/apiError.js'
 import apiResponse from '../utils/apiResponse.js'
@@ -13,7 +14,8 @@ const staffRoles = ['employee', 'branch_manager', 'admin', 'front_desk', 'invent
 
 // POST /employees
 export const createEmployee = asyncHandler(async (req, res) => {
-  const { user_id, branch_id, job_title, hired_at, role } = req.body
+  const { user_id, branch_id, job_title, hired_at, role, name, email, password, phone, address } =
+    req.body
 
   const currentUser = req.user
 
@@ -22,8 +24,15 @@ export const createEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Only admins and branch managers can create employees')
   }
 
-  if (!user_id || !branch_id || !job_title || !hired_at) {
-    throw new ApiError(400, 'user_id, branch_id, job_title, and hired_at are required')
+  if (!branch_id || !job_title || !hired_at) {
+    throw new ApiError(400, 'branch_id, job_title, and hired_at are required')
+  }
+
+  if (!user_id && !(name && email && password)) {
+    throw new ApiError(
+      400,
+      'Provide an existing user_id, or name, email, and password to create a new employee account',
+    )
   }
 
   // Branch manager must use their own branch
@@ -37,30 +46,62 @@ export const createEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Branch not found')
   }
 
-  // Verify user
-  const user = await User.findById(user_id)
-
-  if (!user) {
-    throw new ApiError(404, 'User not found')
-  }
-
   if (role !== undefined && currentUser.role !== 'admin') {
     throw new ApiError(403, 'Only admins can assign employee roles')
   }
 
+  let user
+  let createdNewUser = false
+
+  if (user_id) {
+    user = await User.findById(user_id)
+    if (!user) {
+      throw new ApiError(404, 'User not found')
+    }
+  } else {
+    if (password.length < 8) {
+      throw new ApiError(400, 'Password must contain at least 8 characters')
+    }
+    if (await User.exists({ email: email.toLowerCase() })) {
+      throw new ApiError(409, 'Email is already in use')
+    }
+    // Admins may set the role up front; everyone else gets a plain employee
+    // account, then the normal role-assignment check below still applies.
+    const initialRole = currentUser.role === 'admin' && role ? role : 'employee'
+    user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      password_hash: await bcrypt.hash(password, 10),
+      phone,
+      address,
+      role: initialRole,
+    })
+    createdNewUser = true
+  }
+
   const assignedRole = role ?? user.role
   if (!staffRoles.includes(assignedRole)) {
+    if (createdNewUser) await User.findByIdAndDelete(user._id)
     throw new ApiError(400, `Employee role must be one of: ${staffRoles.join(', ')}`)
   }
 
   // Check existing employee record
-  const existingEmployee = await Employee.findOne({ user_id })
+  const existingEmployee = await Employee.findOne({ user_id: user._id })
 
   if (existingEmployee) {
+    if (createdNewUser) await User.findByIdAndDelete(user._id)
     throw new ApiError(400, 'Employee record already exists for this user')
   }
 
-  const employee = await Employee.create({ user_id, branch_id, job_title, hired_at })
+  let employee
+  try {
+    employee = await Employee.create({ user_id: user._id, branch_id, job_title, hired_at })
+  } catch (error) {
+    // Don't leave an orphaned login account behind if the employee record
+    // fails to create (e.g. validation error on job_title/hired_at).
+    if (createdNewUser) await User.findByIdAndDelete(user._id)
+    throw error
+  }
 
   if (user.role !== assignedRole) {
     user.role = assignedRole

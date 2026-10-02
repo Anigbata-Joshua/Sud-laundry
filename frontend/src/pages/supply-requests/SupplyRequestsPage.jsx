@@ -11,11 +11,13 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { useDialog } from '../../hooks/useDialog'
 
 const CAN_ACT_ROLES = ['admin', 'inventory_officer']
 
 export default function SupplyRequestsPage() {
   const { user } = useAuth()
+  const { prompt } = useDialog()
   const [requests, setRequests] = useState([])
   const [products, setProducts] = useState([])
   const [message, setMessage] = useState('')
@@ -63,7 +65,10 @@ export default function SupplyRequestsPage() {
   }
 
   function addItem() {
-    setReviewItems((current) => [...current, { product_id: '', product_name: '', quantity: 1, unit: '' }])
+    setReviewItems((current) => [
+      ...current,
+      { product_id: '', product_name: '', quantity: 1, unit: '' },
+    ])
   }
 
   async function confirmApprove() {
@@ -89,7 +94,14 @@ export default function SupplyRequestsPage() {
   }
 
   async function reject(request) {
-    const reason = window.prompt('Reason for rejecting this request:')
+    const reason = await prompt('Reason for rejecting this request:', {
+      title: 'Reject supply request',
+      label: 'Rejection reason',
+      placeholder: 'e.g. Current stock is allocated to existing orders / insufficient stock',
+      required: true,
+      confirmLabel: 'Reject request',
+      tone: 'error',
+    })
     if (!reason || !reason.trim()) return
     setBusy(request._id)
     setMessage('')
@@ -141,16 +153,17 @@ export default function SupplyRequestsPage() {
                 <StatusBadge status={request.status} />
               </div>
               <div className="grid gap-1 p-4 text-xs">
-                {(request.status === 'pending' ? request.calculated_items : request.approved_items).map(
-                  (item, index) => (
-                    <p key={index} className="text-gray-600">
-                      {item.product_name} × {item.quantity} {item.unit}
-                      {!item.product_id && request.status === 'pending' && (
-                        <span className="ml-2 text-red-600">— no matching product found</span>
-                      )}
-                    </p>
-                  ),
-                )}
+                {(request.status === 'pending'
+                  ? request.calculated_items
+                  : request.approved_items
+                ).map((item, index) => (
+                  <p key={index} className="text-gray-600">
+                    {item.product_name} × {item.quantity} {item.unit}
+                    {!item.product_id && request.status === 'pending' && (
+                      <span className="ml-2 text-red-600">— no matching product found</span>
+                    )}
+                  </p>
+                ))}
               </div>
               {request.status === 'rejected' && request.rejection_reason && (
                 <p className="border-t border-line bg-red-50 p-3 text-xs text-red-700">
@@ -159,7 +172,11 @@ export default function SupplyRequestsPage() {
               )}
               {canAct && request.status === 'pending' && (
                 <div className="flex gap-2 border-t border-line p-4">
-                  <Button primary disabled={busy === request._id} onClick={() => openReview(request)}>
+                  <Button
+                    primary
+                    disabled={busy === request._id}
+                    onClick={() => openReview(request)}
+                  >
                     <Check className="size-4" /> Review & approve
                   </Button>
                   <Button disabled={busy === request._id} onClick={() => reject(request)}>
@@ -224,7 +241,9 @@ export default function SupplyRequestsPage() {
                       min={1}
                       className="rounded-lg border border-line p-2"
                       value={item.quantity}
-                      onChange={(event) => updateItem(index, 'quantity', Number(event.target.value))}
+                      onChange={(event) =>
+                        updateItem(index, 'quantity', Number(event.target.value))
+                      }
                     />
                   </label>
                   <Button type="button" onClick={() => removeItem(index)}>

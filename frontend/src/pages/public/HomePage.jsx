@@ -410,9 +410,7 @@ export default function HomePage() {
                       </span>
                     </div>
                     <h3 className="mt-4 text-base font-extrabold text-ink">{service.name}</h3>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                      {service.blurb}
-                    </p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{service.blurb}</p>
                   </div>
                   <div className="mt-6 flex items-center justify-between border-t border-line pt-4">
                     <span className="font-mono text-sm font-semibold text-ink">
@@ -469,9 +467,8 @@ export default function HomePage() {
               Never wonder where your order is.
             </h2>
             <p className="mt-3 max-w-md text-[14px] leading-relaxed text-muted">
-              Every order sends a notification when it's picked up, when it moves into
-              processing, and again the moment it's ready — so you'll know before you even open
-              the app.
+              Every order sends a notification when it's picked up, when it moves into processing,
+              and again the moment it's ready — so you'll know before you even open the app.
             </p>
             <ul className="mt-6 grid gap-2.5 text-[13px] font-semibold text-slate-700">
               {['Pickup confirmed', 'In progress at your branch', 'Ready for delivery'].map(
@@ -514,8 +511,8 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-5 text-xl font-semibold leading-relaxed text-ink sm:text-2xl">
-            "I schedule a pickup before I leave for work and get a notification the moment it's
-            back on my doorstep. I haven't set foot in a laundromat in months."
+            "I schedule a pickup before I leave for work and get a notification the moment it's back
+            on my doorstep. I haven't set foot in a laundromat in months."
           </p>
           <p className="mt-5 text-[13px] font-bold text-slate-500">Amaka O. — Lagos</p>
         </div>

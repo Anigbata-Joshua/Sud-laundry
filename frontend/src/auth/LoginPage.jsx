@@ -116,7 +116,6 @@ export default function LoginPage() {
               </span>
             </label>
 
-
             <label className="grid gap-2 text-xs font-bold text-gray-700">
               Password
               <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-sky-100">
@@ -146,7 +145,7 @@ export default function LoginPage() {
             <Link className="justify-self-end text-xs font-bold text-brand" to="/forgot-password">
               Forgot password?
             </Link>
-            
+
             {error && (
               <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
                 {error}
@@ -163,7 +162,10 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-8 text-center text-[11px] text-gray-400">
-            Need an account? <Link className="font-bold text-brand" to="/register">Register</Link>
+            Need an account?{' '}
+            <Link className="font-bold text-brand" to="/register">
+              Register
+            </Link>
           </p>
         </div>
       </section>

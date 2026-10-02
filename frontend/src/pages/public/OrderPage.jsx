@@ -165,13 +165,15 @@ export default function OrderPage() {
   return (
     <section className="py-12 sm:py-16">
       <div className="mx-auto w-[92%] max-w-6xl">
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Book a pickup</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
+          Book a pickup
+        </p>
         <h1 className="mt-2 text-[1.8rem] font-extrabold tracking-tight text-ink sm:text-[2.1rem]">
           Let's get your laundry moving.
         </h1>
         <p className="mt-2 max-w-lg text-[13.5px] text-muted">
-          Choose a branch, add your services and pick a pickup time — you'll get a notification
-          the moment it's confirmed.
+          Choose a branch, add your services and pick a pickup time — you'll get a notification the
+          moment it's confirmed.
         </p>
 
         {optionsError && (
@@ -255,7 +257,9 @@ export default function OrderPage() {
               <div>
                 <StepLabel index="02" title="Add your services" />
                 {!branchId && (
-                  <p className="mt-4 text-[12.5px] text-muted">Choose a branch to see what's available.</p>
+                  <p className="mt-4 text-[12.5px] text-muted">
+                    Choose a branch to see what's available.
+                  </p>
                 )}
                 {branchId && availableServices.length === 0 && (
                   <p className="mt-4 text-[12.5px] text-muted">

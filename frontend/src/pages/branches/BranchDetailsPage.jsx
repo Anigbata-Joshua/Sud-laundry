@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AlertTriangle,
-  ArrowLeft,
-  BarChart3,
-  Boxes,
-  ClipboardList,
-  Users,
-} from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BarChart3, Boxes, ClipboardList, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getBranches, getBranchStats, updateBranch } from '../../api/branches.api'
 import Button from '../../components/common/Button'
@@ -60,7 +53,8 @@ export default function BranchDetailsPage() {
   }, [id])
 
   useEffect(() => {
-    load()
+    const timer = setTimeout(load, 0)
+    return () => clearTimeout(timer)
   }, [load])
 
   async function handleUpdateBranch(event) {
@@ -96,7 +90,9 @@ export default function BranchDetailsPage() {
           <Button onClick={() => navigate('/branches')}>
             <ArrowLeft className="size-4" /> Back to branches
           </Button>
-          <Button primary onClick={load}>Try again</Button>
+          <Button primary onClick={load}>
+            Try again
+          </Button>
         </div>
       </Panel>
     )
@@ -114,19 +110,19 @@ export default function BranchDetailsPage() {
         onOpenEdit={() => setEditOpen(true)}
       />
 
-      <BranchMetrics
-        financials={financials}
-        orders={orders}
-        staff={staff}
-        inventory={inventory}
-      />
+      <BranchMetrics financials={financials} orders={orders} staff={staff} inventory={inventory} />
 
       {/* Navigation Tabs */}
       <div className="mb-5 flex flex-wrap gap-2 border-b border-line pb-2">
         {tabConfig.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
-          const badge = tab.id === 'workflow' ? orders.activeCount : tab.id === 'staff' ? staff.breakdown.total : null
+          const badge =
+            tab.id === 'workflow'
+              ? orders.activeCount
+              : tab.id === 'staff'
+                ? staff.breakdown.total
+                : null
           const hasAlert = tab.id === 'inventory' && inventory.lowStockCount > 0
 
           return (
@@ -143,7 +139,9 @@ export default function BranchDetailsPage() {
               <Icon className="size-4" />
               <span>{tab.label}</span>
               {badge !== null && badge > 0 && (
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${isActive ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800'}`}>
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${isActive ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800'}`}
+                >
                   {badge}
                 </span>
               )}
