@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getEmployees } from '../../api/employees.api'
+import { getLeaveRequests } from '../../api/leaveRequests.api'
 import { getOrder } from '../../api/orders.api'
 import {
   createProcessingWorkflow,
@@ -28,6 +29,7 @@ export default function ProcessingPage() {
   const [workflows, setWorkflows] = useState([])
   const [order, setOrder] = useState(null)
   const [employees, setEmployees] = useState([])
+  const [leaveRequests, setLeaveRequests] = useState([])
   const [steps, setSteps] = useState([{ ...emptyStep }])
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState('')
@@ -56,6 +58,9 @@ export default function ProcessingPage() {
       getEmployees()
         .then((response) => setEmployees(response.data.data))
         .catch((error) => setMessage(error.response?.data?.message ?? 'Unable to load employees.'))
+      getLeaveRequests()
+        .then((response) => setLeaveRequests(response.data.data || []))
+        .catch(() => {})
     }
     // Reload only when the selected order changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +73,29 @@ export default function ProcessingPage() {
       (employee) => (employee.branch_id?._id ?? employee.branch_id) === branchId,
     )
   }, [employees, order])
+
+  const leaveEmployeeIds = useMemo(() => {
+    if (!order) return new Set()
+    const baseTime = order.createdAt
+      ? new Date(order.createdAt).getTime()
+      : new Date(order.order_date || 0).getTime()
+    const windowStart = new Date(baseTime)
+    const windowEnd = order.delivery_time
+      ? new Date(order.delivery_time)
+      : new Date(baseTime + (order.fulfillment?.turnaround_hours || 24) * 60 * 60 * 1000)
+
+    const onLeave = new Set()
+    for (const req of leaveRequests) {
+      if (req.status !== 'approved') continue
+      const start = new Date(req.start_date)
+      const end = new Date(req.end_date)
+      if (start <= windowEnd && end >= windowStart) {
+        const empId = req.employee_id?._id ?? req.employee_id
+        if (empId) onLeave.add(empId.toString())
+      }
+    }
+    return onLeave
+  }, [leaveRequests, order])
 
   const hasActiveWorkflow = workflows.some((workflow) => workflow.status === 'active')
   const canCreate = order && ['received', 'processing'].includes(order.status) && !hasActiveWorkflow
@@ -289,11 +317,15 @@ export default function ProcessingPage() {
                       onChange={(event) => updateStep(index, 'employee_id', event.target.value)}
                     >
                       <option value="">Select employee</option>
-                      {branchEmployees.map((employee) => (
-                        <option key={employee._id} value={employee._id}>
-                          {employee.user_id?.name} · {employee.job_title}
-                        </option>
-                      ))}
+                      {branchEmployees.map((employee) => {
+                        const onLeave = leaveEmployeeIds.has(employee._id.toString())
+                        return (
+                          <option key={employee._id} value={employee._id} disabled={onLeave}>
+                            {employee.user_id?.name} · {employee.job_title}
+                            {onLeave ? ' (On Approved Leave)' : ''}
+                          </option>
+                        )
+                      })}
                     </select>
                   </Field>
                   <Button

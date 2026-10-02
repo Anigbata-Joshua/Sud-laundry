@@ -1,4 +1,5 @@
 import Employee from '../models/employee.model.js'
+import LeaveRequest from '../models/leaveRequest.model.js'
 import Order from '../models/order.model.js'
 import ProcessingWorkflow from '../models/processingWorkflow.model.js'
 import SupplyRequest from '../models/supplyRequest.model.js'
@@ -85,6 +86,28 @@ export const createWorkflow = asyncHandler(async (req, res) => {
       const employee = employees.find((item) => item._id.toString() === employeeId)
       throw new ApiError(409, `${employee?.user_id?.name ?? 'This employee'} already has ${activeCount} active orders (max ${MAX_ACTIVE_ORDERS_PER_EMPLOYEE}) and cannot be assigned more until some are marked ready`)
     }
+  }
+
+  // Filter out employees with approved leave overlapping now -> order's expected delivery time
+  const windowStart = new Date()
+  const windowEnd = order.delivery_time
+    ? new Date(order.delivery_time)
+    : new Date(Date.now() + (order.fulfillment?.turnaround_hours || 24) * 60 * 60 * 1000)
+
+  const overlappingLeave = await LeaveRequest.findOne({
+    employee_id: { $in: uniqueEmployeeIds },
+    status: 'approved',
+    start_date: { $lte: windowEnd },
+    end_date: { $gte: windowStart },
+  })
+  if (overlappingLeave) {
+    const employee = employees.find(
+      (item) => item._id.toString() === overlappingLeave.employee_id.toString(),
+    )
+    throw new ApiError(
+      400,
+      `${employee?.user_id?.name ?? 'Assigned employee'} has approved leave during this order's processing window`,
+    )
   }
 
   // Check if there is an active workflow for order to avoid redundant workflows

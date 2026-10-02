@@ -463,3 +463,132 @@ test('frontend refund eligibility follows the delivery deadline', async () => {
     assert.equal(isWithinRefundWindow({ status: 'delivered' }), false);
     assert.equal(isWithinRefundWindow({ status: 'ready' }), true);
 });
+
+test('leave request submission rejects overlapping pending or approved leave', async () => {
+    const employeeId = id();
+    mock.method(Employee, 'findOne', async () => ({ _id: employeeId }));
+    mock.method(LeaveRequest, 'findOne', async () => ({ _id: id(), status: 'pending' }));
+    await rejectsStatus(
+        invoke(leave.submitLeaveRequest, {
+            user: { role: 'employee', id: id() },
+            body: { start_date: '2026-10-05', end_date: '2026-10-10', reason: 'Vacation' },
+        }),
+        400,
+    );
+});
+
+test('leave request submission rejects invalid date ranges', async () => {
+    const employeeId = id();
+    mock.method(Employee, 'findOne', async () => ({ _id: employeeId }));
+    await rejectsStatus(
+        invoke(leave.submitLeaveRequest, {
+            user: { role: 'employee', id: id() },
+            body: { start_date: '2026-10-15', end_date: '2026-10-10', reason: 'Vacation' },
+        }),
+        400,
+    );
+});
+
+test('approving an already decided leave request is rejected', async () => {
+    mock.method(LeaveRequest, 'findById', async () => ({ status: 'approved' }));
+    await rejectsStatus(
+        invoke(leave.approveLeaveRequest, {
+            user: { role: 'admin', id: id() },
+            params: { id: id() },
+        }),
+        400,
+    );
+});
+
+test('rejecting an already decided leave request is rejected', async () => {
+    mock.method(LeaveRequest, 'findById', async () => ({ status: 'rejected' }));
+    await rejectsStatus(
+        invoke(leave.rejectLeaveRequest, {
+            user: { role: 'admin', id: id() },
+            params: { id: id() },
+            body: { rejection_reason: 'Already handled' },
+        }),
+        400,
+    );
+});
+
+test('rejecting a leave request without reason is rejected', async () => {
+    mock.method(LeaveRequest, 'findById', async () => ({ status: 'pending' }));
+    await rejectsStatus(
+        invoke(leave.rejectLeaveRequest, {
+            user: { role: 'admin', id: id() },
+            params: { id: id() },
+            body: { rejection_reason: '   ' },
+        }),
+        400,
+    );
+});
+
+test('approving leave is blocked when employee has active workflow tasks', async () => {
+    const employeeId = id();
+    mock.method(LeaveRequest, 'findById', async () => ({ _id: id(), employee_id: employeeId, status: 'pending' }));
+    mock.method(Employee, 'findById', async () => ({ _id: employeeId, branch_id: branchId }));
+    mock.method(ProcessingWorkflow, 'findOne', async () => ({ _id: id(), status: 'active' }));
+    await rejectsStatus(
+        invoke(leave.approveLeaveRequest, {
+            user: { role: 'branch_manager', id: id(), branch_id: branchId },
+            params: { id: id() },
+        }),
+        400,
+    );
+});
+
+test('approving leave succeeds and sends notification when valid', async () => {
+    const employeeId = id(), userId = id();
+    const reqDoc = {
+        _id: id(),
+        employee_id: employeeId,
+        status: 'pending',
+        start_date: new Date('2026-10-05'),
+        end_date: new Date('2026-10-10'),
+        save: mock.fn(async () => {}),
+        populate: mock.fn(async () => reqDoc),
+    };
+    mock.method(LeaveRequest, 'findById', async () => reqDoc);
+    mock.method(Employee, 'findById', async () => ({ _id: employeeId, user_id: userId, branch_id: branchId }));
+    mock.method(ProcessingWorkflow, 'findOne', async () => null);
+    const notif = mock.method(Notification, 'create', async () => ({}));
+
+    const res = await invoke(leave.approveLeaveRequest, {
+        user: { role: 'branch_manager', id: id(), branch_id: branchId },
+        params: { id: id() },
+    });
+    assert.equal(res.code, 200);
+    assert.equal(reqDoc.status, 'approved');
+    assert.equal(notif.mock.callCount(), 1);
+    assert.equal(notif.mock.calls[0].arguments[0].user_id, userId);
+});
+
+test('createWorkflow rejects attendants with overlapping approved leave', async () => {
+    const attendantId = id();
+    mock.method(Order, 'findById', async () => ({
+        _id: orderId,
+        branch_id: branchId,
+        status: 'received',
+        items: [{ category: 'regular' }],
+        fulfillment: { turnaround_hours: 24 },
+    }));
+    mock.method(ProcessingWorkflow, 'exists', async () => false);
+    mock.method(Employee, 'find', () => chain([
+        { _id: attendantId, branch_id: branchId, is_active: true, user_id: { name: 'Attendant One' } },
+    ]));
+    mock.method(ProcessingWorkflow, 'find', () => chain([]));
+    mock.method(Order, 'countDocuments', async () => 0);
+    mock.method(LeaveRequest, 'findOne', async () => ({ _id: id(), employee_id: attendantId, status: 'approved' }));
+
+    await rejectsStatus(
+        invoke(workflows.createWorkflow, {
+            user: { role: 'branch_manager', id: id(), branch_id: branchId },
+            body: {
+                order_id: orderId,
+                steps: [{ name: 'washing', employee_id: attendantId }],
+            },
+        }),
+        400,
+    );
+});
