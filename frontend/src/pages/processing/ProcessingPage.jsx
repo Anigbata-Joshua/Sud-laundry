@@ -29,6 +29,7 @@ export default function ProcessingPage() {
   const [workflows, setWorkflows] = useState([])
   const [order, setOrder] = useState(null)
   const [employees, setEmployees] = useState([])
+  const [now] = useState(() => Date.now())
   const [leaveRequests, setLeaveRequests] = useState([])
   const [steps, setSteps] = useState([{ ...emptyStep }])
   const [creating, setCreating] = useState(false)
@@ -76,13 +77,10 @@ export default function ProcessingPage() {
 
   const leaveEmployeeIds = useMemo(() => {
     if (!order) return new Set()
-    const baseTime = order.createdAt
-      ? new Date(order.createdAt).getTime()
-      : new Date(order.order_date || 0).getTime()
-    const windowStart = new Date(baseTime)
+    const windowStart = new Date(now)
     const windowEnd = order.delivery_time
       ? new Date(order.delivery_time)
-      : new Date(baseTime + (order.fulfillment?.turnaround_hours || 24) * 60 * 60 * 1000)
+      : new Date(now + (order.fulfillment?.turnaround_hours || 24) * 60 * 60 * 1000)
 
     const onLeave = new Set()
     for (const req of leaveRequests) {
@@ -95,8 +93,7 @@ export default function ProcessingPage() {
       }
     }
     return onLeave
-  }, [leaveRequests, order])
-
+  }, [leaveRequests, order, now])
   const hasActiveWorkflow = workflows.some((workflow) => workflow.status === 'active')
   const canCreate = order && ['received', 'processing'].includes(order.status) && !hasActiveWorkflow
   const visibleWorkflows = useMemo(() => {

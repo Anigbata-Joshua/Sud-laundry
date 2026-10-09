@@ -29,7 +29,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
 
     try {
         decoded = jwt.verify(token, env.jwtSecret);
-    } catch (error) {
+    } catch {
         throw new ApiError(401, 'Not authorized, token invalid or expired');
     }
 
