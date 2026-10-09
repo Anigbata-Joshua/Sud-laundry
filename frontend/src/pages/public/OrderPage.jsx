@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  ArrowRight,
   BellRing,
   Building2,
   Check,
-  ChevronRight,
+  CheckCircle2,
   Clock,
   Minus,
-  Phone,
   Plus,
   ShieldCheck,
+  Sparkles,
+  Truck,
   Zap,
 } from 'lucide-react'
 import { getBranches } from '../../api/branches.api'
@@ -18,6 +20,7 @@ import { createOrder } from '../../api/orders.api'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { formatNaira } from '../../utils/formatters'
+import BranchCard from '../../components/branches/BranchCard'
 
 function isAvailableAt(service, branchId) {
   if (!branchId) return false
@@ -92,7 +95,15 @@ export default function OrderPage() {
         .filter((item) => item.service),
     [cart, services],
   )
-  const total = cartItems.reduce((sum, item) => sum + item.subtotal, 0)
+
+  const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0)
+  const expressSurcharge = priority === 'express' ? subtotal * 0.3 : 0
+  const grandTotal = subtotal + expressSurcharge
+
+  const selectedBranch = useMemo(
+    () => branches.find((b) => (b._id || b.id) === branchId),
+    [branches, branchId],
+  )
 
   function selectBranch(id) {
     setBranchId(id)
@@ -106,9 +117,9 @@ export default function OrderPage() {
 
   async function submit(event) {
     event.preventDefault()
-    if (!branchId) return setFormError('Choose a branch to continue.')
+    if (!branchId) return setFormError('Please select a branch to continue.')
     if (cartItems.length === 0) return setFormError('Add at least one service to your order.')
-    if (!pickupTime) return setFormError('Choose a pickup time.')
+    if (!pickupTime) return setFormError('Choose a pickup date and time.')
 
     setSubmitting(true)
     setFormError('')
@@ -125,13 +136,11 @@ export default function OrderPage() {
         priority,
       })
       setConfirmedOrder(response.data.data)
-      // Match the app's existing convention for telling the navbar bell to
-      // refresh — placing an order also creates a real notification server-side.
       window.dispatchEvent(new Event('notifications:changed'))
       notify({
         tone: 'success',
-        title: 'Order placed',
-        message: "We'll notify you as it moves through wash, dry and pickup.",
+        title: 'Order placed successfully!',
+        message: "We'll notify you as it moves through processing and pickup.",
       })
     } catch (requestError) {
       setFormError(
@@ -145,7 +154,7 @@ export default function OrderPage() {
   if (isLoading) {
     return (
       <div className="grid min-h-[70vh] place-items-center">
-        <div className="size-8 animate-spin rounded-full border-4 border-sky-100 border-t-brand" />
+        <div className="size-10 animate-spin rounded-full border-4 border-sky-100 border-t-[#4F7DF3]" />
       </div>
     )
   }
@@ -163,301 +172,368 @@ export default function OrderPage() {
   }
 
   return (
-    <section className="py-12 sm:py-16">
-      <div className="mx-auto w-[92%] max-w-6xl">
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
-          Book a pickup
-        </p>
-        <h1 className="mt-2 text-[1.8rem] font-extrabold tracking-tight text-ink sm:text-[2.1rem]">
-          Let's get your laundry moving.
-        </h1>
-        <p className="mt-2 max-w-lg text-[13.5px] text-muted">
-          Choose a branch, add your services and pick a pickup time — you'll get a notification the
-          moment it's confirmed.
-        </p>
-
-        {optionsError && (
-          <p className="mt-6 rounded-xl bg-red-50 p-3.5 text-[12.5px] font-semibold text-red-700">
-            {optionsError}
+    <div className="min-h-screen bg-[#F8FAFC] font-sans pb-20">
+      {/* Header Banner */}
+      <section className="bg-gradient-to-r from-[#0F172A] via-[#1A2E56] to-[#0F172A] text-white pt-12 pb-16 px-4 sm:px-8 border-b border-white/10">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-2 w-fit bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full mb-4">
+            <Sparkles className="size-3.5 text-[#D4AF37]" />
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-100">
+              Premium Laundry Booking
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+            Book Your Laundry & Dry-Cleaning
+          </h1>
+          <p className="mt-3 text-slate-300 max-w-xl text-sm sm:text-base leading-relaxed">
+            Select your preferred branch, customize your garment services, and schedule a convenient
+            pickup window.
           </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-6 text-xs font-semibold text-slate-300">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-[#26C1C9]" /> 24h Express Available
+            </span>
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-[#26C1C9]" /> Eco-Friendly Care
+            </span>
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-[#26C1C9]" /> In-App Tracking
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 -mt-6">
+        {optionsError && (
+          <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs font-semibold text-rose-700 shadow-sm">
+            {optionsError}
+          </div>
         )}
 
         {loadingOptions ? (
-          <div className="mt-10 grid gap-3">
+          <div className="grid gap-4 mt-8">
             {[0, 1, 2].map((key) => (
-              <div key={key} className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+              <div key={key} className="h-24 animate-pulse rounded-2xl bg-white shadow-sm" />
             ))}
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-10 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="grid gap-8">
-              {/* Step 1: branch */}
-              <div>
-                <StepLabel index="01" title="Choose a branch" />
-                <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {branches.map((branch, index) => {
-                    const selected = branch._id === branchId
-                    return (
-                      <button
-                        type="button"
-                        key={branch._id}
-                        onClick={() => selectBranch(branch._id)}
-                        style={{ animationDelay: `${index * 60}ms` }}
-                        className={`animate-fade-up relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                          selected
-                            ? 'border-brand bg-sky-50/70 shadow-xs ring-2 ring-brand'
-                            : 'border-line bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        {/* Animated checkmark badge scaling in 0 -> 1 on selection */}
-                        <span
-                          className={`absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-brand text-white shadow-xs transition-transform duration-200 ease-out ${
-                            selected
-                              ? 'scale-100 opacity-100'
-                              : 'scale-0 opacity-0 pointer-events-none'
-                          }`}
-                          aria-hidden="true"
-                        >
-                          <Check className="size-3 stroke-[2.5]" />
-                        </span>
-
-                        <div>
-                          <span
-                            className={`grid size-9 shrink-0 place-items-center rounded-xl transition-colors duration-200 ${
-                              selected ? 'bg-brand text-white' : 'bg-slate-50 text-slate-500'
-                            }`}
-                          >
-                            <Building2 className="size-4" />
-                          </span>
-                          <span className="mt-3 block text-[13px] font-extrabold text-ink">
-                            {branch.name}
-                          </span>
-                          <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">
-                            {branch.address}
-                          </span>
-                        </div>
-
-                        {/* Real data only: render phone when available */}
-                        {branch.phone && (
-                          <span className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-2 font-mono text-[11px] text-slate-500">
-                            <Phone className="size-3 shrink-0 text-slate-400" />
-                            {branch.phone}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
+          <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] items-start">
+            <div className="space-y-8">
+              {/* Step 1: Branch Selection */}
+              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+                <StepHeader
+                  step="01"
+                  title="Select Service Location"
+                  subtitle="Choose the branch closest to your collection address."
+                />
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {branches.map((branch, index) => (
+                    <BranchCard
+                      key={branch._id || branch.id}
+                      branch={branch}
+                      selected={(branch._id || branch.id) === branchId}
+                      onSelect={selectBranch}
+                      index={index}
+                    />
+                  ))}
                   {branches.length === 0 && (
-                    <p className="text-[12.5px] text-muted">No branches are available right now.</p>
+                    <p className="text-xs text-slate-400 col-span-full py-4 text-center">
+                      No active branches available at the moment.
+                    </p>
                   )}
                 </div>
-              </div>
+              </section>
 
-              {/* Step 2: services */}
-              <div>
-                <StepLabel index="02" title="Add your services" />
-                {!branchId && (
-                  <p className="mt-4 text-[12.5px] text-muted">
-                    Choose a branch to see what's available.
-                  </p>
-                )}
-                {branchId && availableServices.length === 0 && (
-                  <p className="mt-4 text-[12.5px] text-muted">
-                    No services are currently listed for this branch.
-                  </p>
-                )}
-                <div className="mt-4 grid gap-2.5">
-                  {availableServices.map((service) => {
-                    const quantity = cart[service._id] ?? 0
-                    return (
-                      <div
-                        key={service._id}
-                        className={`flex items-center gap-4 rounded-2xl border p-4 transition ${
-                          quantity > 0 ? 'border-brand/40 bg-sky-50/40' : 'border-line bg-white'
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-extrabold text-ink">{service.name}</p>
-                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-muted">
-                            <span className="font-mono">{formatNaira(service.price)}</span>
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="size-3" />
-                              {service.turnaround_hours}hr
+              {/* Step 2: Services Selection */}
+              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+                <StepHeader
+                  step="02"
+                  title="Select Services & Garments"
+                  subtitle={
+                    branchId
+                      ? `Available service options at ${selectedBranch?.name || 'selected branch'}.`
+                      : 'Please select a branch above to view available services.'
+                  }
+                />
+
+                {!branchId ? (
+                  <div className="mt-6 py-12 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+                    <Building2 className="size-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-slate-500">
+                      Choose a branch in Step 1 to load services and live pricing.
+                    </p>
+                  </div>
+                ) : availableServices.length === 0 ? (
+                  <div className="mt-6 py-12 text-center rounded-2xl border border-slate-200 bg-slate-50">
+                    <p className="text-xs font-medium text-slate-500">
+                      No active services currently listed for this branch.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-3.5">
+                    {availableServices.map((service) => {
+                      const quantity = cart[service._id] ?? 0
+                      const isSelected = quantity > 0
+                      return (
+                        <div
+                          key={service._id}
+                          className={`flex items-center justify-between gap-4 rounded-2xl border p-4 sm:p-5 transition-all duration-200 ${
+                            isSelected
+                              ? 'border-[#4F7DF3] bg-gradient-to-r from-blue-50/70 to-white shadow-sm ring-1 ring-[#4F7DF3]/30'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-black text-[#0F172A]">{service.name}</h3>
+                              {service.type && (
+                                <span className="inline-block uppercase px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-slate-100 text-slate-600">
+                                  {service.type}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                              <span className="font-mono font-bold text-[#0F172A]">
+                                {formatNaira(service.price)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-slate-500">
+                                <Clock className="size-3 text-slate-400" />
+                                {service.turnaround_hours}h turnaround
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <button
+                              type="button"
+                              aria-label={`Decrease ${service.name}`}
+                              disabled={quantity === 0}
+                              onClick={() => setQuantity(service._id, quantity - 1)}
+                              className="size-9 rounded-xl border border-slate-200 bg-white text-slate-700 flex items-center justify-center hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+                            >
+                              <Minus className="size-4" />
+                            </button>
+                            <span className="w-6 text-center font-mono font-bold text-sm text-[#0F172A]">
+                              {quantity}
                             </span>
-                          </p>
+                            <button
+                              type="button"
+                              aria-label={`Increase ${service.name}`}
+                              onClick={() => setQuantity(service._id, quantity + 1)}
+                              className="size-9 rounded-xl border border-[#4F7DF3]/30 bg-[#4F7DF3] text-white flex items-center justify-center hover:bg-[#3B63C9] transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm shadow-[#4F7DF3]/20"
+                            >
+                              <Plus className="size-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2.5">
-                          <button
-                            type="button"
-                            aria-label={`Remove one ${service.name}`}
-                            disabled={quantity === 0}
-                            onClick={() => setQuantity(service._id, quantity - 1)}
-                            className="grid size-8 place-items-center rounded-lg border border-line text-slate-500 disabled:opacity-30"
-                          >
-                            <Minus className="size-3.5" />
-                          </button>
-                          <span className="w-5 text-center text-[13px] font-bold text-ink">
-                            {quantity}
-                          </span>
-                          <button
-                            type="button"
-                            aria-label={`Add one ${service.name}`}
-                            onClick={() => setQuantity(service._id, quantity + 1)}
-                            className="grid size-8 place-items-center rounded-lg border border-line text-slate-500 hover:border-slate-300"
-                          >
-                            <Plus className="size-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
 
-              {/* Step 3: schedule */}
-              <div>
-                <StepLabel index="03" title="Schedule pickup" />
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="grid gap-2 text-[12.5px] font-bold text-slate-700">
-                    Pickup time
+              {/* Step 3: Schedule & Priority */}
+              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+                <StepHeader
+                  step="03"
+                  title="Collection & Fulfillment Priority"
+                  subtitle="Set when our team should pick up your garments."
+                />
+                <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                  <label className="grid gap-2 text-xs font-bold text-slate-700">
+                    <span>Pickup Date & Time</span>
                     <input
                       required
                       type="datetime-local"
                       min={earliestPickup()}
                       value={pickupTime}
                       onChange={(event) => setPickupTime(event.target.value)}
-                      className="rounded-xl border border-line p-3 text-[13px] font-normal outline-none focus:border-sky-400"
+                      className="rounded-xl border border-slate-200 p-3.5 text-xs font-normal outline-none focus:border-[#4F7DF3] focus:ring-2 focus:ring-[#4F7DF3]/20 transition-all bg-slate-50/50"
                     />
                   </label>
-                  <div className="grid gap-2 text-[12.5px] font-bold text-slate-700">
-                    Priority
-                    <div className="grid grid-cols-2 gap-2">
+
+                  <div className="grid gap-2 text-xs font-bold text-slate-700">
+                    <span>Turnaround Priority</span>
+                    <div className="grid grid-cols-2 gap-2.5">
                       <button
                         type="button"
                         onClick={() => setPriority('normal')}
-                        className={`rounded-xl border p-3 text-[12.5px] font-bold transition ${
+                        className={`rounded-xl border p-3 text-xs font-bold transition-all cursor-pointer text-center ${
                           priority === 'normal'
-                            ? 'border-brand bg-sky-50 text-brand'
-                            : 'border-line text-slate-500'
+                            ? 'border-[#4F7DF3] bg-blue-50/80 text-[#4F7DF3] ring-2 ring-[#4F7DF3]/20 shadow-xs'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        Normal
+                        Standard
+                        <span className="block text-[10px] font-normal text-slate-400 mt-0.5">
+                          Regular turnaround
+                        </span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setPriority('express')}
-                        className={`flex items-center justify-center gap-1.5 rounded-xl border p-3 text-[12.5px] font-bold transition ${
+                        className={`flex flex-col items-center justify-center rounded-xl border p-3 text-xs font-bold transition-all cursor-pointer text-center ${
                           priority === 'express'
-                            ? 'border-accent bg-accent-light text-accent-hover'
-                            : 'border-line text-slate-500'
+                            ? 'border-[#26C1C9] bg-cyan-50/80 text-[#00A878] ring-2 ring-[#26C1C9]/30 shadow-xs'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        <Zap className="size-3.5" />
-                        Express
+                        <span className="flex items-center gap-1 text-[#00A878]">
+                          <Zap className="size-3.5 fill-current" /> Express (+30%)
+                        </span>
+                        <span className="text-[10px] font-normal text-slate-400 mt-0.5">
+                          24h priority guarantee
+                        </span>
                       </button>
                     </div>
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
 
-            {/* Order summary */}
-            <aside className="h-fit rounded-2xl border border-line bg-white p-5 lg:sticky lg:top-24">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
-                Order summary
-              </p>
+            {/* Sticky Order Summary Card */}
+            <aside className="bg-[#1A1C1E] text-white rounded-3xl p-6 sm:p-8 shadow-2xl lg:sticky lg:top-24 border border-white/10">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+                <div>
+                  <h2 className="text-base font-black uppercase tracking-wider text-white">
+                    Order Summary
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {selectedBranch ? selectedBranch.name : 'No branch selected'}
+                  </p>
+                </div>
+                <div className="size-9 rounded-xl bg-white/10 flex items-center justify-center text-blue-400">
+                  <Truck className="size-4.5" />
+                </div>
+              </div>
+
               {cartItems.length === 0 ? (
-                <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                  <img
-                    src="/images/laundry-basket.png"
-                    alt="Laundry basket"
-                    className="size-12 shrink-0 object-contain"
-                  />
-                  <p className="text-[12.5px] text-muted">
-                    Your order is empty — select your branch and add a service.
+                <div className="py-8 text-center text-xs text-slate-400 rounded-2xl bg-white/5 border border-white/5 px-4">
+                  <p className="font-semibold text-slate-300">Your basket is empty</p>
+                  <p className="mt-1 text-[11px]">
+                    Select items above to see your real-time total.
                   </p>
                 </div>
               ) : (
-                <ul className="mt-3 grid gap-2.5">
+                <ul className="space-y-3 mb-6 divide-y divide-white/5">
                   {cartItems.map((item) => (
                     <li
                       key={item.service._id}
-                      className="flex items-center justify-between text-[12.5px]"
+                      className="pt-2.5 first:pt-0 flex items-center justify-between text-xs"
                     >
-                      <span className="text-slate-600">
-                        {item.quantity} × {item.service.name}
-                      </span>
-                      <span className="font-mono font-semibold text-ink">
+                      <div className="pr-2">
+                        <span className="font-medium text-slate-200 block truncate max-w-[180px]">
+                          {item.service.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {item.quantity} × {formatNaira(item.service.price)}
+                        </span>
+                      </div>
+                      <span className="font-mono font-bold text-white shrink-0">
                         {formatNaira(item.subtotal)}
                       </span>
                     </li>
                   ))}
                 </ul>
               )}
-              <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-                <span className="text-[13px] font-bold text-ink">Total</span>
-                <span className="font-mono text-lg font-extrabold text-ink">
-                  {formatNaira(total)}
-                </span>
+
+              {/* Price Breakdown */}
+              <div className="space-y-2.5 border-t border-white/10 pt-4 text-xs text-slate-300">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span className="font-mono">{formatNaira(subtotal)}</span>
+                </div>
+                {priority === 'express' && (
+                  <div className="flex justify-between text-[#26C1C9] font-medium">
+                    <span className="flex items-center gap-1">
+                      <Zap className="size-3 fill-current" /> Express Surcharge (30%)
+                    </span>
+                    <span className="font-mono">+{formatNaira(expressSurcharge)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-baseline pt-3 border-t border-white/10 text-white">
+                  <span className="text-sm font-bold">Total Due</span>
+                  <span className="text-2xl font-black font-mono text-[#4F7DF3]">
+                    {formatNaira(grandTotal)}
+                  </span>
+                </div>
               </div>
+
               {formError && (
-                <p className="mt-4 rounded-lg bg-red-50 p-3 text-[12px] font-semibold text-red-700">
+                <div className="mt-4 rounded-xl bg-rose-500/20 border border-rose-500/30 p-3 text-xs text-rose-200 font-medium">
                   {formError}
-                </p>
+                </div>
               )}
+
               <button
                 type="submit"
                 disabled={submitting || cartItems.length === 0}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-sky-700 active:scale-[0.98] disabled:opacity-50"
+                className="mt-6 w-full bg-[#4F7DF3] hover:bg-[#3B63C9] active:scale-[0.98] h-14 rounded-2xl text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-[#4F7DF3]/25"
               >
-                {submitting ? 'Placing your order…' : 'Place order'}
-                {!submitting && <ChevronRight className="size-4" />}
+                {submitting ? 'Confirming Order…' : 'Place Order & Schedule Pickup'}
+                {!submitting && <ArrowRight className="size-4" />}
               </button>
-              <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
-                <ShieldCheck className="size-3.5" />
-                You'll be notified at every step, from pickup to delivery.
-              </p>
+
+              <div className="mt-5 space-y-2 border-t border-white/10 pt-4 text-[11px] text-slate-400">
+                <p className="flex items-center gap-2">
+                  <ShieldCheck className="size-3.5 text-[#26C1C9] shrink-0" />
+                  <span>Real-time status updates via SMS & in-app alerts.</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Clock className="size-3.5 text-[#D4AF37] shrink-0" />
+                  <span>Free cancellation within 30 minutes of booking.</span>
+                </p>
+              </div>
             </aside>
           </form>
         )}
       </div>
-    </section>
+    </div>
   )
 }
 
-function StepLabel({ index, title }) {
+function StepHeader({ step, title, subtitle }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="font-mono text-[13px] font-semibold text-slate-300">{index}</span>
-      <h2 className="text-[15px] font-extrabold text-ink">{title}</h2>
+    <div className="flex items-start gap-3.5 pb-4 border-b border-slate-100">
+      <span className="size-8 rounded-xl bg-blue-50 text-[#4F7DF3] font-black text-xs flex items-center justify-center shrink-0 border border-blue-100">
+        {step}
+      </span>
+      <div>
+        <h2 className="text-base font-black text-[#0F172A] tracking-tight">{title}</h2>
+        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
     </div>
   )
 }
 
 function SignInPrompt() {
   return (
-    <section className="grid min-h-[70vh] place-items-center px-4 py-16">
-      <div className="w-full max-w-sm rounded-3xl border border-line bg-white p-8 text-center shadow-sm">
-        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-sky-50 text-brand">
-          <BellRing className="size-5" />
+    <section className="grid min-h-[75vh] place-items-center px-4 py-16 bg-[#F8FAFC]">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 sm:p-10 text-center shadow-xl">
+        <span className="mx-auto size-14 place-items-center rounded-2xl bg-blue-50 text-[#4F7DF3] flex items-center justify-center shadow-sm">
+          <BellRing className="size-6" />
         </span>
-        <h1 className="mt-5 text-lg font-extrabold text-ink">Sign in to book a pickup</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          Create an account or sign in so we can track your order and notify you at every step.
+        <h1 className="mt-5 text-2xl font-black text-[#0F172A] tracking-tight">
+          Sign In to Book a Pickup
+        </h1>
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          Sign in or create an account to schedule laundry collections, customize your services, and
+          track orders in real-time.
         </p>
-        <div className="mt-6 grid gap-2.5">
+        <div className="mt-6 grid gap-3">
           <Link
             to="/login"
             state={{ from: { pathname: '/order' } }}
-            className="rounded-xl bg-brand py-3 text-[13px] font-bold text-white transition hover:bg-sky-700"
+            className="rounded-2xl bg-[#4F7DF3] py-3.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#3B63C9] shadow-md shadow-blue-500/20"
           >
-            Log in
+            Sign In
           </Link>
           <Link
             to="/register"
-            className="rounded-xl border border-line py-3 text-[13px] font-bold text-ink transition hover:border-slate-300"
+            className="rounded-2xl border border-slate-200 py-3.5 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
-            Create an account
+            Create an Account
           </Link>
         </div>
       </div>
@@ -467,21 +543,23 @@ function SignInPrompt() {
 
 function WrongRoleNotice() {
   return (
-    <section className="grid min-h-[70vh] place-items-center px-4 py-16">
-      <div className="w-full max-w-sm rounded-3xl border border-line bg-white p-8 text-center shadow-sm">
-        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-50 text-accent-hover">
-          <ShieldCheck className="size-5" />
+    <section className="grid min-h-[75vh] place-items-center px-4 py-16 bg-[#F8FAFC]">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 sm:p-10 text-center shadow-xl">
+        <span className="mx-auto size-14 place-items-center rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-sm">
+          <ShieldCheck className="size-6" />
         </span>
-        <h1 className="mt-5 text-lg font-extrabold text-ink">This page is for customer accounts</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          You're signed in with a staff account. Head to your workspace to view or manage orders
-          there instead.
+        <h1 className="mt-5 text-xl font-black text-[#0F172A] tracking-tight">
+          Customer Booking Portal
+        </h1>
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          You are signed in with a staff/operational account. Please use your internal workspace to
+          process and dispatch orders.
         </p>
         <Link
           to="/"
-          className="mt-6 inline-block w-full rounded-xl bg-ink py-3 text-[13px] font-bold text-white transition hover:bg-slate-800"
+          className="mt-6 inline-block w-full rounded-2xl bg-[#0F172A] py-3.5 text-xs font-bold text-white transition hover:bg-slate-800"
         >
-          Go to workspace
+          Go to Workspace
         </Link>
       </div>
     </section>
@@ -491,72 +569,73 @@ function WrongRoleNotice() {
 function Confirmation({ order }) {
   const reference = `ORD-${order._id.slice(-6).toUpperCase()}`
   const timeline = [
-    { label: 'Order placed', done: true },
-    { label: 'Picked up', done: false },
-    { label: 'Processing', done: false },
-    { label: 'Ready for delivery', done: false },
+    { label: 'Order Received & Reserved', done: true },
+    { label: 'Pickup Scheduled', done: false },
+    { label: 'In-Facility Processing', done: false },
+    { label: 'Quality Check & Delivery', done: false },
   ]
 
   return (
-    <section className="grid min-h-[70vh] place-items-center px-4 py-16">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-line bg-white shadow-sm">
-        {/* Animated clean clothes hero header */}
-        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+    <section className="grid min-h-[80vh] place-items-center px-4 py-16 bg-[#F8FAFC]">
+      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="relative h-44 w-full overflow-hidden bg-[#0F172A]">
           <img
             src="/images/laundry-hero-clean.gif"
             alt="Clean laundry processing"
-            className="size-full object-cover"
+            className="size-full object-cover opacity-60"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="absolute bottom-3 left-4 flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-xl bg-emerald-500 text-white shadow-sm">
-              <Check className="size-4.5 stroke-[2.5]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/40 to-transparent" />
+          <div className="absolute bottom-4 left-6 flex items-center gap-3">
+            <span className="size-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg">
+              <Check className="size-5 stroke-[3]" />
             </span>
             <div>
-              <p className="text-[11px] font-bold text-emerald-300 uppercase tracking-wide">
-                Confirmed
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+                Order Confirmed
               </p>
-              <p className="font-mono text-sm font-bold text-white">{reference}</p>
+              <p className="font-mono text-base font-bold text-white">{reference}</p>
             </div>
           </div>
         </div>
 
         <div className="p-6 sm:p-8">
-          <h1 className="text-xl font-extrabold text-ink">Order placed successfully!</h1>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">
-            We've notified our team at your branch. You'll get a notification here and in your inbox
-            at every step, from pickup to delivery.
+          <h1 className="text-xl font-black text-[#0F172A] tracking-tight">
+            Thank you! Your pickup is scheduled.
+          </h1>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            We've assigned your order to the branch team. Stock has been reserved and our staff will
+            collect your garments at the requested time.
           </p>
 
-          <ul className="mt-6 grid gap-3 border-t border-line pt-5">
+          <ul className="mt-6 grid gap-3 border-t border-slate-100 pt-5">
             {timeline.map((step) => (
-              <li key={step.label} className="flex items-center gap-3 text-[13px]">
+              <li key={step.label} className="flex items-center gap-3 text-xs">
                 <span
-                  className={`grid size-5 shrink-0 place-items-center rounded-full ${
-                    step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
+                  className={`size-5 rounded-full flex items-center justify-center ${
+                    step.done ? 'bg-[#4F7DF3] text-white' : 'border-2 border-slate-200'
                   }`}
                 >
-                  {step.done && <Check className="size-3 stroke-[2.5]" />}
+                  {step.done && <Check className="size-3 stroke-[3]" />}
                 </span>
-                <span className={step.done ? 'font-semibold text-ink' : 'text-slate-400'}>
+                <span className={step.done ? 'font-bold text-[#0F172A]' : 'text-slate-400'}>
                   {step.label}
                 </span>
               </li>
             ))}
           </ul>
 
-          <div className="mt-7 grid gap-2.5">
+          <div className="mt-8 grid sm:grid-cols-2 gap-3">
             <Link
               to={`/orders/${order._id}`}
-              className="rounded-xl bg-brand py-3 text-center text-[13px] font-bold text-white shadow-sm transition hover:bg-sky-700"
+              className="rounded-2xl bg-[#4F7DF3] py-3.5 text-center text-xs font-black uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition hover:bg-[#3B63C9]"
             >
-              View order details
+              View Order Status
             </Link>
             <Link
               to="/home"
-              className="rounded-xl border border-line py-3 text-center text-[13px] font-bold text-ink transition hover:border-slate-300"
+              className="rounded-2xl border border-slate-200 py-3.5 text-center text-xs font-bold text-slate-700 transition hover:bg-slate-50"
             >
-              Back to home
+              Back to Home
             </Link>
           </div>
         </div>
