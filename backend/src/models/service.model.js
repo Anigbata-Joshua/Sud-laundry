@@ -19,7 +19,7 @@ const serviceSchema = new mongoose.Schema(
         type: {type: String,enum: ['service', 'add-on'],default: 'service',required: true,},
         category: {type: String,trim: true,},
         category_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' },
-        price: {type: Number,min: 0,required: true,},
+        price: {type: Number,min: 0,},
         turnaround_hours: {type: Number,min: 1,},
 
         // Inventory supplies consumed when this service is processed.

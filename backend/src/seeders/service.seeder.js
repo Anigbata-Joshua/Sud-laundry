@@ -18,122 +18,36 @@ if (!branchId) {
 }
 
 const services = [
-    // =========================
-    // LAUNDRY SERVICES
-    // =========================
-
-    {
-        name: 'Washing',
-        type: 'service',
-        category: 'Laundry',
-        price: 1000,
-        turnaround_hours: 72,
-    },
-
-    {
-        name: 'Washing & Ironing',
-        type: 'service',
-        category: 'Laundry',
-        price: 1500,
-        turnaround_hours: 72,
-    },
-
+    // Core Laundry Services
     {
         name: 'Washing & Folding',
         type: 'service',
         category: 'Laundry',
-        price: 1300,
         turnaround_hours: 72,
     },
-
+    {
+        name: 'Washing & Ironing',
+        type: 'service',
+        category: 'Laundry',
+        turnaround_hours: 72,
+    },
     {
         name: 'Ironing',
         type: 'service',
         category: 'Laundry',
-        price: 800,
         turnaround_hours: 24,
     },
-
-
-    // =========================
-    // DRY CLEANING
-    // =========================
-
     {
         name: 'Dry Cleaning',
         type: 'service',
         category: 'Dry Cleaning',
-        price: 2500,
         turnaround_hours: 48,
     },
-
     {
         name: 'Dry Cleaning & Pressing',
         type: 'service',
         category: 'Dry Cleaning',
-        price: 3000,
         turnaround_hours: 48,
-    },
-
-    // =========================
-    // SPECIALTY SERVICES
-    // =========================
-
-    {
-        name: 'Stain Removal',
-        type: 'add-on',
-        category: 'Treatment',
-        price: 500,
-    },
-
-    {
-        name: 'Duvet Cleaning',
-        type: 'service',
-        category: 'Household',
-        price: 3000,
-        turnaround_hours: 72,
-    },
-
-    {
-        name: 'Curtain Cleaning',
-        type: 'service',
-        category: 'Household',
-        price: 3500,
-        turnaround_hours: 72,
-    },
-
-    {
-        name: 'Carpet & Rug Cleaning',
-        type: 'service',
-        category: 'Household',
-        price: 4000,
-        turnaround_hours: 72,
-    },
-
-    {
-        name: 'Shoe Cleaning',
-        type: 'service',
-        category: 'Specialty',
-        price: 2000,
-        turnaround_hours: 48,
-    },
-
-    // =========================
-    // ADD-ONS
-    // =========================
-
-    {
-        name: 'Perfume / Fragrance',
-        type: 'add-on',
-        category: 'Finishing',
-        price: 300,
-        },
-
-    {
-        name: 'Special Packaging',
-        type: 'add-on',
-        category: 'Finishing',
-        price: 500,
     },
 ];
 

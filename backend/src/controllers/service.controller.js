@@ -99,8 +99,8 @@ export const createService = asyncHandler(async (req, res) => {
     }
 
     // Required fields
-    if ((!branch_id && currentUser.role === 'admin') || !name || price === undefined) {
-        throw new ApiError(400, 'branch_id, name and price are required');
+    if ((!branch_id && currentUser.role === 'admin') || !name) {
+        throw new ApiError(400, 'branch_id and name are required');
     }
 
     // Validate name
@@ -115,8 +115,8 @@ export const createService = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Type must be either service or add-on');
     }
 
-    // Validate price
-    if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
+    // Validate price if provided (optional/legacy)
+    if (price !== undefined && (typeof price !== 'number' || !Number.isFinite(price) || price < 0)) {
         throw new ApiError(400, 'Price must be a valid non-negative number');
     }
 

@@ -1100,7 +1100,7 @@ test("createWorkflow rejects attendants with overlapping approved leave", async 
 test("calculateSuppliesForOrder computes whole-order supply needs across all stages", () => {
   const order = {
     items: [
-      { name: "Washing", category: "Laundry", type: "service", quantity: 3 },
+      { name: "Washing & Folding", category: "Laundry", type: "service", quantity: 3 },
       {
         name: "Dry Cleaning",
         category: "Dry Cleaning",
@@ -1139,7 +1139,7 @@ test("createOrder rejects with 409 and sends shortage notices when stock is insu
   mock.method(Order, "findOne", () => chain(null));
   mock.method(Service, "findById", async () => ({
     _id: serviceId,
-    name: "Washing",
+    name: "Washing & Folding",
     price: 1500,
     is_active: true,
     branch_id: branchId,
@@ -1188,7 +1188,7 @@ test("createOrder atomically reserves stock when supplies are available", async 
   mock.method(Order, "findOne", () => chain(null));
   mock.method(Service, "findById", async () => ({
     _id: serviceId,
-    name: "Washing",
+    name: "Washing & Folding",
     price: 1500,
     is_active: true,
     branch_id: branchId,
@@ -1304,7 +1304,7 @@ test("concurrent order creation for last stock unit allows only one to succeed a
   const reserved1 = await inventoryService.checkAndReserveSuppliesForOrder({
     branch_id: branchId,
     items: [
-      { name: "Washing", category: "Laundry", type: "service", quantity: 2 },
+      { name: "Washing & Folding", category: "Laundry", type: "service", quantity: 2 },
     ],
     customer_id: customer1,
   });
@@ -1316,7 +1316,7 @@ test("concurrent order creation for last stock unit allows only one to succeed a
     inventoryService.checkAndReserveSuppliesForOrder({
       branch_id: branchId,
       items: [
-        { name: "Washing", category: "Laundry", type: "service", quantity: 2 },
+        { name: "Washing & Folding", category: "Laundry", type: "service", quantity: 2 },
       ],
       customer_id: id(),
     }),
@@ -1574,7 +1574,7 @@ test("adjustReservedSuppliesForIntake modifies reservations when item counts cha
   await inventoryService.adjustReservedSuppliesForIntake({
     order: orderDoc,
     intakeItems: [
-      { name: "Washing", category: "Laundry", type: "service", quantity: 8 },
+      { name: "Washing & Folding", category: "Laundry", type: "service", quantity: 8 },
     ],
     branch_id: branchId,
   });

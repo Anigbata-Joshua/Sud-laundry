@@ -1,6 +1,5 @@
 import { Building2, Clock, Edit3, Trash2 } from 'lucide-react'
 import Button from '../common/Button'
-import { formatNaira } from '../../utils/formatters'
 
 export default function ServiceTable({ services, branchName, isAdmin, onEdit, onDelete }) {
   return (
@@ -13,7 +12,6 @@ export default function ServiceTable({ services, branchName, isAdmin, onEdit, on
             <th className="px-4 py-3">Category</th>
             {isAdmin && <th className="px-4 py-3">Branch</th>}
             <th className="px-4 py-3">Turnaround</th>
-            <th className="px-4 py-3 font-bold">Unit Price</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
@@ -54,9 +52,6 @@ export default function ServiceTable({ services, branchName, isAdmin, onEdit, on
                     <Clock className="size-3 text-sky-500" />
                     {isAddOn ? 'Instant add-on' : `${service.turnaround_hours} hrs`}
                   </span>
-                </td>
-                <td className="px-4 py-3 font-extrabold text-ink text-sm">
-                  {formatNaira(service.price)}
                 </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">

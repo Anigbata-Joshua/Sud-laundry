@@ -86,9 +86,11 @@ export default function ServiceModal({
               </span>
             </div>
             <div className="text-right">
-              <span className="text-[9px] uppercase font-bold text-gray-400 block">Unit Price</span>
-              <strong className="text-base font-black text-sky-700">
-                {formatNaira(Number(form.price) || 0)}
+              <span className="text-[9px] uppercase font-bold text-gray-400 block">
+                Service Pricing
+              </span>
+              <strong className="text-xs font-bold text-sky-700">
+                {form.price ? formatNaira(Number(form.price)) : 'Priced per item'}
               </strong>
             </div>
           </div>
@@ -151,17 +153,16 @@ export default function ServiceModal({
             </select>
           </label>
 
-          {/* Unit Price */}
+          {/* Unit Price (Optional / Legacy) */}
           <label className="grid gap-1.5 text-xs font-bold text-gray-700">
-            Unit Price (₦)
+            Base Unit Price (Optional ₦)
             <div className="relative">
               <span className="absolute left-3 top-3 text-xs font-bold text-gray-400">₦</span>
               <input
-                required
                 type="number"
                 min="0"
                 name="price"
-                placeholder="0"
+                placeholder="Optional"
                 value={form.price}
                 onChange={onChange}
                 disabled={!isAdmin && Boolean(editingId)}

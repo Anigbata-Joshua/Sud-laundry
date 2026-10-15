@@ -10,7 +10,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import Button from '../common/Button'
-import { formatNaira } from '../../utils/formatters'
 
 function getCategoryMeta(category = '', type = 'service') {
   const cat = category.toLowerCase()
@@ -75,11 +74,6 @@ export default function ServiceCard({ service, branchName, isAdmin, onEdit, onDe
                 {service.name}
               </h3>
             </div>
-          </div>
-
-          <div className="text-right">
-            <span className="text-[10px] uppercase font-bold text-gray-400 block">Unit Price</span>
-            <strong className="text-lg font-black text-ink">{formatNaira(service.price)}</strong>
           </div>
         </div>
 
