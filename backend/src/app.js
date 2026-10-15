@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notification.routes.js'
 import brancheRoutes from './routes/branch.routes.js'
 import serviceRoutes from './routes/service.routes.js'
 import serviceCategoryRoutes from './routes/serviceCategory.routes.js'
+import catalogItemRoutes from './routes/catalogItem.routes.js'
 import orderRoutes from './routes/order.routes.js'
 import productRoutes from './routes/product.routes.js'
 import stockMovementRoutes from './routes/stockMovement.routes.js'
@@ -63,6 +64,7 @@ app.use('/api/v1/notifications', notificationRoutes)
 app.use('/api/v1/branches', brancheRoutes)
 app.use('/api/v1/services', serviceRoutes)
 app.use('/api/v1/service-categories', serviceCategoryRoutes)
+app.use('/api/v1/catalog-items', catalogItemRoutes)
 app.use('/api/v1/orders', orderRoutes)
 app.use('/api/v1/products', productRoutes)
 app.use('/api/v1/stock-movements', stockMovementRoutes)

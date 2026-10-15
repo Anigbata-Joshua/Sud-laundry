@@ -9,7 +9,12 @@ export default function StaffLayout() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        branchId={branchId}
+        onBranchChange={setBranchId}
+      />
       <main className="min-w-0 lg:ml-61">
         <Navbar
           branchId={branchId}
@@ -17,7 +22,7 @@ export default function StaffLayout() {
           onMenuClick={() => setSidebarOpen(true)}
         />
         <div className="mx-auto w-[93%] max-w-295 py-8 sm:py-10">
-          <Outlet context={{ branchId }} />
+          <Outlet context={{ branchId, onBranchChange: setBranchId, setBranchId }} />
         </div>
       </main>
       {sidebarOpen && (
