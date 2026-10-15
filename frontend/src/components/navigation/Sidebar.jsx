@@ -1,11 +1,28 @@
-import { ChevronDown, Droplets, LogOut, X } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Building2, ChevronDown, Droplets, LogOut, X } from 'lucide-react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { getBranches } from '../../api/branches.api'
 import { navigationGroups, ALL_STAFF_ROLES } from '../../constants/navigation'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../common/Avatar'
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, branchId = '', onBranchChange }) {
   const { logout, user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isAdmin = user.role === 'admin'
+
+  const [branches, setBranches] = useState([])
+  const [servicesManualToggle, setServicesManualToggle] = useState(null)
+  const isServicesPage = location.pathname === '/services'
+  const servicesExpanded = servicesManualToggle !== null ? servicesManualToggle : isServicesPage
+
+  useEffect(() => {
+    if (!isAdmin) return
+    getBranches()
+      .then((res) => setBranches(res.data.data || []))
+      .catch(() => setBranches([]))
+  }, [isAdmin])
 
   const visibleGroups = navigationGroups
     .map((group) => ({
@@ -46,49 +63,176 @@ export default function Sidebar({ open, onClose }) {
           <X className="size-5" />
         </button>
       </div>
+
       {visibleGroups.map((group) => (
         <div key={group.label} className="mb-5">
           <p className="mb-2 px-2.5 text-[9px] font-extrabold uppercase tracking-widest text-slate-500">
             {group.label}
           </p>
           <nav className="grid gap-1">
-            {group.items.map(([label, path, Icon, count, children]) => (
-              <div key={path} className={children ? 'group/people' : ''}>
-                <NavLink
-                  to={path}
-                  end={path === '/'}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-xs font-semibold transition ${isActive && !children ? 'bg-slate-800 text-white font-bold border-l-2 border-sky-400' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'}`
-                  }
-                >
-                  <Icon className="size-[17px]" />
-                  <span className="flex-1">{label}</span>
-                  {children && children.length > 0 && (
-                    <ChevronDown className="size-3 transition group-hover/people:rotate-180" />
-                  )}
-                  {count && (
-                    <b className="rounded-full bg-[#3a3c4e] px-1.5 py-0.5 text-[9px] text-gray-300">
-                      {count}
-                    </b>
-                  )}
-                </NavLink>
-                {children && children.length > 0 && (
-                  <div className="grid max-h-0 gap-0.5 overflow-hidden pl-10 opacity-0 transition-all group-hover/people:max-h-20 group-hover/people:py-1 group-hover/people:opacity-100 group-focus-within/people:max-h-20 group-focus-within/people:py-1 group-focus-within/people:opacity-100">
-                    {children.map(([childLabel, childPath]) => (
-                      <NavLink
-                        key={childPath}
-                        to={childPath}
-                        onClick={onClose}
-                        className="rounded-md px-2 py-1.5 text-[10px] font-medium text-gray-500 hover:text-white"
-                      >
-                        {childLabel}
-                      </NavLink>
-                    ))}
+            {group.items.map(([label, path, Icon, count, children]) => {
+              const isServicesAdmin = path === '/services' && isAdmin
+
+              if (isServicesAdmin) {
+                const isServicesActive = location.pathname === '/services'
+                return (
+                  <div key={path} className="grid gap-1">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (!isServicesActive) navigate('/services')
+                        setServicesManualToggle(!servicesExpanded)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          if (!isServicesActive) navigate('/services')
+                          setServicesManualToggle(!servicesExpanded)
+                        }
+                      }}
+                      className={`flex items-center justify-between rounded-xl px-2.5 py-2.5 text-xs font-semibold transition cursor-pointer select-none ${
+                        isServicesActive
+                          ? 'bg-slate-800 text-white font-bold border-l-2 border-sky-400'
+                          : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <Icon className="size-[17px]" />
+                        <span>{label}</span>
+                      </div>
+                      <ChevronDown
+                        className={`size-3.5 transition-transform duration-200 ${
+                          servicesExpanded ? 'rotate-180 text-sky-400' : 'text-slate-500'
+                        }`}
+                      />
+                    </div>
+
+                    {servicesExpanded && (
+                      <div className="flex flex-col gap-1.5 rounded-xl border border-slate-800 bg-slate-950/70 p-2 shadow-inner">
+                        <div className="flex items-center justify-between px-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="size-3 text-sky-400" />
+                            Branch
+                          </span>
+                          <span className="text-[8px] text-sky-400 font-bold truncate max-w-24">
+                            {!branchId
+                              ? 'All'
+                              : branches.find((b) => b._id === branchId)?.name || 'Selected'}
+                          </span>
+                        </div>
+
+                        {/* Dropdown Selector */}
+                        <select
+                          value={branchId}
+                          onChange={(e) => {
+                            if (onBranchChange) onBranchChange(e.target.value)
+                            if (!isServicesActive) navigate('/services')
+                            if (onClose) onClose()
+                          }}
+                          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 outline-none transition focus:border-sky-400 focus:ring-1 focus:ring-sky-400 cursor-pointer"
+                        >
+                          <option value="" className="bg-slate-900 text-slate-200">
+                            All Branches ({branches.length})
+                          </option>
+                          {branches.map((b) => (
+                            <option
+                              key={b._id}
+                              value={b._id}
+                              className="bg-slate-900 text-slate-200"
+                            >
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Quick Selectable Branch Items */}
+                        <div className="flex flex-col gap-0.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onBranchChange) onBranchChange('')
+                              if (!isServicesActive) navigate('/services')
+                              if (onClose) onClose()
+                            }}
+                            className={`flex items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition ${
+                              !branchId
+                                ? 'bg-sky-500/20 text-sky-300 font-bold'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            }`}
+                          >
+                            <span>All Branches</span>
+                            {!branchId && <span className="size-1.5 rounded-full bg-sky-400" />}
+                          </button>
+
+                          {branches.map((b) => {
+                            const isSelected = String(branchId) === String(b._id)
+                            return (
+                              <button
+                                key={b._id}
+                                type="button"
+                                onClick={() => {
+                                  if (onBranchChange) onBranchChange(b._id)
+                                  if (!isServicesActive) navigate('/services')
+                                  if (onClose) onClose()
+                                }}
+                                className={`flex items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium transition ${
+                                  isSelected
+                                    ? 'bg-sky-500/20 text-sky-300 font-bold'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                }`}
+                              >
+                                <span className="truncate">{b.name}</span>
+                                {isSelected && (
+                                  <span className="size-1.5 rounded-full bg-sky-400" />
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                )
+              }
+
+              return (
+                <div key={path} className={children ? 'group/people' : ''}>
+                  <NavLink
+                    to={path}
+                    end={path === '/'}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-xs font-semibold transition ${isActive && !children ? 'bg-slate-800 text-white font-bold border-l-2 border-sky-400' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'}`
+                    }
+                  >
+                    <Icon className="size-[17px]" />
+                    <span className="flex-1">{label}</span>
+                    {children && children.length > 0 && (
+                      <ChevronDown className="size-3 transition group-hover/people:rotate-180" />
+                    )}
+                    {count && (
+                      <b className="rounded-full bg-[#3a3c4e] px-1.5 py-0.5 text-[9px] text-gray-300">
+                        {count}
+                      </b>
+                    )}
+                  </NavLink>
+                  {children && children.length > 0 && (
+                    <div className="grid max-h-0 gap-0.5 overflow-hidden pl-10 opacity-0 transition-all group-hover/people:max-h-20 group-hover/people:py-1 group-hover/people:opacity-100 group-focus-within/people:max-h-20 group-focus-within/people:py-1 group-focus-within/people:opacity-100">
+                      {children.map(([childLabel, childPath]) => (
+                        <NavLink
+                          key={childPath}
+                          to={childPath}
+                          onClick={onClose}
+                          className="rounded-md px-2 py-1.5 text-[10px] font-medium text-gray-500 hover:text-white"
+                        >
+                          {childLabel}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </nav>
         </div>
       ))}

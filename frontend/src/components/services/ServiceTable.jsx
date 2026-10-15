@@ -8,7 +8,6 @@ export default function ServiceTable({ services, branchName, isAdmin, onEdit, on
         <thead>
           <tr className="border-b border-line text-[9px] uppercase tracking-wider text-gray-400">
             <th className="px-4 py-3">Service Name</th>
-            <th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Category</th>
             {isAdmin && <th className="px-4 py-3">Branch</th>}
             <th className="px-4 py-3">Turnaround</th>
@@ -17,65 +16,53 @@ export default function ServiceTable({ services, branchName, isAdmin, onEdit, on
           </tr>
         </thead>
         <tbody>
-          {services.map((service) => {
-            const isAddOn = service.type === 'add-on'
-            return (
-              <tr
-                key={service._id}
-                className="border-b border-gray-100 hover:bg-gray-50/60 transition"
-              >
+          {services.map((service) => (
+            <tr
+              key={service._id}
+              className="border-b border-gray-100 hover:bg-gray-50/60 transition"
+            >
+              <td className="px-4 py-3">
+                <strong className="font-extrabold text-ink text-sm block">{service.name}</strong>
+              </td>
+              <td className="px-4 py-3 font-medium text-gray-600">
+                {service.category || 'Core Service'}
+              </td>
+              {isAdmin && (
                 <td className="px-4 py-3">
-                  <strong className="font-extrabold text-ink text-sm block">{service.name}</strong>
+                  <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
+                    <Building2 className="size-3 text-gray-400" />
+                    {branchName(service.branch_id?._id ?? service.branch_id)}
+                  </span>
                 </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      isAddOn ? 'bg-teal-50 text-teal-700' : 'bg-sky-50 text-sky-700'
-                    }`}
+              )}
+              <td className="px-4 py-3 text-gray-600">
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="size-3 text-sky-500" />
+                  {service.turnaround_hours} hrs
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  <span className="size-1.5 rounded-full bg-emerald-500" /> Active
+                </span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button onClick={() => onEdit(service)}>
+                    <Edit3 className="size-3.5" /> Edit
+                  </Button>
+                  <button
+                    type="button"
+                    title="Deactivate service"
+                    onClick={() => onDelete(service)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
                   >
-                    {service.type}
-                  </span>
-                </td>
-                <td className="px-4 py-3 font-medium text-gray-600">
-                  {service.category || 'General'}
-                </td>
-                {isAdmin && (
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
-                      <Building2 className="size-3 text-gray-400" />
-                      {branchName(service.branch_id?._id ?? service.branch_id)}
-                    </span>
-                  </td>
-                )}
-                <td className="px-4 py-3 text-gray-600">
-                  <span className="inline-flex items-center gap-1">
-                    <Clock className="size-3 text-sky-500" />
-                    {isAddOn ? 'Instant add-on' : `${service.turnaround_hours} hrs`}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                    <span className="size-1.5 rounded-full bg-emerald-500" /> Active
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Button onClick={() => onEdit(service)}>
-                      <Edit3 className="size-3.5" /> Edit
-                    </Button>
-                    <button
-                      type="button"
-                      title="Deactivate service"
-                      onClick={() => onDelete(service)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )
-          })}
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

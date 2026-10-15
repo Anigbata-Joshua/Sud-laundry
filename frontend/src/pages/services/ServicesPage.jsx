@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Building2, Copy, Grid, Layers, List, Plus, Shirt, Sparkles } from 'lucide-react'
 import { getBranches } from '../../api/branches.api'
 import { createService, deleteService, getServices, updateService } from '../../api/services.api'
@@ -35,9 +36,7 @@ const CATALOG_CATEGORIES = [
 const emptyServiceForm = {
   branch_id: '',
   name: '',
-  type: 'service',
-  category: '',
-  price: '',
+  category: 'Laundry',
   turnaround_hours: '24',
 }
 
@@ -47,12 +46,17 @@ export default function ServicesPage() {
   const isBranchManager = user.role === 'branch_manager'
   const canManage = isAdmin || isBranchManager
 
+  const outlet = useOutletContext() || {}
+  const topBarBranchId = outlet.branchId ?? ''
+  const setTopBarBranch = outlet.onBranchChange || outlet.setBranchId
+
   const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | 'services'
 
   // Branches & Services State
   const [branches, setBranches] = useState([])
   const [services, setServices] = useState([])
-  const [branchId, setBranchId] = useState(isAdmin ? '' : user.branch_id || '')
+  // Single source of truth: admin uses top bar branch context; branch manager uses user.branch_id
+  const branchId = isAdmin ? topBarBranchId : user.branch_id || ''
 
   // Catalog State
   const [catalogItems, setCatalogItems] = useState([])
@@ -67,7 +71,6 @@ export default function ServicesPage() {
 
   // Services View State
   const [serviceQuery, setServiceQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
   const [serviceViewMode, setServiceViewMode] = useState('grid')
   const [serviceModalOpen, setServiceModalOpen] = useState(false)
   const [editingServiceId, setEditingServiceId] = useState('')
@@ -79,7 +82,17 @@ export default function ServicesPage() {
   const { confirm } = useDialog()
   const { notify } = useToast()
 
-  // Selected branch for catalog operations
+  // Change branch across top bar and page
+  const handleBranchChange = useCallback(
+    (newBranchId) => {
+      if (isAdmin && setTopBarBranch) {
+        setTopBarBranch(newBranchId)
+      }
+    },
+    [isAdmin, setTopBarBranch],
+  )
+
+  // Selected branch for catalog and branch-specific service operations
   const activeBranchId = useMemo(() => {
     if (!isAdmin) return user.branch_id || ''
     return branchId || branches[0]?._id || ''
@@ -90,20 +103,18 @@ export default function ServicesPage() {
       .then((res) => {
         const list = res.data.data || []
         setBranches(list)
-        if (isAdmin && !branchId && list.length > 0) {
-          setBranchId(list[0]._id)
-        }
       })
       .catch(() => {})
-  }, [isAdmin, branchId])
+  }, [])
 
   const loadServices = useCallback(() => {
     setServicesLoading(true)
-    getServices()
+    const params = branchId ? { branch_id: branchId } : {}
+    getServices(params)
       .then((res) => setServices(res.data.data || []))
       .catch(() => setServiceMessage('Unable to load services.'))
       .finally(() => setServicesLoading(false))
-  }, [])
+  }, [branchId])
 
   const loadCatalogItems = useCallback(() => {
     if (!activeBranchId) return
@@ -119,12 +130,15 @@ export default function ServicesPage() {
   }, [activeBranchId, catalogCategory, catalogQuery])
 
   useEffect(() => {
+    loadBranches()
+  }, [loadBranches])
+
+  useEffect(() => {
     const timer = setTimeout(() => {
-      loadBranches()
       loadServices()
     }, 0)
     return () => clearTimeout(timer)
-  }, [loadBranches, loadServices])
+  }, [loadServices])
 
   useEffect(() => {
     if (activeBranchId) {
@@ -136,29 +150,44 @@ export default function ServicesPage() {
   }, [activeBranchId, loadCatalogItems])
 
   const branchName = useCallback(
-    (id) => branches.find((branch) => branch._id === id)?.name ?? 'Branch',
-    [branches],
+    (id) => {
+      if (!id) return 'Branch'
+      const idStr = String(id._id ?? id)
+      const found = branches.find((branch) => String(branch._id) === idStr)
+      if (found?.name) return found.name
+      if (user?.branch_id && String(user.branch_id?._id ?? user.branch_id) === idStr) {
+        if (user?.branch_id?.name) return user.branch_id.name
+        if (user?.branch_name) return user.branch_name
+      }
+      return 'Branch'
+    },
+    [branches, user],
   )
 
   // Filtered Services for Core Services Tab
   const visibleServices = useMemo(() => {
     return services.filter((service) => {
-      const sBranchId = service.branch_id?._id ?? service.branch_id
-      const matchesBranch = !branchId || sBranchId === branchId
-      const matchesType = typeFilter === 'all' || service.type === typeFilter
+      const sBranchId = String(service.branch_id?._id ?? service.branch_id)
+      if (branchId) {
+        if (sBranchId !== String(branchId)) return false
+      } else {
+        // When "All branches" is selected in top bar, only show services for real registered branches
+        const isRegisteredBranch = branches.some((b) => String(b._id) === sBranchId)
+        if (!isRegisteredBranch) return false
+      }
       const text =
         `${service.name} ${service.category ?? ''} ${branchName(sBranchId)}`.toLowerCase()
       const matchesQuery = text.includes(serviceQuery.toLowerCase())
 
-      return matchesBranch && matchesType && matchesQuery
+      return matchesQuery
     })
-  }, [services, branchId, typeFilter, serviceQuery, branchName])
+  }, [services, branchId, branches, serviceQuery, branchName])
 
   // Active Core Services for the selected branch (for CatalogItemModal)
   const currentBranchCoreServices = useMemo(() => {
     return services.filter((s) => {
-      const sBranchId = s.branch_id?._id ?? s.branch_id
-      return sBranchId === activeBranchId && s.is_active
+      const sBranchId = String(s.branch_id?._id ?? s.branch_id)
+      return sBranchId === String(activeBranchId) && s.is_active
     })
   }, [services, activeBranchId])
 
@@ -239,9 +268,7 @@ export default function ServicesPage() {
     setServiceForm({
       branch_id: service.branch_id?._id ?? service.branch_id,
       name: service.name,
-      type: service.type ?? 'service',
-      category: service.category ?? '',
-      price: service.price || '',
+      category: service.category || 'Laundry',
       turnaround_hours: service.turnaround_hours ?? '24',
     })
     setServiceMessage('')
@@ -253,7 +280,6 @@ export default function ServicesPage() {
     setServiceForm((curr) => ({
       ...curr,
       [name]: value,
-      ...(name === 'type' && value === 'add-on' ? { turnaround_hours: '' } : {}),
     }))
   }
 
@@ -263,15 +289,13 @@ export default function ServicesPage() {
     setServiceMessage('')
 
     const payload = {
-      ...serviceForm,
-      price: serviceForm.price ? Number(serviceForm.price) : undefined,
-      turnaround_hours:
-        serviceForm.type === 'service' ? Number(serviceForm.turnaround_hours) : undefined,
+      name: serviceForm.name.trim(),
+      category: serviceForm.category.trim(),
+      turnaround_hours: Number(serviceForm.turnaround_hours) || 24,
     }
 
-    if (editingServiceId) {
-      delete payload.branch_id
-      if (!isAdmin) delete payload.price
+    if (!editingServiceId) {
+      payload.branch_id = activeBranchId
     }
 
     try {
@@ -280,6 +304,11 @@ export default function ServicesPage() {
 
       setServiceModalOpen(false)
       loadServices()
+      notify({
+        tone: 'success',
+        title: editingServiceId ? 'Service updated' : 'Service created',
+        message: `Saved "${payload.name}"`,
+      })
     } catch (err) {
       setServiceMessage(err.response?.data?.message || 'Unable to save service.')
     } finally {
@@ -338,7 +367,7 @@ export default function ServicesPage() {
       </PageHeading>
 
       {/* KPI Metrics Header */}
-      <ServiceMetrics services={services} />
+      <ServiceMetrics services={visibleServices} catalogItems={catalogItems} />
 
       {/* Tab Switcher */}
       <div className="mb-4 flex border-b border-line">
@@ -370,7 +399,7 @@ export default function ServicesPage() {
           <Layers className="size-4" />
           <span>Core Laundry Services</span>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-600">
-            {services.length}
+            {visibleServices.length}
           </span>
         </button>
       </div>
@@ -393,7 +422,7 @@ export default function ServicesPage() {
                   <span className="text-xs font-bold text-gray-400">Branch:</span>
                   <select
                     value={activeBranchId}
-                    onChange={(e) => setBranchId(e.target.value)}
+                    onChange={(e) => handleBranchChange(e.target.value)}
                     className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-brand"
                   >
                     {branches.map((b) => (
@@ -488,40 +517,29 @@ export default function ServicesPage() {
                 className="w-full sm:max-w-xs"
               />
 
-              <div className="flex rounded-xl bg-gray-100 p-1 text-xs font-bold">
-                {[
-                  { id: 'all', label: 'All Items' },
-                  { id: 'service', label: 'Core Services' },
-                  { id: 'add-on', label: 'Add-ons' },
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setTypeFilter(t.id)}
-                    className={`rounded-lg px-3 py-1.5 transition ${
-                      typeFilter === t.id
-                        ? 'bg-white text-ink shadow-xs font-black'
-                        : 'text-gray-500 hover:text-ink'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
               {isAdmin && (
-                <select
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-brand"
-                >
-                  <option value="">All Branches ({branches.length})</option>
-                  {branches.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-400">Branch:</span>
+                  <select
+                    value={branchId}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-brand"
+                  >
+                    <option value="">All Branches ({branches.length})</option>
+                    {branches.map((b) => (
+                      <option key={b._id} value={b._id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isBranchManager && (
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+                  <Building2 className="size-3.5" />
+                  {branchName(activeBranchId)}
+                </span>
               )}
             </div>
 

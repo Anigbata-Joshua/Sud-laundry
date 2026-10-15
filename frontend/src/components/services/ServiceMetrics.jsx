@@ -1,20 +1,15 @@
-import { Clock, Layers, PlusCircle, Shirt } from 'lucide-react'
+import { Clock, Droplets, Layers, Shirt } from 'lucide-react'
 import MetricCard from '../dashboard/MetricCard'
-import { formatNaira } from '../../utils/formatters'
 
-export default function ServiceMetrics({ services }) {
-  const regularServices = services.filter((s) => s.type !== 'add-on')
-  const addOns = services.filter((s) => s.type === 'add-on')
+export default function ServiceMetrics({ services = [], catalogItems = [] }) {
+  const uniqueCategories = new Set(catalogItems.map((c) => c.category).filter(Boolean)).size
 
-  const totalPrice = services.reduce((acc, s) => acc + (Number(s.price) || 0), 0)
-  const avgPrice = services.length > 0 ? Math.round(totalPrice / services.length) : 0
-
-  const minHours = regularServices.reduce((min, s) => {
+  const minHours = services.reduce((min, s) => {
     const hours = Number(s.turnaround_hours)
     return hours && hours > 0 ? (min === null ? hours : Math.min(min, hours)) : min
   }, null)
 
-  const maxHours = regularServices.reduce((max, s) => {
+  const maxHours = services.reduce((max, s) => {
     const hours = Number(s.turnaround_hours)
     return hours && hours > 0 ? Math.max(max, hours) : max
   }, 0)
@@ -24,34 +19,34 @@ export default function ServiceMetrics({ services }) {
       ? minHours === maxHours
         ? `${minHours}h standard`
         : `${minHours}h – ${maxHours}h window`
-      : 'On-demand'
+      : '24h – 72h'
 
   return (
     <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         icon={Shirt}
         tone="sky"
-        label="Active Catalog Items"
-        value={services.length}
-        note={`${regularServices.length} standard · ${addOns.length} add-ons`}
+        label="Active Garment Items"
+        value={catalogItems.length}
+        note="Priced per service matrix"
       />
       <MetricCard
         icon={Layers}
-        tone="green"
-        label="Average Unit Price"
-        value={formatNaira(avgPrice)}
-        note="Across active catalog"
+        tone="purple"
+        label="Garment Categories"
+        value={`${uniqueCategories || 5} Categories`}
+        note="Casuals, Native, Corporate & more"
       />
       <MetricCard
-        icon={PlusCircle}
-        tone="teal"
-        label="Special Care Add-ons"
-        value={addOns.length}
-        note="Stain, starch, fragrance & express"
+        icon={Droplets}
+        tone="blue"
+        label="Core Laundry Services"
+        value={`${services.length} Processes`}
+        note="Standard branch operations"
       />
       <MetricCard
         icon={Clock}
-        tone="blue"
+        tone="teal"
         label="Turnaround Window"
         value={turnaroundRange}
         note="Promised delivery time"

@@ -119,8 +119,8 @@ const CATALOG_TEMPLATES = [
     piece_count: 1,
     description: 'Single or double-breasted suit jacket',
     prices: {
-      'Washing & Folding': null,
-      'Washing & Ironing': null,
+      'Washing & Folding': 2000,
+      'Washing & Ironing': 2500,
       'Ironing': 1500,
       'Dry Cleaning': 3500,
       'Dry Cleaning & Pressing': 4500,
@@ -132,8 +132,8 @@ const CATALOG_TEMPLATES = [
     piece_count: 2,
     description: 'Matching jacket and trousers',
     prices: {
-      'Washing & Folding': null,
-      'Washing & Ironing': null,
+      'Washing & Folding': 3000,
+      'Washing & Ironing': 3800,
       'Ironing': 2200,
       'Dry Cleaning': 5000,
       'Dry Cleaning & Pressing': 6500,
@@ -145,8 +145,8 @@ const CATALOG_TEMPLATES = [
     piece_count: 3,
     description: 'Matching jacket, waistcoat, and trousers',
     prices: {
-      'Washing & Folding': null,
-      'Washing & Ironing': null,
+      'Washing & Folding': 4000,
+      'Washing & Ironing': 5000,
       'Ironing': 3000,
       'Dry Cleaning': 7000,
       'Dry Cleaning & Pressing': 9000,
@@ -158,8 +158,8 @@ const CATALOG_TEMPLATES = [
     piece_count: 1,
     description: 'Silk or microfiber necktie',
     prices: {
-      'Washing & Folding': null,
-      'Washing & Ironing': null,
+      'Washing & Folding': 600,
+      'Washing & Ironing': 800,
       'Ironing': 500,
       'Dry Cleaning': 1000,
       'Dry Cleaning & Pressing': 1400,
@@ -227,8 +227,8 @@ const CATALOG_TEMPLATES = [
     piece_count: 2,
     description: 'Heavy wool or trench overcoat',
     prices: {
-      'Washing & Folding': null,
-      'Washing & Ironing': null,
+      'Washing & Folding': 3000,
+      'Washing & Ironing': 4000,
       'Ironing': 2000,
       'Dry Cleaning': 5500,
       'Dry Cleaning & Pressing': 7000,
@@ -270,7 +270,7 @@ const CATALOG_TEMPLATES = [
     prices: {
       'Washing & Folding': 3500,
       'Washing & Ironing': 4800,
-      'Ironing': null,
+      'Ironing': 2500,
       'Dry Cleaning': 5500,
       'Dry Cleaning & Pressing': 6500,
     },
@@ -283,7 +283,7 @@ const CATALOG_TEMPLATES = [
     prices: {
       'Washing & Folding': 4500,
       'Washing & Ironing': 6000,
-      'Ironing': null,
+      'Ironing': 3500,
       'Dry Cleaning': 7000,
       'Dry Cleaning & Pressing': 8500,
     },
@@ -403,11 +403,7 @@ const seedCatalogItems = async () => {
       }
       branches = [branch];
     } else {
-      branches = await Branch.find({ is_active: true });
-      if (branches.length === 0) {
-        // Fallback to all branches
-        branches = await Branch.find();
-      }
+      branches = await Branch.find().sort({ name: 1 });
     }
 
     if (branches.length === 0) {

@@ -1,44 +1,20 @@
-import {
-  Building2,
-  Clock,
-  Droplets,
-  Edit3,
-  Flame,
-  PlusCircle,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-} from 'lucide-react'
+import { Building2, Clock, Droplets, Edit3, Flame, Sparkles, Trash2 } from 'lucide-react'
 import Button from '../common/Button'
 
-function getCategoryMeta(category = '', type = 'service') {
+function getCategoryMeta(category = '') {
   const cat = category.toLowerCase()
-  if (type === 'add-on') {
-    return {
-      icon: PlusCircle,
-      badgeColor: 'bg-teal-50 text-teal-700 border-teal-200',
-      iconBg: 'bg-teal-50 text-teal-600',
-    }
-  }
-  if (cat.includes('dry') || cat.includes('suit') || cat.includes('gown')) {
+  if (cat.includes('dry')) {
     return {
       icon: Sparkles,
       badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       iconBg: 'bg-indigo-50 text-indigo-600',
     }
   }
-  if (cat.includes('iron') || cat.includes('press') || cat.includes('steam')) {
+  if (cat.includes('iron') || cat.includes('press')) {
     return {
       icon: Flame,
       badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
       iconBg: 'bg-amber-50 text-amber-600',
-    }
-  }
-  if (cat.includes('stain') || cat.includes('care') || cat.includes('luxury')) {
-    return {
-      icon: ShieldCheck,
-      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      iconBg: 'bg-emerald-50 text-emerald-600',
     }
   }
   return {
@@ -49,14 +25,13 @@ function getCategoryMeta(category = '', type = 'service') {
 }
 
 export default function ServiceCard({ service, branchName, isAdmin, onEdit, onDelete }) {
-  const isAddOn = service.type === 'add-on'
-  const meta = getCategoryMeta(service.category, service.type)
+  const meta = getCategoryMeta(service.category)
   const Icon = meta.icon
 
   return (
     <article className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-xs transition hover:border-sky-300 hover:shadow-md">
       <div>
-        {/* Top bar: Category badge + Price */}
+        {/* Top bar: Category badge & Name */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
             <span
@@ -68,7 +43,7 @@ export default function ServiceCard({ service, branchName, isAdmin, onEdit, onDe
               <span
                 className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.badgeColor}`}
               >
-                {service.category || (isAddOn ? 'Add-on' : 'General')}
+                {service.category || 'Core Service'}
               </span>
               <h3 className="mt-1 text-base font-extrabold text-ink transition group-hover:text-sky-700">
                 {service.name}
@@ -77,13 +52,11 @@ export default function ServiceCard({ service, branchName, isAdmin, onEdit, onDe
           </div>
         </div>
 
-        {/* Turnaround & Specs */}
+        {/* Turnaround & Branch Specs */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700">
             <Clock className="size-3.5 text-sky-600" />
-            {isAddOn
-              ? 'Instant Treatment / Add-on'
-              : `${service.turnaround_hours} hr promised turnaround`}
+            {service.turnaround_hours} hr promised turnaround
           </span>
 
           {isAdmin && (
