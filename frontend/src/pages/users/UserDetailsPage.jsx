@@ -77,7 +77,7 @@ export default function UserDetailsPage() {
                   <small className="block text-gray-400">{order.branch_id?.name}</small>
                 </span>
                 <StatusBadge status={order.status} />
-                <strong>{formatNaira(order.total_price)}</strong>
+                <strong>{formatNaira(order.amount_due ?? order.total_price)}</strong>
               </button>
             ))
           )}

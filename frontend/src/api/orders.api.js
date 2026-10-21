@@ -6,5 +6,6 @@ export const getOrder = (id) => apiClient.get(`/orders/${id}`)
 export const createOrder = (payload) => apiClient.post('/orders', payload)
 export const updateOrder = (id, payload) => apiClient.patch(`/orders/${id}`, payload)
 export const getMyOrders = (params) => apiClient.get('/orders/me', { params })
+export const getPricingConfig = () => apiClient.get('/orders/pricing-config')
 export const forceCancelOrder = (id, payload) =>
   apiClient.patch(`/orders/${id}/force-cancel`, payload)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { AtSign, Droplets, Globe, Menu, MessageCircle, Shirt, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
@@ -7,12 +7,22 @@ const NAV_LINKS = [
   { label: 'Home', to: '/home' },
   { label: 'Services', to: '/home#services' },
   { label: 'How it works', to: '/home#how-it-works' },
+  { label: 'Estimator', to: '/home#pricing-estimator' },
   { label: 'Contact', to: '/contact' },
 ]
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { isAuthenticated, user } = useAuth()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 15)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -23,7 +33,13 @@ export default function PublicLayout() {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-50 border-b border-line/80 bg-white/85 backdrop-blur-md">
+      <header
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'border-b border-line/90 bg-white/90 backdrop-blur-xl shadow-xs shadow-slate-900/5'
+            : 'border-b border-line/40 bg-white/70 backdrop-blur-md'
+        }`}
+      >
         <div className="mx-auto flex h-16 w-[92%] max-w-6xl items-center justify-between sm:h-[74px]">
           <Link to="/home" className="flex items-center gap-2">
             <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-sm shadow-sky-900/20">

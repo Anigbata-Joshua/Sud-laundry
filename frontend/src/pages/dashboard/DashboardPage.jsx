@@ -9,7 +9,7 @@ import Panel, { PanelTitle } from '../../components/common/Panel'
 import MetricCard from '../../components/dashboard/MetricCard'
 import OrderTable from '../../components/orders/OrderTable'
 import { useAuth } from '../../hooks/useAuth'
-import { formatNaira } from '../../utils/formatters'
+import { formatNaira, formatOrderItem } from '../../utils/formatters'
 
 const avatarTones = ['lilac', 'mint', 'peach', 'blue', 'yellow']
 
@@ -28,7 +28,7 @@ function formatOrders(orders) {
       dbId: order._id,
       customer,
       initials,
-      service: order.items?.[0]?.name ?? 'Laundry service',
+      service: order.items?.[0] ? formatOrderItem(order.items[0]) : 'Laundry service',
       pieces: order.items?.reduce((total, item) => total + item.quantity, 0) ?? 0,
       branch: order.branch_id?.name ?? 'Branch',
       status: order.status,

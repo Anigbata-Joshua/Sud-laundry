@@ -9,7 +9,7 @@ import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import MetricCard from '../../components/dashboard/MetricCard'
 import StatusBadge from '../../components/tables/StatusBadge'
-import { formatNaira } from '../../utils/formatters'
+import { formatNaira, formatOrderItem } from '../../utils/formatters'
 
 const emptyPayment = {
   orderId: '',
@@ -241,7 +241,8 @@ export default function PaymentsPage() {
                   .map((order) => (
                     <option key={order._id} value={order._id}>
                       ORD-{order._id.slice(-6).toUpperCase()} ·{' '}
-                      {order.customer_id?.name ?? 'Customer'} ·{' '}
+                      {order.customer_id?.name ?? 'Customer'}
+                      {order.items?.[0] ? ` · ${formatOrderItem(order.items[0])}` : ''} ·{' '}
                       {formatNaira(order.amount_due ?? order.total_price)}
                     </option>
                   ))}

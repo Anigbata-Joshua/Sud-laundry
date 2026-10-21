@@ -3,6 +3,7 @@ import { Clock3, ExternalLink } from 'lucide-react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { getOrders } from '../../api/orders.api'
 import PageHeading from '../../components/common/PageHeading'
+import { formatOrderItem } from '../../utils/formatters'
 
 const stages = [
   ['placed', 'Intake', '#9b87f5'],
@@ -88,7 +89,7 @@ export default function WorkflowPage() {
                     </h3>
                     <p className="text-[9px] text-gray-400">
                       {order.items?.reduce((total, item) => total + item.quantity, 0) ?? 0} items ·{' '}
-                      {order.items?.[0]?.name ?? 'Laundry order'}
+                      {order.items?.[0] ? formatOrderItem(order.items[0]) : 'Laundry order'}
                     </p>
                     <small className="mt-3 flex items-center gap-1 text-[9px] capitalize text-gray-400">
                       <Clock3 className="size-3" />

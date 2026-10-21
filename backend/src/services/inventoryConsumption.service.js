@@ -11,6 +11,7 @@ import {
   SERVICE_SUPPLIES_RECIPE,
   DEFAULT_PACKAGING_PER_UNIT,
   STAGE_SERVICE_CATEGORIES,
+  calculateEffectivePieces,
   getTier,
 } from "../config/serviceSupplies.config.js";
 import logger from "../utils/logger.js";
@@ -32,23 +33,36 @@ export function calculateSuppliesForStep({ order, stepName }) {
 
   for (const item of order.items ?? []) {
     // Only count a service's supplies against the stage it actually belongs to
-    if (relevantCategories && !relevantCategories.includes(item.category))
+    if (
+      relevantCategories &&
+      !relevantCategories.some(
+        (cat) => cat.toLowerCase() === (item.category || "").toLowerCase(),
+      )
+    ) {
       continue;
+    }
 
-    const recipe = SERVICE_SUPPLIES_RECIPE[item.name];
+    const recipe =
+      SERVICE_SUPPLIES_RECIPE[item.service_name || item.name];
     if (!recipe) continue; // service has no supply requirement
+
+    const effectivePieces = calculateEffectivePieces(
+      item.quantity,
+      item.piece_count || 1,
+    );
+
     if (recipe.perUnit) {
       for (const supply of recipe.perUnit) {
         addAmount(
           supply.productName,
-          supply.quantity * item.quantity,
+          supply.quantity * effectivePieces,
           supply.unit,
         );
       }
       continue;
     }
 
-    const tier = getTier(item.quantity);
+    const tier = getTier(effectivePieces);
     const tierSupplies = recipe[tier];
     if (!tierSupplies) continue;
 
@@ -61,7 +75,11 @@ export function calculateSuppliesForStep({ order, stepName }) {
     // Only real garments need packaging materials
     const totalGarments = (order.items ?? [])
       .filter((item) => item.type === "service")
-      .reduce((sum, item) => sum + item.quantity, 0);
+      .reduce(
+        (sum, item) =>
+          sum + calculateEffectivePieces(item.quantity, item.piece_count || 1),
+        0,
+      );
     for (const supply of DEFAULT_PACKAGING_PER_UNIT) {
       addAmount(
         supply.productName,
@@ -181,14 +199,15 @@ export async function notifyOfficersOfStockShortage({
 // Notify customer when service is temporarily unavailable due to stock shortage
 export async function notifyCustomerOfStockShortage({
   customerId,
-  productName,
+  productName: _productName,
 }) {
   if (!customerId) return;
   try {
     await createNotification({
       user_id: customerId,
       type: "other",
-      message: `We're sorry, your order could not be placed because required supplies (${productName}) are temporarily out of stock at the selected branch.`,
+      message:
+        "We're sorry, your order could not be placed because required supplies are temporarily out of stock at the selected branch.",
     });
   } catch (err) {
     logger.error("Failed to notify customer of stock shortage:", {
@@ -249,7 +268,7 @@ export async function checkAndReserveSuppliesForOrder({
       ]);
       throw new ApiError(
         409,
-        `Insufficient stock for "${item.product_name}": required ${item.quantity} ${item.unit || "units"}, available ${Math.max(0, item.available)} ${item.unit || "units"}`,
+        "This service is temporarily unavailable. Please try again later or choose another branch.",
       );
     }
   }
@@ -352,14 +371,47 @@ export async function checkAndReserveSuppliesForOrder({
 // Release unconsumed reservations on cancellation
 export async function releaseReservedSuppliesForOrder(order) {
   if (!order?.supplies_reserved || !order.supplies_reserved.length) return;
+
+  const toRelease = new Map();
   for (const item of order.supplies_reserved) {
-    if (!item.consumed && item.quantity > 0) {
-      await Product.updateOne(
-        { _id: item.product_id },
-        { $inc: { reserved_quantity: -item.quantity } },
-      );
-      item.consumed = true;
+    if (!item.consumed && item.quantity > 0 && item.product_id) {
+      const prodId = item.product_id.toString();
+      toRelease.set(prodId, (toRelease.get(prodId) || 0) + item.quantity);
     }
+  }
+
+  if (toRelease.size === 0) return;
+
+  const releasedBatch = [];
+  try {
+    for (const [prodId, qty] of toRelease.entries()) {
+      await Product.updateOne(
+        { _id: prodId },
+        { $inc: { reserved_quantity: -qty } },
+      );
+      releasedBatch.push({ prodId, qty });
+    }
+    for (const item of order.supplies_reserved) {
+      if (!item.consumed && item.quantity > 0) {
+        item.consumed = true;
+      }
+    }
+  } catch (error) {
+    if (releasedBatch.length) {
+      await Promise.all(
+        releasedBatch.map((r) =>
+          Product.updateOne(
+            { _id: r.prodId },
+            { $inc: { reserved_quantity: r.qty } },
+          ).catch((e) =>
+            logger.error("Failed rollback in releaseReservedSuppliesForOrder:", {
+              error: e.message,
+            }),
+          ),
+        ),
+      );
+    }
+    throw error;
   }
 }
 
@@ -376,57 +428,110 @@ export async function consumeReservedSuppliesForStep({
   if (!stageItems.length) return;
 
   const lowStockAlerts = [];
-  for (const item of stageItems) {
-    const product = await Product.findById(item.product_id);
-    if (product) {
-      product.quantity = Math.max(0, product.quantity - item.quantity);
-      product.reserved_quantity = Math.max(
-        0,
-        (product.reserved_quantity || 0) - item.quantity,
-      );
-      await product.save();
+  const appliedProducts = [];
+  const createdMovements = [];
+  const initialSuppliesUsedCount = (order.supplies_used || []).length;
 
-      await StockMovement.create([
-        {
-          product_id: product._id,
-          branch_id: order.branch_id,
-          employee_id,
-          order_id: order._id,
-          type: "usage",
-          quantity: -item.quantity,
-          notes: `Automatic supply usage for Order #${order._id
-            .toString()
-            .slice(-6)
-            .toUpperCase()} (${step.name})`,
-        },
-      ]);
+  try {
+    for (const item of stageItems) {
+      const product = await Product.findById(item.product_id);
+      if (product) {
+        const prevQuantity = product.quantity;
+        const prevReserved = product.reserved_quantity || 0;
 
-      order.supplies_used.push({
-        product_id: product._id,
-        name: product.name,
-        quantity_used: item.quantity,
-        employee_id,
-        used_at: new Date(),
-      });
-
-      item.consumed = true;
-
-      if (
-        product.reorder_point > 0 &&
-        product.quantity <= product.reorder_point
-      ) {
-        lowStockAlerts.push({
-          productName: product.name,
-          remaining: product.quantity,
-          reorderPoint: product.reorder_point,
-          unit: product.unit || "units",
-          branchId: order.branch_id,
+        product.quantity = Math.max(0, product.quantity - item.quantity);
+        product.reserved_quantity = Math.max(
+          0,
+          (product.reserved_quantity || 0) - item.quantity,
+        );
+        await product.save();
+        appliedProducts.push({
+          productId: product._id,
+          prevQuantity,
+          prevReserved,
         });
+
+        const movement = await StockMovement.create([
+          {
+            product_id: product._id,
+            branch_id: order.branch_id,
+            employee_id,
+            order_id: order._id,
+            type: "usage",
+            quantity: -item.quantity,
+            notes: `Automatic supply usage for Order #${order._id
+              .toString()
+              .slice(-6)
+              .toUpperCase()} (${step.name})`,
+          },
+        ]);
+        if (movement && movement[0]) {
+          createdMovements.push(movement[0]._id);
+        }
+
+        order.supplies_used.push({
+          product_id: product._id,
+          name: product.name,
+          quantity_used: item.quantity,
+          employee_id,
+          used_at: new Date(),
+        });
+
+        item.consumed = true;
+
+        if (
+          product.reorder_point > 0 &&
+          product.quantity <= product.reorder_point
+        ) {
+          lowStockAlerts.push({
+            productName: product.name,
+            remaining: product.quantity,
+            reorderPoint: product.reorder_point,
+            unit: product.unit || "units",
+            branchId: order.branch_id,
+          });
+        }
       }
     }
-  }
 
-  await order.save();
+    await order.save();
+  } catch (error) {
+    for (const item of stageItems) {
+      item.consumed = false;
+    }
+    if (order.supplies_used) {
+      order.supplies_used.splice(initialSuppliesUsedCount);
+    }
+    if (appliedProducts.length) {
+      await Promise.all(
+        appliedProducts.map((p) =>
+          Product.updateOne(
+            { _id: p.productId },
+            {
+              $set: {
+                quantity: p.prevQuantity,
+                reserved_quantity: p.prevReserved,
+              },
+            },
+          ).catch((e) =>
+            logger.error("Failed product rollback in consumeReservedSuppliesForStep:", {
+              error: e.message,
+            }),
+          ),
+        ),
+      );
+    }
+    if (createdMovements.length) {
+      await StockMovement.deleteMany({
+        _id: { $in: createdMovements },
+      }).catch((e) =>
+        logger.error("Failed movement deletion in consumeReservedSuppliesForStep:", {
+          error: e.message,
+        }),
+      );
+    }
+    throw error;
+  }
 
   for (const alert of lowStockAlerts) {
     await notifyBranchManagersOfLowStock(alert);
@@ -466,43 +571,119 @@ export async function adjustReservedSuppliesForIntake({
   }
 
   const allProdIds = new Set([...prevMap.keys(), ...newMap.keys()]);
+  const deltas = [];
   for (const prodId of allProdIds) {
     const prevQty = prevMap.get(prodId) || 0;
     const newQty = newMap.get(prodId) || 0;
     const delta = newQty - prevQty;
+    if (delta !== 0) {
+      deltas.push({ prodId, delta, prevQty, newQty });
+    }
+  }
+
+  // 1. Pre-check: Verify all products that need increase have sufficient stock before touching ANY product
+  for (const { prodId, delta } of deltas) {
     if (delta > 0) {
-      const updated = await Product.findOneAndUpdate(
-        {
-          _id: prodId,
-          branch_id,
-          is_active: true,
-          $expr: {
-            $gte: [
-              {
-                $subtract: [
-                  "$quantity",
-                  { $ifNull: ["$reserved_quantity", 0] },
-                ],
-              },
-              delta,
-            ],
-          },
-        },
-        { $inc: { reserved_quantity: delta } },
-        { new: true },
+      const itemInfo = resolvedNew.find(
+        (r) => r.product_id && r.product_id.toString() === prodId.toString(),
       );
-      if (!updated) {
+      const available = itemInfo?.available ?? -1;
+      if (!itemInfo || !itemInfo.found || available < delta) {
+        const productName = itemInfo?.product_name || "Supplies";
+        try {
+          await notifyOfficersOfStockShortage({
+            branchId: branch_id,
+            productName,
+            required: delta,
+            available: Math.max(0, available),
+            unit: itemInfo?.unit || "units",
+          });
+        } catch (notifyErr) {
+          logger.error("Failed to notify officers during intake shortage:", {
+            error: notifyErr.message,
+          });
+        }
         throw new ApiError(
           409,
           "Insufficient stock available to increase intake quantities",
         );
       }
-    } else if (delta < 0) {
-      await Product.updateOne(
-        { _id: prodId },
-        { $inc: { reserved_quantity: delta } },
+    }
+  }
+
+  // 2. Atomically apply adjustments with full rollback tracking
+  const appliedBatch = [];
+  try {
+    for (const { prodId, delta } of deltas) {
+      if (delta > 0) {
+        const updated = await Product.findOneAndUpdate(
+          {
+            _id: prodId,
+            branch_id,
+            is_active: true,
+            $expr: {
+              $gte: [
+                {
+                  $subtract: [
+                    "$quantity",
+                    { $ifNull: ["$reserved_quantity", 0] },
+                  ],
+                },
+                delta,
+              ],
+            },
+          },
+          { $inc: { reserved_quantity: delta } },
+          { new: true },
+        );
+        if (!updated) {
+          const itemInfo = resolvedNew.find(
+            (r) => r.product_id && r.product_id.toString() === prodId.toString(),
+          );
+          const productName = itemInfo?.product_name || "Supplies";
+          try {
+            await notifyOfficersOfStockShortage({
+              branchId: branch_id,
+              productName,
+              required: delta,
+              unit: itemInfo?.unit || "units",
+            });
+          } catch (notifyErr) {
+            logger.error("Failed to notify officers during intake shortage:", {
+              error: notifyErr.message,
+            });
+          }
+          throw new ApiError(
+            409,
+            "Insufficient stock available to increase intake quantities",
+          );
+        }
+        appliedBatch.push({ prodId, delta });
+      } else if (delta < 0) {
+        await Product.updateOne(
+          { _id: prodId },
+          { $inc: { reserved_quantity: delta } },
+        );
+        appliedBatch.push({ prodId, delta });
+      }
+    }
+  } catch (error) {
+    // Rollback any modifications made in this attempt
+    if (appliedBatch.length) {
+      await Promise.all(
+        appliedBatch.map((a) =>
+          Product.updateOne(
+            { _id: a.prodId },
+            { $inc: { reserved_quantity: -a.delta } },
+          ).catch((rollbackErr) => {
+            logger.error("Failed rollback in adjustReservedSuppliesForIntake:", {
+              error: rollbackErr.message,
+            });
+          }),
+        ),
       );
     }
+    throw error;
   }
 
   const consumedItems = (order.supplies_reserved || []).filter(

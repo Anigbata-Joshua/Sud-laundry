@@ -6,6 +6,7 @@ import Notification from "../src/models/notification.model.js";
 import Branch from "../src/models/branch.model.js";
 import Product from "../src/models/product.model.js";
 import Service from "../src/models/service.model.js";
+import CatalogItem from "../src/models/catalogItem.model.js";
 import ServiceCategory from "../src/models/serviceCategory.model.js";
 import SupplyRequest from "../src/models/supplyRequest.model.js";
 import User from "../src/models/user.model.js";
@@ -1135,8 +1136,17 @@ test("createOrder rejects with 409 and sends shortage notices when stock is insu
   const serviceId = id(),
     customerUserId = id(),
     branchManagerId = id(),
-    officerId = id();
+    officerId = id(),
+    catalogItemId = id();
   mock.method(Order, "findOne", () => chain(null));
+  mock.method(CatalogItem, "findOne", async () => ({
+    _id: catalogItemId,
+    name: "Shirt",
+    category: "Tops",
+    piece_count: 1,
+    is_active: true,
+    services: [{ service_id: serviceId, price: 1500, is_available: true }],
+  }));
   mock.method(Service, "findById", async () => ({
     _id: serviceId,
     name: "Washing & Folding",
@@ -1170,7 +1180,7 @@ test("createOrder rejects with 409 and sends shortage notices when stock is insu
       user: { role: "customer", id: customerUserId },
       body: {
         branch_id: branchId,
-        items: [{ service_id: serviceId, quantity: 2 }],
+        items: [{ catalog_item_id: catalogItemId, service_id: serviceId, quantity: 2 }],
         pickup_time: new Date(Date.now() + 86400000).toISOString(),
       },
     }),
@@ -1179,13 +1189,47 @@ test("createOrder rejects with 409 and sends shortage notices when stock is insu
 
   // Customer and officer were notified
   assert(notif.mock.callCount() >= 2);
+  const createdNotifs = notif.mock.calls.map((c) => c.arguments[0]);
+  const customerNotifs = createdNotifs.filter(
+    (n) => String(n.user_id) === String(customerUserId),
+  );
+  const staffNotifs = createdNotifs.filter(
+    (n) => String(n.user_id) !== String(customerUserId),
+  );
+
+  assert(customerNotifs.length > 0, "Customer must receive notification");
+  for (const cn of customerNotifs) {
+    assert(
+      !cn.message.includes("Laundry Detergent") &&
+        !cn.message.includes("Packaging Nylon"),
+      `Customer notification message must never contain product names: "${cn.message}"`,
+    );
+  }
+
+  assert(staffNotifs.length > 0, "Staff must receive shortage alert");
+  for (const sn of staffNotifs) {
+    assert(
+      sn.message.includes("Packaging Nylon") ||
+        sn.message.includes("Laundry Detergent"),
+      `Staff notification message must contain product detail: "${sn.message}"`,
+    );
+  }
 });
 
 test("createOrder atomically reserves stock when supplies are available", async () => {
   const serviceId = id(),
     customerUserId = id(),
-    prodId = id();
+    prodId = id(),
+    catalogItemId = id();
   mock.method(Order, "findOne", () => chain(null));
+  mock.method(CatalogItem, "findOne", async () => ({
+    _id: catalogItemId,
+    name: "Shirt",
+    category: "Tops",
+    piece_count: 1,
+    is_active: true,
+    services: [{ service_id: serviceId, price: 1500, is_available: true }],
+  }));
   mock.method(Service, "findById", async () => ({
     _id: serviceId,
     name: "Washing & Folding",
@@ -1224,7 +1268,7 @@ test("createOrder atomically reserves stock when supplies are available", async 
     user: { role: "customer", id: customerUserId },
     body: {
       branch_id: branchId,
-      items: [{ service_id: serviceId, quantity: 2 }],
+      items: [{ catalog_item_id: catalogItemId, service_id: serviceId, quantity: 2 }],
       pickup_time: new Date(Date.now() + 86400000).toISOString(),
     },
   });
@@ -1663,9 +1707,18 @@ test("createOrder notifies only branch_manager and front_desk staff alongside th
     managerUserId = id(),
     frontDeskUserId = id(),
     attendantUserId = id(),
-    orderBranchId = id();
+    orderBranchId = id(),
+    catalogItemId = id();
 
   mock.method(Order, "findOne", () => chain(null));
+  mock.method(CatalogItem, "findOne", async () => ({
+    _id: catalogItemId,
+    name: "Shirt",
+    category: "Tops",
+    piece_count: 1,
+    is_active: true,
+    services: [{ service_id: serviceId, price: 1000, is_available: true }],
+  }));
   mock.method(Service, "findById", async () => ({
     _id: serviceId,
     name: "Ironing",
@@ -1693,7 +1746,7 @@ test("createOrder notifies only branch_manager and front_desk staff alongside th
     customer_id: customerUserId,
     branch_id: orderBranchId,
     items: [
-      { service_id: serviceId, quantity: 1, unit_price: 1000, subtotal: 1000 },
+      { service_id: serviceId, catalog_item_id: catalogItemId, quantity: 1, unit_price: 1000, subtotal: 1000 },
     ],
     total_price: 1000,
   };
@@ -1740,7 +1793,7 @@ test("createOrder notifies only branch_manager and front_desk staff alongside th
     user: { role: "customer", id: customerUserId },
     body: {
       branch_id: orderBranchId,
-      items: [{ service_id: serviceId, quantity: 1 }],
+      items: [{ catalog_item_id: catalogItemId, service_id: serviceId, quantity: 1 }],
       pickup_time: new Date(Date.now() + 86400000).toISOString(),
     },
   });

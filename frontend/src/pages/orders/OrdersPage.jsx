@@ -9,7 +9,7 @@ import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import SearchInput from '../../components/common/SearchInput'
 import OrderTable from '../../components/orders/OrderTable'
-import { formatNaira } from '../../utils/formatters'
+import { formatNaira, formatOrderItem } from '../../utils/formatters'
 
 const tabs = [
   'All',
@@ -37,7 +37,7 @@ function formatOrder(order, index) {
       .join('')
       .slice(0, 2)
       .toUpperCase(),
-    service: order.items?.[0]?.name ?? 'Laundry service',
+    service: order.items?.[0] ? formatOrderItem(order.items[0]) : 'Laundry service',
     pieces: order.items?.reduce((total, item) => total + item.quantity, 0) ?? 0,
     branch: order.branch_id?.name ?? 'Branch',
     status: order.status,

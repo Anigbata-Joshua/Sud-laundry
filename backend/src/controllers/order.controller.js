@@ -4,12 +4,14 @@
 
 import Order from "../models/order.model.js";
 import Service from "../models/service.model.js";
+import CatalogItem from "../models/catalogItem.model.js";
 import Branch from "../models/branch.model.js";
 import Employee from "../models/employee.model.js";
 import ApiError from "../utils/apiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import apiResponse from "../utils/apiResponse.js";
 import createNotification from "../services/notification.service.js";
+import logger from "../utils/logger.js";
 import { env } from "../config/env.js";
 import { transitionPickup } from "../services/orderPickup.service.js";
 import {
@@ -17,6 +19,18 @@ import {
   releaseReservedSuppliesForOrder,
   adjustReservedSuppliesForIntake,
 } from "../services/inventoryConsumption.service.js";
+
+export function calculateExpressSurcharge(totalPrice, priority) {
+  if (priority !== "express") return 0;
+  return Math.round(totalPrice * (env.expressSurchargePercent / 100) * 100) / 100;
+}
+
+// GET /orders/pricing-config
+export const getPricingConfig = asyncHandler(async (req, res) => {
+  return apiResponse(res, 200, { express_surcharge_percent: env.expressSurchargePercent, },
+    "Pricing configuration",
+  );
+});
 
 export const confirmPickup = asyncHandler(async (req, res) => {
   const order = await transitionPickup({
@@ -33,12 +47,7 @@ export const sendOutOrder = asyncHandler(async (req, res) => {
     actor: req.user,
     action: "send",
   });
-  return apiResponse(
-    res,
-    200,
-    order,
-    "Order sent out; pickup confirmation is due in 2 days",
-  );
+  return apiResponse(res, 200, order, "Order sent out; pickup confirmation is due in 2 days");
 });
 
 const DUPLICATE_ORDER_WINDOW_SECONDS = 10;
@@ -51,20 +60,11 @@ export const createOrder = asyncHandler(async (req, res) => {
   if (!["admin", "customer"].includes(req.user.role)) {
     throw new ApiError(403, "Only customers and admins can create orders");
   }
-  const {
-    branch_id,
-    customer_id,
-    items,
-    pickup_time,
-    priority = "normal",
-  } = req.body;
+  const { branch_id, customer_id, items, pickup_time, priority = "normal" } = req.body;
   const customerId = req.user.role === "admin" ? customer_id : req.user.id;
 
   if (!branch_id || !customerId || !Array.isArray(items) || !items.length) {
-    throw new ApiError(
-      400,
-      "branch_id, customer_id and at least one item are required",
-    );
+    throw new ApiError(400, "branch_id, customer_id and at least one item are required");
   }
 
   // Validate priority
@@ -98,26 +98,51 @@ export const createOrder = asyncHandler(async (req, res) => {
   }).sort({ createdAt: -1 });
 
   if (duplicateRequest) {
-    throw new ApiError(
-      409,
-      "A similar order was just submitted — if this is intentional, please wait a few seconds and try again",
-    );
+    throw new ApiError(409, "A similar order was just submitted — if this is intentional, please wait a few seconds and try again");
   }
 
   let total_price = 0;
   let longestTurnaroundHours = 0;
   const resolvedItems = [];
+  const seenLines = new Set();
 
   for (const item of items) {
-    if (
-      !item.service_id ||
-      typeof item.quantity !== "number" ||
-      item.quantity <= 0
-    ) {
-      throw new ApiError(
-        400,
-        "Each item requires a valid service_id and a positive quantity",
-      );
+    if (!item.catalog_item_id) {
+      throw new ApiError(400, "Each item requires a valid catalog_item_id");
+    }
+
+    if (!item.service_id) {
+      throw new ApiError(400, "Each item requires a valid service_id");
+    }
+
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 500) {
+      throw new ApiError(400, "Item quantity must be a positive integer not exceeding 500");
+    }
+
+    const lineKey = `${item.catalog_item_id}:${item.service_id}`;
+    if (seenLines.has(lineKey)) {
+      throw new ApiError(400, "Duplicate item and service detected: please combine quantities into a single line");
+    }
+    seenLines.add(lineKey);
+
+    const catalogItem = await CatalogItem.findOne({
+      _id: item.catalog_item_id,
+      branch_id,
+      is_active: true,
+    });
+
+    if (!catalogItem) {
+      throw new ApiError(400, "Garment item not found or inactive at this branch",);
+    }
+
+    const servicePricing = catalogItem.services.find(
+      (s) =>
+        String(s.service_id) === String(item.service_id) &&
+        s.is_available === true,
+    );
+
+    if (!servicePricing) {
+      throw new ApiError( 400,`Service is unavailable for "${catalogItem.name}"`);
     }
 
     const service = await Service.findById(item.service_id);
@@ -140,7 +165,6 @@ export const createOrder = asyncHandler(async (req, res) => {
     }
 
     // Only regular services determine order turnaround.
-    // Add-ons do not have their own turnaround time.
     if (service.type === "service") {
       if (
         typeof service.turnaround_hours !== "number" ||
@@ -158,17 +182,24 @@ export const createOrder = asyncHandler(async (req, res) => {
       );
     }
 
-    const subtotal = service.price * item.quantity;
+    // Never trust client price: use verified price from CatalogItem
+    const unit_price = servicePricing.price;
+    const subtotal = Math.round(unit_price * item.quantity * 100) / 100;
 
     total_price += subtotal;
 
     resolvedItems.push({
       service_id: service._id,
-      name: service.name,
-      category: service.category,
-      type: service.type,
+      name: service.name, // SERVICE name
+      category: service.category, // SERVICE category
+      type: service.type || "service",
+      catalog_item_id: catalogItem._id,
+      item_name: catalogItem.name, // GARMENT name
+      item_category: catalogItem.category, // GARMENT category
+      piece_count: catalogItem.piece_count || 1,
+      service_name: service.name,
       quantity: item.quantity,
-      unit_price: service.price,
+      unit_price,
       subtotal,
     });
   }
@@ -189,11 +220,8 @@ export const createOrder = asyncHandler(async (req, res) => {
   const deliveryDate = new Date(
     pickupDate.getTime() + turnaround_hours * 60 * 60 * 1000,
   );
-  // Express orders receive the configured surcharge
-  const express_surcharge =
-    priority === "express"
-      ? total_price * (env.expressSurchargePercent / 100)
-      : 0;
+  // Express orders receive the configured surcharge calculated via shared helper
+  const express_surcharge = calculateExpressSurcharge(total_price, priority);
 
   const amount_due = total_price + express_surcharge;
 
@@ -204,22 +232,39 @@ export const createOrder = asyncHandler(async (req, res) => {
     customer_id: customerId,
   });
 
-  const order = await Order.create({
-    customer_id: customerId,
-    branch_id,
-    items: resolvedItems,
-    supplies_reserved,
-    total_price,
-    express_surcharge,
-    amount_due,
-    pickup_time: pickupDate,
-    delivery_time: deliveryDate,
+  let order;
+  try {
+    order = await Order.create({
+      customer_id: customerId,
+      branch_id,
+      items: resolvedItems,
+      supplies_reserved,
+      total_price,
+      express_surcharge,
+      amount_due,
+      pickup_time: pickupDate,
+      delivery_time: deliveryDate,
 
-    fulfillment: {
-      priority,
-      turnaround_hours,
-    },
-  });
+      fulfillment: {
+        priority,
+        turnaround_hours,
+      },
+    });
+  } catch (createErr) {
+    if (supplies_reserved && supplies_reserved.length) {
+      await releaseReservedSuppliesForOrder({ supplies_reserved }).catch(
+        (releaseErr) => {
+          logger.error(
+            "Failed to release reserved supplies on order creation failure:",
+            {
+              error: releaseErr.message,
+            },
+          );
+        },
+      );
+    }
+    throw createErr;
+  }
 
   await createNotification({
     user_id: customerId,
@@ -345,6 +390,16 @@ export const getOrderById = asyncHandler(async (req, res) => {
   return apiResponse(res, 200, order, "Order fetched successfully");
 });
 
+const populateOrderDetails = async (doc) => {
+  if (doc && typeof doc.populate === "function") {
+    await doc.populate([
+      { path: "customer_id", select: "name email phone address" },
+      { path: "branch_id", select: "name address phone" },
+    ]);
+  }
+  return doc;
+};
+
 // PATCH /orders/:id
 export const updateOrder = asyncHandler(async (req, res) => {
   if (["sent_out", "delivered"].includes(req.body.status)) {
@@ -358,6 +413,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
       actor: req.user,
       action: req.body.status === "sent_out" ? "send" : "confirm",
     });
+    await populateOrderDetails(updated);
     return apiResponse(res, 200, updated, "Order updated successfully");
   }
   const order = await Order.findById(req.params.id);
@@ -397,6 +453,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
 
     await releaseReservedSuppliesForOrder(order);
     await order.save();
+    await populateOrderDetails(order);
 
     await createNotification({
       user_id: req.user.id,
@@ -458,6 +515,19 @@ export const updateOrder = asyncHandler(async (req, res) => {
       const employee = await Employee.findOne({ user_id: req.user.id });
       if (!employee) throw new ApiError(404, "Employee record not found");
 
+      const originalItems = order.items.map((item) => ({
+        ...(item.toObject ? item.toObject() : item),
+      }));
+      const originalSuppliesReserved = (order.supplies_reserved || []).map(
+        (s) => ({
+          ...(s.toObject ? s.toObject() : s),
+        }),
+      );
+      const originalTotalPrice = order.total_price;
+      const originalExpressSurcharge = order.express_surcharge;
+      const originalAmountDue = order.amount_due;
+      const originalStatus = order.status;
+
       const correctedItems = order.items.map((item, index) => {
         const correction = intake_items[index];
         const quantity = Number(correction?.quantity);
@@ -482,18 +552,89 @@ export const updateOrder = asyncHandler(async (req, res) => {
         branch_id: order.branch_id,
       });
 
-      order.intake = {
-        original_items: order.items,
-        verified_by: employee._id,
-        verified_at: new Date(),
-        notes: intake_notes?.trim() || undefined,
-      };
-      order.items = correctedItems;
-      order.total_price = correctedItems.reduce(
-        (sum, item) => sum + item.subtotal,
-        0,
-      );
-      order.amount_due = order.total_price + order.express_surcharge;
+      try {
+        const previousAmountDue = order.amount_due;
+        order.intake = {
+          original_items: originalItems,
+          verified_by: employee._id,
+          verified_at: new Date(),
+          notes: intake_notes?.trim() || undefined,
+        };
+        order.items = correctedItems;
+        order.total_price = correctedItems.reduce(
+          (sum, item) => sum + item.subtotal,
+          0,
+        );
+        order.express_surcharge = calculateExpressSurcharge(
+          order.total_price,
+          order.priority,
+        );
+        order.amount_due = order.total_price + order.express_surcharge;
+        order.status = status;
+
+        if (previousAmountDue !== order.amount_due) {
+          await createNotification({
+            user_id: order.customer_id,
+            order_id: order._id,
+            type: "order_received",
+            message: `Your order quantities were verified at intake. The updated total is ₦${order.amount_due.toLocaleString()}.`,
+          });
+        }
+
+        if (pickup_time !== undefined) {
+          const pickupDate = new Date(pickup_time);
+          if (Number.isNaN(pickupDate.getTime())) {
+            throw new ApiError(400, "pickup_time must be a valid date");
+          }
+          order.pickup_time = pickupDate;
+        }
+
+        if (delivery_time !== undefined) {
+          const deliveryDate = new Date(delivery_time);
+          if (Number.isNaN(deliveryDate.getTime())) {
+            throw new ApiError(400, "delivery_time must be a valid date");
+          }
+          order.delivery_time = deliveryDate;
+        }
+
+        if (payment_status !== undefined) {
+          if (req.user.role !== "admin") {
+            throw new ApiError(
+              403,
+              "Only admins can manually update payment status",
+            );
+          }
+          order.payment_status = payment_status;
+        }
+
+        await order.save();
+        await populateOrderDetails(order);
+        return apiResponse(res, 200, order, "Order updated successfully");
+      } catch (err) {
+        // Rollback reserved supplies back to original
+        await adjustReservedSuppliesForIntake({
+          order,
+          intakeItems: originalItems,
+          branch_id: order.branch_id,
+        }).catch((rollbackErr) => {
+          logger.error(
+            "Failed to rollback reserved supplies during failed intake:",
+            {
+              error: rollbackErr.message,
+            },
+          );
+        });
+
+        order.items = originalItems;
+        order.supplies_reserved = originalSuppliesReserved;
+        order.total_price = originalTotalPrice;
+        order.express_surcharge = originalExpressSurcharge;
+        order.amount_due = originalAmountDue;
+        order.status = originalStatus;
+        order.intake = undefined;
+
+        throw err;
+      }
     }
 
     order.status = status;
@@ -532,6 +673,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
   }
 
   await order.save();
+  await populateOrderDetails(order);
 
   return apiResponse(res, 200, order, "Order updated successfully");
 });
@@ -595,6 +737,7 @@ export const forceCancelOrder = asyncHandler(async (req, res) => {
 
   await releaseReservedSuppliesForOrder(order);
   await order.save();
+  await populateOrderDetails(order);
 
   const openingLine = on_customer_request
     ? "Your order was cancelled per your request."

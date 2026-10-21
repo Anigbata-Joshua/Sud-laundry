@@ -387,6 +387,12 @@ export default function ProductsPage() {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Branch Location</th>
                 <th className="px-4 py-3">On hand</th>
+                {canManage && (
+                  <>
+                    <th className="px-4 py-3">Reserved</th>
+                    <th className="px-4 py-3">Available</th>
+                  </>
+                )}
                 <th className="px-4 py-3">Reorder at</th>
                 <th className="px-4 py-3">Unit Price</th>
                 <th className="px-4 py-3">Status</th>
@@ -396,6 +402,8 @@ export default function ProductsPage() {
             <tbody>
               {visible.map((product) => {
                 const isLow = product.quantity <= product.reorder_point
+                const reserved = product.reserved_quantity || 0
+                const available = Math.max(0, (product.quantity || 0) - reserved)
                 return (
                   <tr key={product._id} className="border-b border-gray-100 hover:bg-gray-50/50">
                     <td className="px-4 py-3">
@@ -419,6 +427,16 @@ export default function ProductsPage() {
                     <td className="px-4 py-3 font-bold text-ink">
                       {product.quantity} {product.unit}
                     </td>
+                    {canManage && (
+                      <>
+                        <td className="px-4 py-3 font-semibold text-amber-700">
+                          {reserved} {product.unit}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-emerald-700">
+                          {available} {product.unit}
+                        </td>
+                      </>
+                    )}
                     <td className="px-4 py-3 text-gray-500">
                       {product.reorder_point} {product.unit}
                     </td>

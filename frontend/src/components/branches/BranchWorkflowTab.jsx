@@ -2,7 +2,7 @@ import { Clock3, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../common/Button'
 import Panel from '../common/Panel'
-import { formatNaira } from '../../utils/formatters'
+import { formatNaira, formatOrderItem } from '../../utils/formatters'
 
 const workflowStages = [
   { key: 'placed', label: 'Intake / Placed', color: '#9b87f5' },
@@ -59,7 +59,9 @@ export default function BranchWorkflowTab({ branchName, orders }) {
                   >
                     <div className="flex justify-between items-center text-[10px] font-bold text-sky-700">
                       <span>ORD-{order._id.slice(-6).toUpperCase()}</span>
-                      <span className="text-gray-400">{formatNaira(order.total_price)}</span>
+                      <span className="text-gray-400">
+                        {formatNaira(order.amount_due ?? order.total_price)}
+                      </span>
                     </div>
                     <h4 className="mt-1 text-xs font-bold text-ink truncate">
                       {order.customer_id?.name || 'Customer'}
@@ -72,7 +74,11 @@ export default function BranchWorkflowTab({ branchName, orders }) {
                           minute: '2-digit',
                         })}
                       </span>
-                      <span>{order.items?.length || 1} service(s)</span>
+                      <span className="truncate max-w-[120px]">
+                        {order.items?.[0]
+                          ? formatOrderItem(order.items[0])
+                          : `${order.items?.length || 1} service(s)`}
+                      </span>
                     </div>
                   </div>
                 ))}
