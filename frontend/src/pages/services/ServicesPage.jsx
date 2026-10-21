@@ -164,9 +164,9 @@ export default function ServicesPage() {
     [branches, user],
   )
 
-  // Filtered Services for Core Services Tab
+  // Filtered Services for Core Services Tab (deduplicated by name)
   const visibleServices = useMemo(() => {
-    return services.filter((service) => {
+    const filtered = services.filter((service) => {
       const sBranchId = String(service.branch_id?._id ?? service.branch_id)
       if (branchId) {
         if (sBranchId !== String(branchId)) return false
@@ -181,14 +181,41 @@ export default function ServicesPage() {
 
       return matchesQuery
     })
+
+    // Remove any duplicate services by name
+    const seen = new Set()
+    const unique = []
+    for (const service of filtered) {
+      const nameKey = service.name.trim().toLowerCase()
+      // If scoped to a branch, deduplicate within that branch;
+      // If in "All Branches" view, deduplicate across branches so services are distinct
+      const key = branchId
+        ? `${String(service.branch_id?._id ?? service.branch_id)}::${nameKey}`
+        : nameKey
+      if (!seen.has(key)) {
+        seen.add(key)
+        unique.push(service)
+      }
+    }
+    return unique
   }, [services, branchId, branches, serviceQuery, branchName])
 
-  // Active Core Services for the selected branch (for CatalogItemModal)
+  // Active Core Services for the selected branch (for CatalogItemModal), deduplicated
   const currentBranchCoreServices = useMemo(() => {
-    return services.filter((s) => {
+    const branchList = services.filter((s) => {
       const sBranchId = String(s.branch_id?._id ?? s.branch_id)
       return sBranchId === String(activeBranchId) && s.is_active
     })
+    const seen = new Set()
+    const unique = []
+    for (const s of branchList) {
+      const key = s.name.trim().toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        unique.push(s)
+      }
+    }
+    return unique
   }, [services, activeBranchId])
 
   // Catalog Item Handlers

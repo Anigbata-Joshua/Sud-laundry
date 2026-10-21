@@ -6,8 +6,10 @@ import authenticate from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/role.middleware.js';
 
 const router = express.Router();
+// Public pricing config (e.g. express surcharge percent for order placement)
+router.get('/pricing-config', orderController.getPricingConfig);
 
-// All order routes require a logged-in user — no public access.
+// All subsequent order routes require a logged-in user — no public access.
 router.use(authenticate);
 
 // Customer — own history, must come before /:id so 'me' isn't parsed as an ObjectId

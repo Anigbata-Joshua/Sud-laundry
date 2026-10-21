@@ -174,7 +174,9 @@ export default function BranchOverviewTab({ financials, orders }) {
                   <td className="py-3 text-gray-500">
                     {order.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 1} pcs
                   </td>
-                  <td className="py-3 font-bold text-ink">{formatNaira(order.total_price)}</td>
+                  <td className="py-3 font-bold text-ink">
+                    {formatNaira(order.amount_due ?? order.total_price)}
+                  </td>
                   <td className="py-3">
                     <StatusBadge status={order.status} />
                   </td>

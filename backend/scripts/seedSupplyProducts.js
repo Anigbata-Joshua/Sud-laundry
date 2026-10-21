@@ -21,7 +21,12 @@ if (!branchId) {
 }
 
 const products = [
+    { name: 'Laundry Detergent', unit: 'scoop', quantity: 100, reorder_point: 20 },
+    { name: 'Fabric Softener', unit: 'cap', quantity: 50, reorder_point: 10 },
+    { name: 'Ironing Starch', unit: 'spray', quantity: 50, reorder_point: 10 },
     { name: 'Dry Cleaning Solvent', unit: 'unit', quantity: 50, reorder_point: 10 },
+    { name: 'Packaging Nylon', unit: 'pieces', quantity: 100, reorder_point: 20 },
+    { name: 'Hanger', unit: 'pieces', quantity: 100, reorder_point: 20 },
     { name: 'Stain Remover', unit: 'unit', quantity: 50, reorder_point: 10 },
     { name: 'Shoe Cleaner', unit: 'unit', quantity: 30, reorder_point: 5 },
     { name: 'Perfume', unit: 'spray', quantity: 50, reorder_point: 10 },
@@ -50,11 +55,11 @@ const seedSupplyProducts = async () => {
         for (const productData of products) {
             const existingProduct = await Product.findOne({
                 branch_id: branchId,
-                name: productData.name,
+                name: { $regex: new RegExp(`^${productData.name}$`, 'i') },
             });
 
             if (existingProduct) {
-                logger.info(`⏭️ Skipped: ${productData.name} already exists`);
+                logger.info(`⏭️ Skipped: "${existingProduct.name}" already exists (${existingProduct.quantity} ${existingProduct.unit} on hand)`);
                 skippedCount++;
                 continue;
             }

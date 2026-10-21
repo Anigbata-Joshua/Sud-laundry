@@ -7,6 +7,8 @@
   --color-brand: #0284c7;
   --color-brand-hover: #0369a1;
   --color-brand-light: #f0f9ff;
+  --color-brand-subtle: #e0f2fe;
+  --color-brand-dark: #075985;
   --color-ink: #0f172a;
   --color-muted: #64748b;
   --color-line: #e2e8f0;
@@ -19,6 +21,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     box-sizing: border-box;
   }

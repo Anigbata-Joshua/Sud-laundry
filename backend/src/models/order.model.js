@@ -11,9 +11,17 @@ const orderItemSchema = new mongoose.Schema(
       ref: "Service",
       required: true,
     },
-    name: { type: String, required: true },
-    category: { type: String },
-    type: { type: String },
+    name: { type: String, required: true }, // SERVICE name
+    category: { type: String }, // SERVICE category
+    type: { type: String, default: "service" },
+    catalog_item_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CatalogItem",
+    },
+    item_name: { type: String }, // GARMENT name
+    item_category: { type: String }, // GARMENT category
+    piece_count: { type: Number, default: 1, min: 1 },
+    service_name: { type: String }, // SERVICE name snapshot
     quantity: { type: Number, min: 1, required: true },
     unit_price: { type: Number, min: 0, required: true },
     subtotal: { type: Number, min: 0, required: true },
