@@ -39,6 +39,7 @@ export default function ProcessingPage() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [historyDate, setHistoryDate] = useState('')
   const canManage = ['admin', 'branch_manager'].includes(user.role)
+  const canReviewQC = ['admin', 'branch_manager', 'front_desk'].includes(user.role)
   const { prompt } = useDialog()
 
   function load() {
@@ -167,7 +168,11 @@ export default function ProcessingPage() {
     setBusy(workflowId)
     setMessage('')
     try {
-      await reviewProcessingQuality(workflowId, result, notes)
+      const response = await reviewProcessingQuality(workflowId, result, notes)
+      const updated = response.data?.data
+      if (updated) {
+        setWorkflows((current) => current.map((w) => (w._id === updated._id ? updated : w)))
+      }
       setOrder((current) => ({ ...current, status: result === 'pass' ? 'ready' : 'processing' }))
       load()
     } catch (error) {
@@ -206,7 +211,18 @@ export default function ProcessingPage() {
         )}
       </PageHeading>
 
-      {message && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
+      {message && (
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-red-50 p-3 text-xs text-red-700">
+          <span>{message}</span>
+          <button
+            type="button"
+            onClick={() => setMessage('')}
+            className="p-1 text-red-500 hover:text-red-700"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
       <Panel className="mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
         <div className="flex rounded-lg bg-gray-50 p-1">
           {['active', 'history'].map((item) => (
@@ -257,6 +273,7 @@ export default function ProcessingPage() {
             user={user}
             busy={busy}
             canManage={canManage}
+            canReviewQC={canReviewQC}
             orderPage={Boolean(orderId)}
             onStepAction={actOnStep}
             onReview={review}
@@ -353,7 +370,16 @@ export default function ProcessingPage() {
   )
 }
 
-function WorkflowCard({ workflow, user, busy, canManage, orderPage, onStepAction, onReview }) {
+function WorkflowCard({
+  workflow,
+  user,
+  busy,
+  canManage,
+  canReviewQC,
+  orderPage,
+  onStepAction,
+  onReview,
+}) {
   const order = workflow.order_id
   const [requestedSteps, setRequestedSteps] = useState({})
   const [supplyBusy, setSupplyBusy] = useState('')
@@ -458,25 +484,29 @@ function WorkflowCard({ workflow, user, busy, canManage, orderPage, onStepAction
           )
         })}
       </div>
-      {canManage && order?.status === 'quality_check' && workflow.status === 'completed' && (
-        <div className="flex gap-2 border-t border-line p-4">
-          <Button
-            primary
-            disabled={busy === workflow._id}
-            onClick={() => onReview(workflow._id, 'pass')}
-          >
-            <Check className="size-4" /> Pass QC
-          </Button>
-          <Button disabled={busy === workflow._id} onClick={() => onReview(workflow._id, 'fail')}>
-            <RotateCcw className="size-4" /> Fail and reprocess
-          </Button>
-        </div>
-      )}
-      {workflow.qc_notes && (
-        <p className="border-t border-line bg-red-50 p-3 text-xs text-red-700">
-          QC failed: {workflow.qc_notes}
-        </p>
-      )}
+      {(canReviewQC || canManage) &&
+        order?.status === 'quality_check' &&
+        workflow.status === 'completed' && (
+          <div className="flex gap-2 border-t border-line p-4">
+            <Button
+              primary
+              disabled={busy === workflow._id}
+              onClick={() => onReview(workflow._id, 'pass')}
+            >
+              <Check className="size-4" /> Pass QC
+            </Button>
+            <Button disabled={busy === workflow._id} onClick={() => onReview(workflow._id, 'fail')}>
+              <RotateCcw className="size-4" /> Fail and reprocess
+            </Button>
+          </div>
+        )}
+      {workflow.qc_notes &&
+        workflow.status !== 'completed' &&
+        !['ready', 'delivered'].includes(order?.status) && (
+          <p className="border-t border-line bg-red-50 p-3 text-xs text-red-700">
+            QC rework reason: {workflow.qc_notes}
+          </p>
+        )}
     </Panel>
   )
 }

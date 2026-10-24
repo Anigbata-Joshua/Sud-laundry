@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   ArrowLeft,
   Building2,
@@ -8,14 +8,23 @@ import {
   MapPin,
   Phone,
   UserRound,
+  RotateCcw,
+  RefreshCw,
+  X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { forceCancelOrder, getOrder, updateOrder } from '../../api/orders.api'
 import { getOrderPayments } from '../../api/payments.api'
+import {
+  getOrderProcessingWorkflows,
+  reviewProcessingQuality,
+  updateProcessingStep,
+} from '../../api/processingWorkflows.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
 import StatusBadge from '../../components/tables/StatusBadge'
+import ReassignModal from '../../components/orders/ReassignModal'
 import { formatNaira, formatOrderItem } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
 import { useDialog } from '../../hooks/useDialog'
@@ -27,6 +36,7 @@ import { getCustomerStatusLabel } from '../../constants/orderStatusLabels'
 // "Mark order received" action at all.
 const CAN_RECEIVE_ROLES = ['admin', 'branch_manager', 'front_desk']
 const CAN_MANAGE_ROLES = ['admin', 'branch_manager']
+const CAN_QC_ROLES = ['admin', 'branch_manager', 'front_desk']
 
 function formatTime(value, fallback) {
   return value ? new Date(value).toLocaleString('en-NG') : fallback
@@ -41,11 +51,23 @@ export default function OrderDetailsPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [payments, setPayments] = useState([])
+  const [workflows, setWorkflows] = useState([])
+  const [reassignModalOpen, setReassignModalOpen] = useState(false)
+  const [qcActionBusy, setQcActionBusy] = useState(false)
 
   // Intake-correction form state — only relevant while status is 'placed'.
   const [intakeMode, setIntakeMode] = useState(false)
   const [intakeQuantities, setIntakeQuantities] = useState([])
   const [intakeNotes, setIntakeNotes] = useState('')
+
+  const loadWorkflows = useCallback(() => {
+    if (!id) return
+    getOrderProcessingWorkflows(id)
+      .then((response) => {
+        setWorkflows(response.data.data || [])
+      })
+      .catch(() => {})
+  }, [id])
 
   useEffect(() => {
     let active = true
@@ -60,10 +82,11 @@ export default function OrderDetailsPage() {
       .catch((requestError) => {
         if (active) setError(requestError.response?.data?.message ?? 'Unable to load order.')
       })
+    loadWorkflows()
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, loadWorkflows])
 
   async function changeStatus(status) {
     const previousStatus = order.status
@@ -85,6 +108,7 @@ export default function OrderDetailsPage() {
             ? updatedOrder.branch_id
             : current?.branch_id,
       }))
+      loadWorkflows()
     } catch (requestError) {
       setOrder((current) => ({ ...current, status: previousStatus }))
       setError(requestError.response?.data?.message ?? 'Unable to update order status.')
@@ -128,8 +152,65 @@ export default function OrderDetailsPage() {
             : current?.branch_id,
       }))
       setIntakeMode(false)
+      loadWorkflows()
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to confirm intake.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleQcReview(result) {
+    const activeWorkflow = workflows.find((w) => w.status === 'active') || workflows[0]
+    if (!activeWorkflow) return
+    let notes = ''
+    if (result === 'fail') {
+      const entered = await prompt('Why did quality control fail?', {
+        title: 'QC Failure Reason',
+        label: 'Inspection notes / rework reason',
+        placeholder: 'e.g. Stains remain on fabric, requires re-wash',
+        required: true,
+        confirmLabel: 'Record QC Fail & Reprocess',
+        tone: 'error',
+      })
+      if (!entered || !entered.trim()) return
+      notes = entered.trim()
+    }
+    setQcActionBusy(true)
+    setError('')
+    try {
+      const response = await reviewProcessingQuality(activeWorkflow._id, result, notes)
+      const updatedWorkflow = response.data?.data
+      if (updatedWorkflow) {
+        setWorkflows((current) =>
+          current.map((w) => (w._id === updatedWorkflow._id ? updatedWorkflow : w)),
+        )
+      }
+      const refreshed = await getOrder(id)
+      setOrder(refreshed.data.data)
+      loadWorkflows()
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Unable to record quality check result.')
+    } finally {
+      setQcActionBusy(false)
+    }
+  }
+
+  async function handleAttendantStepAction(action) {
+    const activeWorkflow = workflows.find((w) => w.status === 'active') || workflows[0]
+    const activeStep =
+      activeWorkflow?.steps?.find((s) => s.status !== 'completed') ||
+      activeWorkflow?.steps?.[activeWorkflow?.steps?.length - 1]
+    if (!activeWorkflow || !activeStep) return
+    setSaving(true)
+    setError('')
+    try {
+      await updateProcessingStep(activeWorkflow._id, activeStep._id, action)
+      const refreshed = await getOrder(id)
+      setOrder(refreshed.data.data)
+      loadWorkflows()
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Unable to update step.')
     } finally {
       setSaving(false)
     }
@@ -180,6 +261,17 @@ export default function OrderDetailsPage() {
   const branch = order.branch_id
   const canReceive = CAN_RECEIVE_ROLES.includes(user.role)
   const canManage = CAN_MANAGE_ROLES.includes(user.role)
+  const canQc = CAN_QC_ROLES.includes(user.role)
+
+  const activeWorkflow = workflows.find((w) => w.status === 'active') || workflows[0]
+  const activeStep =
+    activeWorkflow?.steps?.find((s) => s.status !== 'completed') ||
+    activeWorkflow?.steps?.[activeWorkflow?.steps?.length - 1]
+  const assignedEmployee = activeStep?.employee_id
+  const assignedName = assignedEmployee?.user_id?.name || assignedEmployee?.job_title || null
+  const isAssignedToCurrentUser =
+    user.role === 'employee' &&
+    (assignedEmployee?.user_id?._id || assignedEmployee?.user_id) === (user._id || user.id)
 
   return (
     <>
@@ -188,16 +280,29 @@ export default function OrderDetailsPage() {
         title={`ORD-${order._id.slice(-6).toUpperCase()}`}
         subtitle={`Created ${formatTime(order.createdAt, 'Unknown')}`}
       >
-        {canManage && ['received', 'processing', 'quality_check'].includes(order.status) && (
-          <Button primary onClick={() => navigate(`/orders/${id}/processing`)}>
-            Create / view workflow
-          </Button>
-        )}
+        {canManage &&
+          ['received', 'processing', 'quality_check'].includes(order.status) &&
+          activeWorkflow && (
+            <Button onClick={() => setReassignModalOpen(true)}>
+              <RefreshCw className="size-4" /> Reassign attendant
+            </Button>
+          )}
         <Button onClick={() => navigate(-1)}>
           <ArrowLeft className="size-4" /> Back
         </Button>
       </PageHeading>
-      {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+      {error && (
+        <div className="mb-3 flex items-center justify-between rounded-lg bg-red-50 p-3 text-xs text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="p-1 text-red-500 hover:text-red-700"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       {user.role === 'customer' && <CustomerOrderTracker status={order.status} />}
 
@@ -217,9 +322,114 @@ export default function OrderDetailsPage() {
             <CountdownTimer
               deliveryTime={order.delivery_time}
               processingStartedAt={order.processing_started_at}
-              turnaroundHours={order.fulfillment?.turnaround_hours}
+              turnaroundHours={
+                order.fulfillment?.turnaround_hours ||
+                (order.express_surcharge > 0 || order.fulfillment?.priority === 'express' ? 24 : 48)
+              }
               status={order.status}
             />
+
+            {/* Quality Check Review Card */}
+            {order.status === 'quality_check' && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                      Quality Check Review
+                    </h3>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      Processing completed by <b>{assignedName || 'attendant'}</b>. Confirm garments
+                      meet standards.
+                    </p>
+                  </div>
+                  {canQc && activeWorkflow && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        primary
+                        disabled={qcActionBusy}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => handleQcReview('pass')}
+                      >
+                        <Check className="size-4" /> Pass QC
+                      </Button>
+                      <Button
+                        disabled={qcActionBusy}
+                        className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                        onClick={() => handleQcReview('fail')}
+                      >
+                        <RotateCcw className="size-4" /> Fail & Rework
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Attendant & Processing Assignment Card (visible to staff) */}
+            {user.role !== 'customer' &&
+              ['received', 'processing', 'quality_check', 'ready'].includes(order.status) && (
+                <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-brand">
+                        Attendant Assignment{' '}
+                        {activeWorkflow?.cycle > 1 ? `· Cycle ${activeWorkflow.cycle}` : ''}
+                      </span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <UserRound className="size-4 text-sky-700" />
+                        <span className="text-xs font-extrabold text-ink">
+                          {assignedName ? assignedName : 'No attendant assigned (pending)'}
+                        </span>
+                        {activeStep?.status && (
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-sky-800 shadow-xs border border-sky-100">
+                            {activeStep.status.replaceAll('_', ' ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {canManage &&
+                      ['received', 'processing', 'quality_check'].includes(order.status) &&
+                      activeWorkflow && (
+                        <Button onClick={() => setReassignModalOpen(true)}>
+                          <RefreshCw className="size-3.5" /> Reassign
+                        </Button>
+                      )}
+                  </div>
+
+                  {/* Attendant Action Buttons if user is assigned attendant */}
+                  {isAssignedToCurrentUser && (
+                    <div className="mt-3 pt-3 border-t border-sky-100 flex items-center gap-2">
+                      {activeStep?.status === 'assigned' && (
+                        <Button
+                          primary
+                          disabled={saving}
+                          onClick={() => handleAttendantStepAction('accept')}
+                        >
+                          Accept task & begin processing
+                        </Button>
+                      )}
+                      {activeStep?.status === 'accepted' && (
+                        <Button
+                          primary
+                          disabled={saving}
+                          onClick={() => handleAttendantStepAction('complete')}
+                        >
+                          <Check className="size-4" /> Complete processing (send to QC)
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {activeWorkflow?.qc_notes &&
+                    ['processing', 'quality_check'].includes(order.status) &&
+                    activeWorkflow.status !== 'completed' && (
+                      <div className="mt-3 rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-700">
+                        <p className="font-bold">Rework requested from Quality Check:</p>
+                        <p className="mt-0.5 italic">{activeWorkflow.qc_notes}</p>
+                      </div>
+                    )}
+                </div>
+              )}
 
             {canReceive && order.status === 'placed' && !intakeMode && (
               <Button primary className="mt-4" disabled={saving} onClick={startIntakeCheck}>
@@ -432,14 +642,55 @@ export default function OrderDetailsPage() {
             <Detail
               icon={CalendarDays}
               value={
-                order.actual_turnaround_hours == null
-                  ? 'Turnaround unavailable'
-                  : `${order.actual_turnaround_hours} hour turnaround`
+                order.actual_turnaround_hours != null
+                  ? `${order.actual_turnaround_hours} hour turnaround (completed)`
+                  : order.express_surcharge > 0 || order.fulfillment?.priority === 'express'
+                    ? 'Express turnaround (24 hours)'
+                    : order.fulfillment?.turnaround_hours
+                      ? `${order.fulfillment.turnaround_hours} hour turnaround`
+                      : 'Standard turnaround (48 hours)'
               }
             />
+            {order.status !== 'delivered' && order.status !== 'cancelled' && (
+              <Detail
+                icon={CalendarDays}
+                value={
+                  order.delivery_time
+                    ? `Estimated ready: ${formatTime(order.delivery_time, 'TBD')}`
+                    : order.processing_started_at &&
+                        (order.fulfillment?.turnaround_hours ||
+                          (order.express_surcharge > 0 || order.fulfillment?.priority === 'express'
+                            ? 24
+                            : 48))
+                      ? `Estimated ready: ${formatTime(new Date(new Date(order.processing_started_at).getTime() + (order.fulfillment?.turnaround_hours || (order.express_surcharge > 0 || order.fulfillment?.priority === 'express' ? 24 : 48)) * 3600 * 1000))}`
+                      : 'Estimated ready: Within 24-48 hours'
+                }
+              />
+            )}
           </Panel>
         </div>
       </div>
+
+      {reassignModalOpen && activeWorkflow && (
+        <ReassignModal
+          isOpen={reassignModalOpen}
+          onClose={() => setReassignModalOpen(false)}
+          workflowId={activeWorkflow._id}
+          orderId={order._id}
+          branchId={order.branch_id?._id || order.branch_id}
+          currentAttendantId={activeStep?.employee_id?._id || activeStep?.employee_id}
+          onReassigned={async (updatedWorkflow) => {
+            if (updatedWorkflow) {
+              setWorkflows((current) =>
+                current.map((w) => (w._id === updatedWorkflow._id ? updatedWorkflow : w)),
+              )
+            }
+            const refreshed = await getOrder(id)
+            setOrder(refreshed.data.data)
+            loadWorkflows()
+          }}
+        />
+      )}
     </>
   )
 }
