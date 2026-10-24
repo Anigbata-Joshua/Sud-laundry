@@ -11,6 +11,7 @@ import {
   consumeReservedSuppliesForStep,
   releaseReservedSuppliesForOrder,
 } from "../services/inventoryConsumption.service.js";
+import { getBranchAttendantsAvailability } from "../services/workflowAssignment.service.js";
 
 // Maximum active orders an attendant can have at a time
 const MAX_ACTIVE_ORDERS_PER_EMPLOYEE = 5;
@@ -60,6 +61,22 @@ async function manageBranchWorkflow(user, branchId) {
     user.branch_id !== branchId.toString()
   ) {
     throw new ApiError(403, "You can only manage workflows for your branch");
+  }
+}
+
+async function checkCanReviewQuality(user, branchId) {
+  if (!["admin", "branch_manager", "front_desk"].includes(user.role)) {
+    throw new ApiError(
+      403,
+      "Only front desk, branch managers and admins can review quality",
+    );
+  }
+  if (
+    ["branch_manager", "front_desk"].includes(user.role) &&
+    user.branch_id &&
+    user.branch_id.toString() !== branchId.toString()
+  ) {
+    throw new ApiError(403, "You can only review quality for your branch");
   }
 }
 
@@ -317,7 +334,7 @@ export const updateStep = asyncHandler(async (req, res) => {
     step.status = "accepted";
     step.accepted_at = new Date();
 
-    // Customer countdown starts when the attendant accepts their order
+    order.status = "processing";
     if (!order.processing_started_at) {
       const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
       await createNotification({
@@ -327,8 +344,8 @@ export const updateStep = asyncHandler(async (req, res) => {
         message: `Your order ${reference} has started processing.`,
       });
       order.processing_started_at = new Date();
-      await order.save();
     }
+    await order.save();
   } else if (req.body.action === "complete" && step.status === "accepted") {
     step.status = "completed";
     step.completed_at = new Date();
@@ -380,25 +397,218 @@ export const updateStep = asyncHandler(async (req, res) => {
 export const reviewQuality = asyncHandler(async (req, res) => {
   const workflow = await ProcessingWorkflow.findById(req.params.id);
   if (!workflow) throw new ApiError(404, "Workflow not found");
-  await manageBranchWorkflow(req.user, workflow.branch_id);
+  await checkCanReviewQuality(req.user, workflow.branch_id);
   if (workflow.status !== "completed")
     throw new ApiError(409, "Processing is not complete");
   const order = await Order.findById(workflow.order_id);
   if (order.status !== "quality_check")
     throw new ApiError(409, "Order is not awaiting quality check");
 
+  const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
+
   // handle pass or fail
   if (req.body.result === "pass") {
     order.status = "ready";
+    order.ready_at = new Date();
+    workflow.status = "completed";
+    workflow.qc_notes = null;
+    await workflow.save();
+    await order.save();
+
+    await createNotification({
+      user_id: order.customer_id,
+      order_id: order._id,
+      type: "order_ready",
+      message: `Your order ${reference} has passed quality inspection and is ready for collection/delivery.`,
+    });
+
+    await workflow.populate(workflowPopulate);
+    return apiResponse(res, 200, workflow, "Quality check passed");
   } else if (req.body.result === "fail") {
     workflow.status = "qc_failed";
-    workflow.qc_notes = req.body.notes || null;
+    workflow.qc_notes = req.body.notes || "Quality check failed. Needs reprocessing.";
+    await workflow.save();
+
+    // Re-route to same attendant for reprocessing in a single step
+    const lastStep = workflow.steps[workflow.steps.length - 1];
+    const sameAttendantId = lastStep?.employee_id;
+
+    const previous = await ProcessingWorkflow.findOne({ order_id: order._id }).sort({
+      cycle: -1,
+    });
+
+    const nextWorkflow = await ProcessingWorkflow.create({
+      order_id: order._id,
+      branch_id: order.branch_id,
+      cycle: (previous?.cycle ?? 0) + 1,
+      created_by: req.user.id,
+      qc_notes: req.body.notes || null,
+      steps: [
+        {
+          name: "processing",
+          sequence: 1,
+          employee_id: sameAttendantId,
+          status: "assigned",
+        },
+      ],
+    });
+
     order.status = "processing";
-    await releaseReservedSuppliesForOrder(order);
+    await order.save();
+
+    const attendant = await Employee.findById(sameAttendantId).populate("user_id");
+    if (attendant?.user_id) {
+      await createNotification({
+        user_id: attendant.user_id._id,
+        order_id: order._id,
+        type: "task_assigned",
+        message: `Order ${reference} failed quality check and was returned to you for reprocessing: "${req.body.notes || "Reprocessing required"}".`,
+      });
+    }
+
+    await nextWorkflow.populate(workflowPopulate);
+    return apiResponse(
+      res,
+      200,
+      nextWorkflow,
+      "Quality check failed, returned for reprocessing",
+    );
   } else {
     throw new ApiError(400, "Quality result must be pass or fail");
   }
+});
+
+// Reassign workflow step to another attendant
+export const reassignWorkflow = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { employee_id: targetEmployeeId } = req.body;
+
+  if (!targetEmployeeId) {
+    throw new ApiError(400, "employee_id is required for reassignment");
+  }
+
+  const workflow = await ProcessingWorkflow.findById(id);
+  if (!workflow) throw new ApiError(404, "Workflow not found");
+
+  await manageBranchWorkflow(req.user, workflow.branch_id);
+
+  if (workflow.status !== "active") {
+    throw new ApiError(409, "Only active workflows can be reassigned");
+  }
+
+  const order = await Order.findById(workflow.order_id);
+  if (!order) throw new ApiError(404, "Order not found");
+
+  if (["ready", "sent_out", "delivered", "cancelled"].includes(order.status)) {
+    throw new ApiError(409, "Cannot reassign completed, ready, or cancelled orders");
+  }
+
+  const targetEmployee = await Employee.findById(targetEmployeeId).populate({
+    path: "user_id",
+    select: "_id name email role is_active",
+  });
+
+  if (
+    !targetEmployee ||
+    !targetEmployee.is_active ||
+    targetEmployee.branch_id.toString() !== workflow.branch_id.toString() ||
+    !targetEmployee.user_id ||
+    !targetEmployee.user_id.is_active ||
+    targetEmployee.user_id.role !== "employee"
+  ) {
+    throw new ApiError(
+      400,
+      "Target employee must be an active attendant at this branch",
+    );
+  }
+
+  const activeCount = await countActiveOrdersForEmployee(targetEmployee._id);
+  if (activeCount >= MAX_ACTIVE_ORDERS_PER_EMPLOYEE) {
+    throw new ApiError(
+      409,
+      `${targetEmployee.user_id.name} already has ${activeCount} active orders (max ${MAX_ACTIVE_ORDERS_PER_EMPLOYEE}) and cannot be assigned more until some are marked ready`,
+    );
+  }
+
+  const windowStart = order.received_at || new Date();
+  const windowEnd = order.delivery_time
+    ? new Date(order.delivery_time)
+    : new Date(
+        Date.now() +
+          (order.fulfillment?.turnaround_hours || 24) * 60 * 60 * 1000,
+      );
+
+  const overlappingLeave = await LeaveRequest.findOne({
+    employee_id: targetEmployee._id,
+    status: "approved",
+    start_date: { $lte: windowEnd },
+    end_date: { $gte: windowStart },
+  });
+
+  if (overlappingLeave) {
+    throw new ApiError(
+      400,
+      `${targetEmployee.user_id.name} has approved leave during this order's processing window`,
+    );
+  }
+
+  const activeStep =
+    workflow.steps.find((s) => s.status !== "completed") ||
+    workflow.steps[workflow.steps.length - 1];
+
+  if (!activeStep) {
+    throw new ApiError(409, "No active step found to reassign");
+  }
+
+  activeStep.employee_id = targetEmployee._id;
+  activeStep.status = "assigned";
+  activeStep.accepted_at = null;
+  workflow.qc_notes = null;
+
+  if (order.status === "processing") {
+    order.status = "received";
+    await order.save();
+  }
+
   await workflow.save();
-  await order.save();
-  return apiResponse(res, 200, workflow, `Quality check ${req.body.result}ed`);
+
+  const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
+  await createNotification({
+    user_id: targetEmployee.user_id._id,
+    order_id: order._id,
+    type: "task_assigned",
+    message: `You were assigned “${activeStep.name}” for ${reference} via reassignment.`,
+  });
+
+  await workflow.populate(workflowPopulate);
+  return apiResponse(res, 200, workflow, "Workflow reassigned successfully");
+});
+
+// Get available attendants for branch / order
+export const getAttendantsAvailability = asyncHandler(async (req, res) => {
+  const { branchId } = req.params;
+  const { orderId } = req.query;
+
+  let order = null;
+  if (orderId) {
+    order = await Order.findById(orderId);
+  }
+
+  const bId = branchId || order?.branch_id || req.user.branch_id;
+  if (!bId) throw new ApiError(400, "branch_id is required");
+
+  if (
+    req.user.role === "branch_manager" &&
+    req.user.branch_id &&
+    req.user.branch_id !== bId.toString()
+  ) {
+    throw new ApiError(403, "You can only view attendants for your branch");
+  }
+
+  const attendants = await getBranchAttendantsAvailability({
+    branch_id: bId,
+    order,
+  });
+
+  return apiResponse(res, 200, attendants, "Attendants availability fetched");
 });

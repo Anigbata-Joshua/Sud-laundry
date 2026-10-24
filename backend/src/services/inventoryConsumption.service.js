@@ -422,9 +422,13 @@ export async function consumeReservedSuppliesForStep({
   employee_id,
 }) {
   if (!order?.supplies_reserved || !order.supplies_reserved.length) return;
-  const stageItems = order.supplies_reserved.filter(
-    (item) => item.stage === step.name && !item.consumed,
-  );
+  const stageItems = order.supplies_reserved.filter((item) => {
+    if (item.consumed) return false;
+    // Single processing workflow step consumes all reserved supplies for the order
+    if (step.name === 'processing') return true;
+    // Legacy multi-step workflows filter by matching stage
+    return item.stage === step.name;
+  });
   if (!stageItems.length) return;
 
   const lowStockAlerts = [];

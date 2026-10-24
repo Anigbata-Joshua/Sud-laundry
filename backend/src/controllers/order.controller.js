@@ -19,6 +19,7 @@ import {
   releaseReservedSuppliesForOrder,
   adjustReservedSuppliesForIntake,
 } from "../services/inventoryConsumption.service.js";
+import { autoAssignProcessingWorkflow } from "../services/workflowAssignment.service.js";
 
 export function calculateExpressSurcharge(totalPrice, priority) {
   if (priority !== "express") return 0;
@@ -607,7 +608,14 @@ export const updateOrder = asyncHandler(async (req, res) => {
           order.payment_status = payment_status;
         }
 
+        order.status = status;
         await order.save();
+
+        await autoAssignProcessingWorkflow({
+          order,
+          createdByUserId: req.user.id,
+        });
+
         await populateOrderDetails(order);
         return apiResponse(res, 200, order, "Order updated successfully");
       } catch (err) {
@@ -672,7 +680,22 @@ export const updateOrder = asyncHandler(async (req, res) => {
     order.payment_status = payment_status;
   }
 
+  const becameReceived = order.isModified("status") && order.status === "received";
   await order.save();
+
+  if (becameReceived) {
+    try {
+      await autoAssignProcessingWorkflow({
+        order,
+        createdByUserId: req.user.id,
+      });
+    } catch (assignErr) {
+      order.status = "placed";
+      await order.save();
+      throw assignErr;
+    }
+  }
+
   await populateOrderDetails(order);
 
   return apiResponse(res, 200, order, "Order updated successfully");

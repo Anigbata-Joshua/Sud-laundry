@@ -12,6 +12,8 @@ import Product from '../src/models/product.model.js';
 import Notification from '../src/models/notification.model.js';
 import Employee from '../src/models/employee.model.js';
 import User from '../src/models/user.model.js';
+import LeaveRequest from '../src/models/leaveRequest.model.js';
+import ProcessingWorkflow from '../src/models/processingWorkflow.model.js';
 import * as catalogController from '../src/controllers/catalogItem.controller.js';
 import * as orderController from '../src/controllers/order.controller.js';
 import { calculateExpressSurcharge } from '../src/controllers/order.controller.js';
@@ -714,6 +716,10 @@ test('updateOrder intake correction adjusts quantities, recalculates totals & ex
     reserved_quantity: 2,
   }));
   mock.method(Product, 'updateOne', async () => ({}));
+  mock.method(Employee, 'find', () => chain([]));
+  mock.method(LeaveRequest, 'find', () => chain([]));
+  mock.method(ProcessingWorkflow, 'findOne', () => chain(null));
+  mock.method(ProcessingWorkflow, 'create', async () => ({ steps: [] }));
   const notifCreated = [];
   mock.method(Notification, 'create', async (doc) => {
     notifCreated.push(doc);
@@ -1184,6 +1190,10 @@ test('updateOrder returns populated customer_id and branch_id matching getOrderB
     reserved_quantity: 2,
   }));
   mock.method(Product, 'updateOne', async () => ({}));
+  mock.method(Employee, 'find', () => chain([]));
+  mock.method(LeaveRequest, 'find', () => chain([]));
+  mock.method(ProcessingWorkflow, 'findOne', () => chain(null));
+  mock.method(ProcessingWorkflow, 'create', async () => ({ steps: [] }));
   mock.method(Notification, 'create', async () => ({}));
 
   const staffUser = { id: staffUserId, role: 'front_desk', branch_id: branchA };

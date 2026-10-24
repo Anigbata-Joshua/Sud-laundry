@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarDays, Plus } from 'lucide-react'
+import { CalendarDays, Plus, X } from 'lucide-react'
 import {
   approveLeaveRequest,
   createLeaveRequest,
@@ -41,6 +41,7 @@ export default function LeaveRequestsPage() {
 
   async function submit(event) {
     event.preventDefault()
+    setMessage('')
     try {
       await createLeaveRequest(form)
       notify({
@@ -57,6 +58,7 @@ export default function LeaveRequestsPage() {
   }
 
   async function decide(request, decision) {
+    setMessage('')
     try {
       if (decision === 'approve') {
         await approveLeaveRequest(request._id)
@@ -102,7 +104,18 @@ export default function LeaveRequestsPage() {
         )}
       </PageHeading>
 
-      {message && <p className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
+      {message && (
+        <div className="mb-3 flex items-center justify-between rounded-lg bg-red-50 p-3 text-xs text-red-700">
+          <span>{message}</span>
+          <button
+            type="button"
+            onClick={() => setMessage('')}
+            className="p-1 text-red-500 hover:text-red-700"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       <Panel className="overflow-hidden">
         <div className="grid gap-3 p-4">
@@ -120,8 +133,10 @@ export default function LeaveRequestsPage() {
                   {formatDate(request.start_date)} — {formatDate(request.end_date)}
                 </p>
                 <p className="mt-1 text-xs">{request.reason}</p>
-                {request.rejection_reason && (
-                  <p className="mt-1 text-[10px] text-red-600">{request.rejection_reason}</p>
+                {request.status === 'rejected' && request.rejection_reason && (
+                  <p className="mt-1 text-[10px] text-red-600">
+                    Rejection reason: {request.rejection_reason}
+                  </p>
                 )}
               </div>
               <StatusBadge status={request.status} />
