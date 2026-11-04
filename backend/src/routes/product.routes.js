@@ -8,9 +8,11 @@ import { authorize } from '../middlewares/role.middleware.js';
 const router = express.Router();
 
 // All product/inventory routes require staff or admin — never public, never customer.
-router.use(authenticate, authorize('admin', 'branch_manager', 'employee', 'inventory_officer'));
+router.use(authenticate, authorize('admin', 'branch_manager', 'employee', 'inventory_officer', 'front_desk'));
 
 router.get('/', productController.getAllProducts);
+// Needs-attention route must be registered BEFORE /:id
+router.get('/needs-attention', productController.getProductsNeedingAttention);
 router.get('/:id', productController.getProductById);
 router.post('/', authorize('admin', 'branch_manager', 'inventory_officer'), productController.createProduct);
 router.patch('/:id', authorize('admin', 'branch_manager', 'inventory_officer'), productController.updateProduct);

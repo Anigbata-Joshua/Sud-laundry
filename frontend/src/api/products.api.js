@@ -2,6 +2,8 @@
 import apiClient from './client'
 
 export const getProducts = (params) => apiClient.get('/products', { params })
+export const getProductsNeedingAttention = (params) =>
+  apiClient.get('/products/needs-attention', { params })
 export const getProduct = (id, params) => apiClient.get(`/products/${id}`, { params })
 export const createProduct = (details) => apiClient.post('/products', details)
 export const updateProduct = (id, details) => apiClient.patch(`/products/${id}`, details)

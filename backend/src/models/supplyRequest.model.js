@@ -1,14 +1,15 @@
 // Owner: Josh
-// Purpose: attendant -> inventory officer approval gate for supply
-// disbursement. Replaces the old flat auto-deduction — stock is only
-// ever removed once an inventory_officer reviews and approves this.
+// Purpose: Attendant/staff supply requests:
+// 1) "extra_supplies" — optional mid-job requests when attendants need extra supplies
+// 2) "restock" — branch manager supply requests for low/missing stock
+// Reviewed and approved/rejected by inventory officers.
 
 import mongoose from 'mongoose';
 
 const requestedItemSchema = new mongoose.Schema(
     {
         product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-        product_name: { type: String, required: true }, // kept even if product_id is null (not found at branch)
+        product_name: { type: String, required: true },
         quantity: { type: Number, required: true, min: 0 },
         unit: { type: String },
     },
@@ -17,12 +18,19 @@ const requestedItemSchema = new mongoose.Schema(
 
 const supplyRequestSchema = new mongoose.Schema(
     {
-        order_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-        workflow_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ProcessingWorkflow', required: true },
-        step_id: { type: mongoose.Schema.Types.ObjectId, required: true },
+        order_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+        workflow_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ProcessingWorkflow' },
+        step_id: { type: mongoose.Schema.Types.ObjectId },
         branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
 
         requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
+
+        request_type: {
+            type: String,
+            enum: ['extra_supplies', 'restock'],
+            default: 'extra_supplies',
+        },
+        reason: { type: String, trim: true },
 
         status: {
             type: String,
@@ -30,11 +38,10 @@ const supplyRequestSchema = new mongoose.Schema(
             default: 'pending',
         },
 
-        // System-calculated suggestion, shown to the officer as a starting point.
+        // Items requested / suggested
         calculated_items: [requestedItemSchema],
 
-        // What the officer actually decides to disburse — may differ from
-        // calculated_items if they judge the order needs more/less.
+        // What the officer actually decides to disburse or restock
         approved_items: [requestedItemSchema],
 
         reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
@@ -44,11 +51,10 @@ const supplyRequestSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-// One pending request per step at a time — an attendant shouldn't be able
-// to spam multiple requests for the same step.
+// One pending request per step for extra supplies
 supplyRequestSchema.index(
     { step_id: 1, status: 1 },
-    { unique: true, partialFilterExpression: { status: 'pending' } },
+    { unique: true, partialFilterExpression: { status: 'pending', step_id: { $type: 'objectId' } } },
 );
 
 supplyRequestSchema.index({ branch_id: 1, status: 1, createdAt: -1 });

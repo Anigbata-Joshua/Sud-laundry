@@ -12,11 +12,17 @@ import {
   TrendingDown,
   X,
 } from 'lucide-react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { getBranches } from '../../api/branches.api'
-import { createProduct, deleteProduct, getProducts, updateProduct } from '../../api/products.api'
+import {
+  createProduct,
+  deleteProduct,
+  getProducts,
+  getProductsNeedingAttention,
+  updateProduct,
+} from '../../api/products.api'
 import { createStockMovement, getStockMovements } from '../../api/stockMovements.api'
-import { getSupplyRequests } from '../../api/supplyRequests.api'
+import { createSupplyRequest, getSupplyRequests } from '../../api/supplyRequests.api'
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel, { PanelTitle } from '../../components/common/Panel'
@@ -33,13 +39,23 @@ const emptyProduct = {
   unit: 'pieces',
   reorder_point: '',
   branch_id: '',
+  initial_stock: '',
 }
 
 export default function ProductsPage() {
   const { user } = useAuth()
   const { branchId: contextBranchId } = useOutletContext()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentView = searchParams.get('view') === 'needs-attention' ? 'needs-attention' : 'all'
+
   const [selectedBranch, setSelectedBranch] = useState(contextBranchId || '')
   const [products, setProducts] = useState([])
+  const [needsAttentionData, setNeedsAttentionData] = useState({
+    items: [],
+    total: 0,
+    low_stock_count: 0,
+    missing_count: 0,
+  })
   const [branches, setBranches] = useState([])
   const [supplyRequests, setSupplyRequests] = useState([])
   const [stockMovements, setStockMovements] = useState([])
@@ -49,25 +65,53 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState(null)
   const [stockProduct, setStockProduct] = useState(null)
   const [stock, setStock] = useState({ type: 'purchase', quantity: '', notes: '' })
+  const [restockProduct, setRestockProduct] = useState(null)
+  const [restockForm, setRestockForm] = useState({ quantity: 20, reason: '' })
   const [message, setMessage] = useState('')
   const [showAnalytics, setShowAnalytics] = useState(true)
   const { confirm } = useDialog()
   const { notify } = useToast()
 
   const canManage = ['admin', 'branch_manager', 'inventory_officer'].includes(user.role)
+  const canDirectlyChangeStock = ['admin', 'inventory_officer'].includes(user.role)
 
   const effectiveBranchId = user.role === 'admin' ? selectedBranch : contextBranchId
 
+  function setView(newView) {
+    if (newView === 'all') {
+      searchParams.delete('view')
+    } else {
+      searchParams.set('view', newView)
+    }
+    setSearchParams(searchParams)
+  }
+
   const load = useCallback(async () => {
     try {
-      const [productResponse, branchResponse, requestsResponse, movementsResponse] =
-        await Promise.all([
-          getProducts(effectiveBranchId ? { branch_id: effectiveBranchId } : undefined),
-          getBranches(),
-          getSupplyRequests().catch(() => ({ data: { data: [] } })),
-          getStockMovements().catch(() => ({ data: { data: [] } })),
-        ])
+      const [
+        productResponse,
+        needsAttentionResponse,
+        branchResponse,
+        requestsResponse,
+        movementsResponse,
+      ] = await Promise.all([
+        getProducts(effectiveBranchId ? { branch_id: effectiveBranchId } : undefined),
+        getProductsNeedingAttention(
+          effectiveBranchId ? { branch_id: effectiveBranchId } : undefined,
+        ).catch(() => ({ data: { data: { items: [], total: 0 } } })),
+        getBranches(),
+        getSupplyRequests().catch(() => ({ data: { data: [] } })),
+        getStockMovements().catch(() => ({ data: { data: [] } })),
+      ])
       setProducts(productResponse.data.data ?? [])
+      setNeedsAttentionData(
+        needsAttentionResponse.data.data ?? {
+          items: [],
+          total: 0,
+          low_stock_count: 0,
+          missing_count: 0,
+        },
+      )
       setBranches(branchResponse.data.data ?? [])
       setSupplyRequests(requestsResponse.data.data ?? [])
       setStockMovements(movementsResponse.data.data ?? [])
@@ -99,7 +143,6 @@ export default function ProductsPage() {
       })
     })
 
-    // Count supply requests by branch
     supplyRequests.forEach((req) => {
       const bId = req.branch_id?._id ?? req.branch_id
       if (bId && map.has(bId)) {
@@ -109,7 +152,6 @@ export default function ProductsPage() {
       }
     })
 
-    // Count stock movements by branch
     stockMovements.forEach((mov) => {
       const bId = mov.branch_id?._id ?? mov.branch_id
       if (bId && map.has(bId)) {
@@ -119,7 +161,6 @@ export default function ProductsPage() {
       }
     })
 
-    // Count products by branch
     products.forEach((p) => {
       const bId = p.branch_id?._id ?? p.branch_id
       if (bId && map.has(bId)) {
@@ -146,17 +187,27 @@ export default function ProductsPage() {
     })
   }, [products, query, effectiveBranchId])
 
+  const visibleAttention = useMemo(() => {
+    return (needsAttentionData.items || []).filter((item) => {
+      return `${item.name} ${item.description ?? ''} ${item.unit}`
+        .toLowerCase()
+        .includes(query.toLowerCase())
+    })
+  }, [needsAttentionData.items, query])
+
   function openProduct(product = null) {
-    setEditing(product)
+    const isEdit = Boolean(product?._id)
+    setEditing(isEdit ? product : null)
     setForm(
       product
         ? {
-            name: product.name,
+            name: product.name || '',
             description: product.description ?? '',
             price: product.price ?? '',
-            unit: product.unit,
-            reorder_point: product.reorder_point,
-            branch_id: product.branch_id?._id ?? product.branch_id,
+            unit: product.unit || 'pieces',
+            reorder_point: product.reorder_point ?? '',
+            branch_id: product.branch_id?._id ?? product.branch_id ?? effectiveBranchId,
+            initial_stock: '',
           }
         : { ...emptyProduct, branch_id: effectiveBranchId },
     )
@@ -169,6 +220,7 @@ export default function ProductsPage() {
       ...form,
       price: Number(form.price || 0),
       reorder_point: Number(form.reorder_point || 0),
+      initial_stock: form.initial_stock !== '' ? Number(form.initial_stock) : undefined,
     }
     try {
       if (editing?._id) await updateProduct(editing._id, payload)
@@ -203,6 +255,7 @@ export default function ProductsPage() {
       })
     }
   }
+
   async function recordStock(event) {
     event.preventDefault()
     const magnitude = Math.abs(Number(stock.quantity))
@@ -221,7 +274,36 @@ export default function ProductsPage() {
     }
   }
 
-  const lowStockCount = visible.filter((p) => p.quantity <= p.reorder_point).length
+  async function submitRestockRequest(event) {
+    event.preventDefault()
+    if (!restockProduct) return
+    try {
+      await createSupplyRequest({
+        request_type: 'restock',
+        branch_id: effectiveBranchId,
+        items: [
+          {
+            product_id: restockProduct.product_id || undefined,
+            product_name: restockProduct.name,
+            quantity: Number(restockForm.quantity),
+            unit: restockProduct.unit,
+          },
+        ],
+        reason: restockForm.reason,
+      })
+      notify({
+        tone: 'success',
+        title: 'Restock requested',
+        message: `Restock request for ${restockProduct.name} sent to inventory officer.`,
+      })
+      setRestockProduct(null)
+      load()
+    } catch (err) {
+      setMessage(err.response?.data?.message ?? 'Failed to submit restock request.')
+    }
+  }
+
+  const attentionCount = needsAttentionData.total || 0
 
   return (
     <>
@@ -237,7 +319,7 @@ export default function ProductsPage() {
         </Link>
         <Link to="/supply-requests">
           <Button>
-            <Boxes className="size-4" /> Supply requests
+            <Boxes className="size-4" /> Extra supply requests
           </Button>
         </Link>
         {canManage && (
@@ -297,7 +379,6 @@ export default function ProductsPage() {
       {/* Branch Comparative Analytics Section */}
       {user.role === 'admin' && showAnalytics && branches.length > 0 && (
         <div className="mb-5 grid gap-4 lg:grid-cols-2">
-          {/* Supply Requests entering each branch */}
           <Panel className="p-5">
             <PanelTitle eyebrow="Intelligence" title="Supply Requests by Branch">
               <span className="text-[10px] text-gray-400">Total volume</span>
@@ -326,7 +407,6 @@ export default function ProductsPage() {
             </div>
           </Panel>
 
-          {/* Stock Consumption & Movement by Branch */}
           <Panel className="p-5">
             <PanelTitle eyebrow="Flow Audit" title="Inventory Consumption & Usage">
               <span className="text-[10px] text-gray-400">Supplies used by branch</span>
@@ -359,120 +439,286 @@ export default function ProductsPage() {
 
       {/* Main Inventory Panel */}
       <Panel className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+        {/* View Switcher Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-gray-50/50 p-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setView('all')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                currentView === 'all'
+                  ? 'bg-white text-ink shadow-xs border border-line'
+                  : 'text-gray-500 hover:text-ink'
+              }`}
+            >
+              All Products ({products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('needs-attention')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                currentView === 'needs-attention'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : attentionCount > 0
+                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                    : 'text-gray-500 hover:text-ink'
+              }`}
+            >
+              <AlertTriangle className="size-3.5" />
+              Needs Attention ({attentionCount})
+            </button>
+          </div>
+
           <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search products by name, unit, description…"
-            className="max-w-sm"
+            placeholder="Search products by name, unit…"
+            className="max-w-xs"
           />
-
-          <div className="flex items-center gap-3 text-xs">
-            {lowStockCount > 0 && (
-              <span className="flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 font-bold text-red-700 border border-red-200">
-                <AlertTriangle className="size-3.5" />
-                {lowStockCount} Low stock alert{lowStockCount === 1 ? '' : 's'}
-              </span>
-            )}
-            <span className="text-gray-500 font-medium">
-              Showing <b>{visible.length}</b> product{visible.length === 1 ? '' : 's'}
-            </span>
-          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full whitespace-nowrap text-left text-[11px]">
-            <thead>
-              <tr className="border-b border-line text-[9px] uppercase tracking-wider text-gray-400">
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3">Branch Location</th>
-                <th className="px-4 py-3">On hand</th>
-                {canManage && (
-                  <>
-                    <th className="px-4 py-3">Reserved</th>
-                    <th className="px-4 py-3">Available</th>
-                  </>
-                )}
-                <th className="px-4 py-3">Reorder at</th>
-                <th className="px-4 py-3">Unit Price</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((product) => {
-                const isLow = product.quantity <= product.reorder_point
-                const reserved = product.reserved_quantity || 0
-                const available = Math.max(0, (product.quantity || 0) - reserved)
-                return (
-                  <tr key={product._id} className="border-b border-gray-100 hover:bg-gray-50/50">
-                    <td className="px-4 py-3">
-                      <Link
-                        to={`/inventory/${product._id}`}
-                        className="flex items-center gap-2 font-bold text-ink hover:text-brand"
-                      >
-                        <Package className="size-7 rounded-lg bg-sky-50 p-1.5 text-sky-700" />
-                        {product.name}
-                      </Link>
-                      {product.description && (
-                        <small className="ml-9 block text-gray-400">{product.description}</small>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-gray-600">
-                      <span className="inline-flex items-center gap-1">
-                        <Building2 className="size-3 text-sky-500" />
-                        {product.branch_id?.name || 'Assigned Branch'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-ink">
-                      {product.quantity} {product.unit}
-                    </td>
-                    {canManage && (
-                      <>
-                        <td className="px-4 py-3 font-semibold text-amber-700">
-                          {reserved} {product.unit}
-                        </td>
-                        <td className="px-4 py-3 font-bold text-emerald-700">
-                          {available} {product.unit}
-                        </td>
-                      </>
-                    )}
-                    <td className="px-4 py-3 text-gray-500">
-                      {product.reorder_point} {product.unit}
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      ₦{Number(product.price ?? 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={isLow ? 'Low' : 'Healthy'} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button onClick={() => setStockProduct(product)}>Stock</Button>
-                        {canManage && (
-                          <>
-                            <Button onClick={() => openProduct(product)}>
-                              <Edit3 className="size-3.5" />
-                            </Button>
-                            <Button onClick={() => remove(product)}>
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </>
+        {/* View: ALL PRODUCTS */}
+        {currentView === 'all' && (
+          <div className="overflow-x-auto">
+            <table className="w-full whitespace-nowrap text-left text-[11px]">
+              <thead>
+                <tr className="border-b border-line text-[9px] uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Branch Location</th>
+                  <th className="px-4 py-3">On hand</th>
+                  {canManage && (
+                    <>
+                      <th className="px-4 py-3">Reserved</th>
+                      <th className="px-4 py-3">Available</th>
+                    </>
+                  )}
+                  <th className="px-4 py-3">Reorder at</th>
+                  <th className="px-4 py-3">Unit Price</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((product) => {
+                  const isLow = product.quantity <= product.reorder_point
+                  const reserved = product.reserved_quantity || 0
+                  const available = Math.max(0, (product.quantity || 0) - reserved)
+                  return (
+                    <tr key={product._id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/inventory/${product._id}`}
+                          className="flex items-center gap-2 font-bold text-ink hover:text-brand"
+                        >
+                          <Package className="size-7 rounded-lg bg-sky-50 p-1.5 text-sky-700" />
+                          {product.name}
+                        </Link>
+                        {product.description && (
+                          <small className="ml-9 block text-gray-400">{product.description}</small>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-600">
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 className="size-3 text-sky-500" />
+                          {product.branch_id?.name || 'Assigned Branch'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-ink">
+                        {product.quantity} {product.unit}
+                      </td>
+                      {canManage && (
+                        <>
+                          <td className="px-4 py-3 font-semibold text-amber-700">
+                            {reserved} {product.unit}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-emerald-700">
+                            {available} {product.unit}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-4 py-3 text-gray-500">
+                        {product.reorder_point} {product.unit}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        ₦{Number(product.price ?? 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={isLow ? 'Low' : 'Healthy'} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          {canDirectlyChangeStock && (
+                            <Button onClick={() => setStockProduct(product)}>Stock</Button>
+                          )}
+                          {user.role === 'branch_manager' && (
+                            <Button
+                              onClick={() => {
+                                setRestockProduct(product)
+                                setRestockForm({
+                                  quantity: Math.max(20, product.reorder_point || 10),
+                                  reason: '',
+                                })
+                              }}
+                            >
+                              Request restock
+                            </Button>
+                          )}
+                          {canManage && (
+                            <>
+                              <Button onClick={() => openProduct(product)}>
+                                <Edit3 className="size-3.5" />
+                              </Button>
+                              <Button onClick={() => remove(product)}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
 
-          {visible.length === 0 && (
-            <div className="py-12 text-center text-xs text-gray-400">
-              No products found for the selected branch or search filter.
+            {visible.length === 0 && (
+              <div className="py-12 text-center text-xs text-gray-400">
+                No products found for the selected branch or search filter.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* View: NEEDS ATTENTION */}
+        {currentView === 'needs-attention' && (
+          <div className="overflow-x-auto">
+            <div className="border-b border-amber-200 bg-amber-50/50 p-4 text-xs text-amber-900">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="size-4 text-amber-600" /> Action Required: Low Stock &
+                Missing Recipe Supplies
+              </p>
+              <p className="mt-1 text-[11px] text-amber-800">
+                Products shown below are either depleted/at reorder threshold, or required by core
+                recipes and missing from this branch.
+              </p>
             </div>
-          )}
-        </div>
+            <table className="w-full whitespace-nowrap text-left text-[11px]">
+              <thead>
+                <tr className="border-b border-line text-[9px] uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Type & Reason</th>
+                  <th className="px-4 py-3">On hand</th>
+                  <th className="px-4 py-3">Reserved</th>
+                  <th className="px-4 py-3">Available</th>
+                  <th className="px-4 py-3">Reorder Point</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleAttention.map((item, index) => {
+                  return (
+                    <tr
+                      key={item._id || `missing-${index}`}
+                      className="border-b border-gray-100 hover:bg-gray-50/50"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 font-bold text-ink">
+                          <Package
+                            className={`size-7 rounded-lg p-1.5 ${
+                              item.is_missing
+                                ? 'bg-red-50 text-red-600'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}
+                          />
+                          <div>
+                            <span>{item.name}</span>
+                            <small className="block text-gray-400">{item.description}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.is_missing ? (
+                          <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-700">
+                            Missing Recipe Product
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                            Low Stock (≤ {item.reorder_point})
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-ink">
+                        {item.quantity} {item.unit}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-amber-700">
+                        {item.reserved_quantity || 0} {item.unit}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-emerald-700">
+                        {item.available_quantity || 0} {item.unit}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {item.reorder_point} {item.unit}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          {/* Branch Manager: Request Restock */}
+                          {user.role === 'branch_manager' && (
+                            <Button
+                              primary
+                              onClick={() => {
+                                setRestockProduct(item)
+                                setRestockForm({
+                                  quantity: Math.max(20, item.reorder_point || 10),
+                                  reason: item.is_missing
+                                    ? 'Missing recipe product needed for operations'
+                                    : 'Stock at reorder point',
+                                })
+                              }}
+                            >
+                              Request restock
+                            </Button>
+                          )}
+
+                          {/* Inventory Officer / Admin: Add Stock or Add Product */}
+                          {canDirectlyChangeStock && (
+                            <>
+                              {item.is_missing ? (
+                                <Button
+                                  primary
+                                  onClick={() =>
+                                    openProduct({
+                                      name: item.name,
+                                      unit: item.unit,
+                                      reorder_point: item.reorder_point,
+                                      branch_id: effectiveBranchId,
+                                    })
+                                  }
+                                >
+                                  <Plus className="size-3.5" /> Add product
+                                </Button>
+                              ) : (
+                                <Button primary onClick={() => setStockProduct(item)}>
+                                  <Plus className="size-3.5" /> Add stock
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {visibleAttention.length === 0 && (
+              <div className="py-12 text-center text-xs text-gray-400">
+                ✅ No items need attention at this branch. All recipe supplies exist and stock is
+                healthy!
+              </div>
+            )}
+          </div>
+        )}
       </Panel>
 
       {/* New / Edit Product Dialog */}
@@ -489,7 +735,7 @@ export default function ProductsPage() {
               required
             />
             <Field
-              label="Unit (e.g. pieces, ml, kg)"
+              label="Unit (e.g. scoop, cap, spray, unit, pieces)"
               value={form.unit}
               onChange={(event) => setForm({ ...form, unit: event.target.value })}
               required
@@ -508,6 +754,16 @@ export default function ProductsPage() {
               value={form.reorder_point}
               onChange={(event) => setForm({ ...form, reorder_point: event.target.value })}
             />
+            {!editing && canDirectlyChangeStock && (
+              <Field
+                label="Initial stock on hand"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={form.initial_stock}
+                onChange={(event) => setForm({ ...form, initial_stock: event.target.value })}
+              />
+            )}
             {user.role === 'admin' && !editing && (
               <label className="grid gap-2 text-xs font-bold text-ink sm:col-span-2">
                 Branch Location
@@ -574,6 +830,39 @@ export default function ProductsPage() {
             />
             <Button primary type="submit">
               Record movement
+            </Button>
+          </form>
+        </Dialog>
+      )}
+
+      {/* Branch Manager: Request Restock Dialog */}
+      {restockProduct && (
+        <Dialog
+          title={`Request Restock · ${restockProduct.name}`}
+          onClose={() => setRestockProduct(null)}
+        >
+          <form className="grid gap-3" onSubmit={submitRestockRequest}>
+            <p className="text-xs text-gray-500">
+              Submit a restock request to the inventory officer for{' '}
+              <strong>{restockProduct.name}</strong> ({restockProduct.unit}).
+            </p>
+            <Field
+              label={`Quantity needed (${restockProduct.unit})`}
+              type="number"
+              min="1"
+              value={restockForm.quantity}
+              onChange={(event) => setRestockForm({ ...restockForm, quantity: event.target.value })}
+              required
+            />
+            <Field
+              label="Reason / Urgency"
+              placeholder="e.g. Critical for regular washing orders; stock depleted"
+              value={restockForm.reason}
+              onChange={(event) => setRestockForm({ ...restockForm, reason: event.target.value })}
+              required
+            />
+            <Button primary type="submit">
+              Send restock request
             </Button>
           </form>
         </Dialog>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, CheckCheck, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -8,8 +9,27 @@ import {
 import Button from '../../components/common/Button'
 import PageHeading from '../../components/common/PageHeading'
 import Panel from '../../components/common/Panel'
+import { useAuth } from '../../hooks/useAuth'
+
+function getNotificationTitle(item) {
+  if (item.type === 'other') {
+    if (/stock|out of stock|shortage|restock/i.test(item.message)) {
+      return 'Stock Alert'
+    }
+    if (/cancelled|cancellation/i.test(item.message)) {
+      return 'Order Cancellation'
+    }
+    if (/leave/i.test(item.message)) {
+      return 'Leave Request'
+    }
+    return 'Operational Alert'
+  }
+  return item.type.replaceAll('_', ' ')
+}
 
 export default function NotificationsPage() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
@@ -39,12 +59,32 @@ export default function NotificationsPage() {
   }, [load])
 
   async function readOne(item) {
-    if (item.is_read) return
-    await markNotificationRead(item._id)
-    setItems((current) =>
-      current.map((entry) => (entry._id === item._id ? { ...entry, is_read: true } : entry)),
-    )
-    window.dispatchEvent(new Event('notifications:changed'))
+    if (!item.is_read) {
+      await markNotificationRead(item._id)
+      setItems((current) =>
+        current.map((entry) => (entry._id === item._id ? { ...entry, is_read: true } : entry)),
+      )
+      window.dispatchEvent(new Event('notifications:changed'))
+    }
+  }
+
+  async function handleItemClick(item) {
+    await readOne(item)
+
+    const isStockAlert = /stock|out of stock|shortage|restock/i.test(item.message)
+    const canManageInventory = ['admin', 'branch_manager', 'inventory_officer'].includes(user?.role)
+
+    if (isStockAlert && canManageInventory) {
+      navigate('/inventory?view=needs-attention')
+      return
+    }
+
+    if (item.order_id) {
+      const orderId = typeof item.order_id === 'object' ? item.order_id._id : item.order_id
+      if (orderId) {
+        navigate(`/orders/${orderId}`)
+      }
+    }
   }
 
   async function readAll() {
@@ -101,14 +141,21 @@ export default function NotificationsPage() {
           items.map((item) => (
             <button
               key={item._id}
-              onClick={() => readOne(item)}
-              className={`flex w-full gap-3 border-b border-gray-100 p-4 text-left hover:bg-gray-50 ${item.is_read ? 'bg-white' : 'bg-sky-50/50'}`}
+              onClick={() => handleItemClick(item)}
+              className={`flex w-full gap-3 border-b border-gray-100 p-4 text-left hover:bg-gray-50 transition cursor-pointer ${item.is_read ? 'bg-white' : 'bg-sky-50/50'}`}
             >
               <span
                 className={`mt-1 size-2 shrink-0 rounded-full ${item.is_read ? 'bg-gray-200' : 'bg-brand'}`}
               />
               <div className="grid flex-1 gap-1">
-                <strong className="text-xs capitalize">{item.type.replaceAll('_', ' ')}</strong>
+                <div className="flex items-center justify-between">
+                  <strong className="text-xs capitalize">{getNotificationTitle(item)}</strong>
+                  {/stock|out of stock|shortage|restock/i.test(item.message) && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+                      View attention list →
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-gray-600">{item.message}</p>
                 <small className="text-[9px] text-gray-400">
                   {new Date(item.sent_at ?? item.createdAt).toLocaleString('en-NG')}
