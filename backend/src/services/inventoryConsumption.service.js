@@ -6,6 +6,7 @@ import User from "../models/user.model.js";
 import Order from "../models/order.model.js";
 import SupplyRequest from "../models/supplyRequest.model.js";
 import ApiError from "../utils/apiError.js";
+import Notification from "../models/notification.model.js";
 import createNotification from "./notification.service.js";
 import {
   SERVICE_SUPPLIES_RECIPE,
@@ -182,12 +183,30 @@ export async function notifyOfficersOfStockShortage({
       ? `⚠️ Out of Stock Alert: Product "${productName}" is not available or inactive at your branch. Restock required to accept new orders.`
       : `⚠️ Stock Shortage Alert: Product "${productName}" has only ${available} ${unit} available, but ${required} ${unit} was requested for an incoming order. Please restock immediately.`;
 
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
     for (const recipient of recipients) {
-      await createNotification({
-        user_id: recipient._id,
-        type: "other",
-        message,
-      });
+      const existing = (mongoose.connection.readyState === 1 || Notification.findOne?.mock)
+        ? await Notification.findOne({
+            user_id: recipient._id,
+            type: "other",
+            message: { $regex: new RegExp(productName, "i") },
+            createdAt: { $gte: thirtyMinutesAgo },
+          }).catch(() => null)
+        : null;
+
+      if (existing) {
+        existing.message = message;
+        existing.sent_at = new Date();
+        existing.is_read = false;
+        await existing.save();
+      } else {
+        await createNotification({
+          user_id: recipient._id,
+          type: "other",
+          message,
+        });
+      }
     }
   } catch (err) {
     logger.error("Failed to notify officers of stock shortage:", {
@@ -499,6 +518,7 @@ export async function consumeReservedSuppliesForStep({
     }
 
     await order.save();
+    return { appliedProducts, createdMovements };
   } catch (error) {
     for (const item of stageItems) {
       item.consumed = false;
@@ -854,12 +874,30 @@ export const notifyBranchManagersOfLowStock = async ({
 
     const alertMessage = `⚠️ Low Stock Alert: Product "${productName}" has only ${remaining} ${unit} left at your branch (Reorder point: ${reorderPoint} ${unit}). Please restock.`;
 
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
     for (const manager of managers) {
-      await createNotification({
-        user_id: manager._id,
-        type: "other",
-        message: alertMessage,
-      });
+      const existing = (mongoose.connection.readyState === 1 || Notification.findOne?.mock)
+        ? await Notification.findOne({
+            user_id: manager._id,
+            type: "other",
+            message: { $regex: new RegExp(productName, "i") },
+            createdAt: { $gte: thirtyMinutesAgo },
+          }).catch(() => null)
+        : null;
+
+      if (existing) {
+        existing.message = alertMessage;
+        existing.sent_at = new Date();
+        existing.is_read = false;
+        await existing.save();
+      } else {
+        await createNotification({
+          user_id: manager._id,
+          type: "other",
+          message: alertMessage,
+        });
+      }
     }
   } catch (err) {
     logger.error("Failed to notify branch managers of low stock:", {

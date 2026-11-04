@@ -1,6 +1,9 @@
 import Employee from "../models/employee.model.js";
 import LeaveRequest from "../models/leaveRequest.model.js";
 import Order from "../models/order.model.js";
+import Product from "../models/product.model.js";
+import StockMovement from "../models/stockMovement.model.js";
+import logger from "../utils/logger.js";
 import ProcessingWorkflow from "../models/processingWorkflow.model.js";
 import createNotification from "../services/notification.service.js";
 import ApiError from "../utils/apiError.js";
@@ -324,8 +327,16 @@ export const updateStep = asyncHandler(async (req, res) => {
     const order = await Order.findById(workflow.order_id);
     if (!order) throw new ApiError(404, "Order not found");
 
+    const prevStepStatus = step.status;
+    const prevOrderProcessingStarted = order.processing_started_at;
+    const prevOrderStatus = order.status;
+    const initialSuppliesReserved = (order.supplies_reserved || []).map((s) => ({
+      ...(s.toObject ? s.toObject() : s),
+    }));
+    const initialSuppliesUsedCount = (order.supplies_used || []).length;
+
     // Convert this stage's reserved supplies into actual stock usage
-    await consumeReservedSuppliesForStep({
+    const consumedResult = await consumeReservedSuppliesForStep({
       order,
       step,
       employee_id: employee._id,
@@ -335,17 +346,61 @@ export const updateStep = asyncHandler(async (req, res) => {
     step.accepted_at = new Date();
 
     order.status = "processing";
-    if (!order.processing_started_at) {
-      const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
-      await createNotification({
-        user_id: order.customer_id,
-        order_id: order._id,
-        type: "processing",
-        message: `Your order ${reference} has started processing.`,
-      });
+    const needsStartedAt = !order.processing_started_at;
+    if (needsStartedAt) {
       order.processing_started_at = new Date();
     }
-    await order.save();
+
+    try {
+      await order.save();
+      await workflow.save();
+    } catch (saveErr) {
+      step.status = prevStepStatus;
+      delete step.accepted_at;
+      order.status = prevOrderStatus;
+      order.processing_started_at = prevOrderProcessingStarted;
+      order.supplies_reserved = initialSuppliesReserved;
+      if (order.supplies_used) {
+        order.supplies_used.splice(initialSuppliesUsedCount);
+      }
+      await order.save().catch(() => {});
+
+      if (consumedResult?.appliedProducts?.length) {
+        await Promise.all(
+          consumedResult.appliedProducts.map((p) =>
+            Product.updateOne(
+              { _id: p.productId },
+              { $set: { quantity: p.prevQuantity, reserved_quantity: p.prevReserved } },
+            ).catch(() => {}),
+          ),
+        );
+      }
+      if (consumedResult?.createdMovements?.length) {
+        await StockMovement.deleteMany({
+          _id: { $in: consumedResult.createdMovements },
+        }).catch(() => {});
+      }
+      throw saveErr;
+    }
+
+    if (needsStartedAt) {
+      const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
+      try {
+        await createNotification({
+          user_id: order.customer_id,
+          order_id: order._id,
+          type: "processing",
+          message: `Your order ${reference} has started processing.`,
+        });
+      } catch (notifErr) {
+        logger.error("Failed to notify customer of processing start:", {
+          error: notifErr.message,
+        });
+      }
+    }
+
+    await workflow.populate(workflowPopulate);
+    return apiResponse(res, 200, workflow, "Workflow process updated");
   } else if (req.body.action === "complete" && step.status === "accepted") {
     step.status = "completed";
     step.completed_at = new Date();

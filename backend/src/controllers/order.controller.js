@@ -450,10 +450,29 @@ export const updateOrder = asyncHandler(async (req, res) => {
       );
     }
 
+    const prevStatus = order.status;
+    const previouslyConsumed = (order.supplies_reserved || []).map((s) => s.consumed);
     order.status = "cancelled";
 
     await releaseReservedSuppliesForOrder(order);
-    await order.save();
+    try {
+      await order.save();
+    } catch (saveErr) {
+      order.status = prevStatus;
+      if (Array.isArray(order.supplies_reserved)) {
+        for (let i = 0; i < order.supplies_reserved.length; i++) {
+          const item = order.supplies_reserved[i];
+          if (!previouslyConsumed[i] && item.consumed && item.quantity > 0 && item.product_id) {
+            await Product.updateOne(
+              { _id: item.product_id },
+              { $inc: { reserved_quantity: item.quantity } },
+            ).catch(() => {});
+            item.consumed = false;
+          }
+        }
+      }
+      throw saveErr;
+    }
     await populateOrderDetails(order);
 
     await createNotification({
@@ -758,8 +777,28 @@ export const forceCancelOrder = asyncHandler(async (req, res) => {
   order.refund_amount = refund_amount;
   order.amount_due = amount_due;
 
+  const prevStatus = order.status;
+  const previouslyConsumed = (order.supplies_reserved || []).map((s) => s.consumed);
+
   await releaseReservedSuppliesForOrder(order);
-  await order.save();
+  try {
+    await order.save();
+  } catch (saveErr) {
+    order.status = prevStatus;
+    if (Array.isArray(order.supplies_reserved)) {
+      for (let i = 0; i < order.supplies_reserved.length; i++) {
+        const item = order.supplies_reserved[i];
+        if (!previouslyConsumed[i] && item.consumed && item.quantity > 0 && item.product_id) {
+          await Product.updateOne(
+            { _id: item.product_id },
+            { $inc: { reserved_quantity: item.quantity } },
+          ).catch(() => {});
+          item.consumed = false;
+        }
+      }
+    }
+    throw saveErr;
+  }
   await populateOrderDetails(order);
 
   const openingLine = on_customer_request

@@ -1,10 +1,15 @@
 // Owner: Josh
-// Purpose: attendant -> inventory officer supply approval flow.
-// Stock is only ever deducted from approveRequest() — never automatically.
+// Purpose: Attendant/staff supply requests:
+// 1) "extra_supplies" — optional mid-job requests when attendants need extra supplies
+// 2) "restock" — branch manager supply requests for low/missing stock
+// Reviewed and approved/rejected by inventory officers.
 
 import Employee from '../models/employee.model.js'
 import mongoose from 'mongoose'
 import Order from '../models/order.model.js'
+import Branch from '../models/branch.model.js'
+import Product from '../models/product.model.js'
+import StockMovement from '../models/stockMovement.model.js'
 import ProcessingWorkflow from '../models/processingWorkflow.model.js'
 import SupplyRequest from '../models/supplyRequest.model.js'
 import createNotification from '../services/notification.service.js'
@@ -17,8 +22,7 @@ import {
   disburseApprovedSupplies,
 } from '../services/inventoryConsumption.service.js'
 
-// Stages that actually consume supplies. 'intake', 'quality_check',
-// 'delivery_ready' don't need a request.
+// Stages that can consume supplies.
 const SUPPLY_STAGES = ['washing', 'processing', 'packaging']
 
 const requestPopulate = [
@@ -28,8 +32,8 @@ const requestPopulate = [
     populate: { path: 'customer_id', select: 'name' },
   },
   { path: 'branch_id', select: 'name' },
-  { path: 'requested_by', populate: { path: 'user_id', select: 'name email' } },
-  { path: 'reviewed_by', populate: { path: 'user_id', select: 'name email' } },
+  { path: 'requested_by', populate: { path: 'user_id', select: 'name email role' } },
+  { path: 'reviewed_by', populate: { path: 'user_id', select: 'name email role' } },
 ]
 
 async function getEmployeeForUser(userId) {
@@ -40,9 +44,83 @@ async function getEmployeeForUser(userId) {
 
 // POST /supply-requests
 export const createRequest = asyncHandler(async (req, res) => {
-  const { workflow_id, step_id } = req.body
+  const {
+    request_type = 'extra_supplies',
+    workflow_id,
+    step_id,
+    items,
+    reason,
+    branch_id: providedBranchId,
+  } = req.body
+
+  const employee = await getEmployeeForUser(req.user.id)
+
+  if (request_type === 'restock') {
+    if (!['branch_manager', 'admin'].includes(req.user.role)) {
+      throw new ApiError(403, 'Only branch managers and admins can submit restock requests')
+    }
+
+    const branch_id =
+      req.user.role === 'branch_manager'
+        ? req.user.branch_id
+        : providedBranchId || req.user.branch_id
+
+    if (!branch_id) throw new ApiError(400, 'branch_id is required')
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new ApiError(400, 'Provide at least one item to restock')
+    }
+
+    const calculated_items = []
+    for (const item of items) {
+      if (!item.product_name || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+        throw new ApiError(400, 'Each item must have a product_name and positive quantity')
+      }
+      calculated_items.push({
+        product_id: item.product_id || undefined,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit: item.unit || 'units',
+      })
+    }
+
+    const request = await SupplyRequest.create({
+      branch_id,
+      requested_by: employee._id,
+      request_type: 'restock',
+      reason: reason?.trim() || undefined,
+      calculated_items,
+    })
+
+    const branch = await Branch.findById(branch_id)
+    const officers = await Employee.find({
+      branch_id,
+      is_active: true,
+    }).populate({
+      path: 'user_id',
+      match: { role: { $in: ['inventory_officer'] }, is_active: true },
+      select: '_id',
+    })
+
+    await Promise.all(
+      officers
+        .filter((o) => o.user_id)
+        .map((o) =>
+          createNotification({
+            user_id: o.user_id._id,
+            type: 'supply_requested',
+            message: `New restock request for ${branch?.name || 'branch'} awaiting your review.`,
+          }),
+        ),
+    )
+
+    await request.populate(requestPopulate)
+    return apiResponse(res, 201, request, 'Restock request created')
+  }
+
+  // Extra supplies request from attendant mid-job
   if (!workflow_id || !step_id) {
-    throw new ApiError(400, 'workflow_id and step_id are required')
+    throw new ApiError(400, 'workflow_id and step_id are required for extra supplies request')
   }
 
   const workflow = await ProcessingWorkflow.findById(workflow_id)
@@ -51,8 +129,10 @@ export const createRequest = asyncHandler(async (req, res) => {
   const step = workflow.steps.id(step_id)
   if (!step) throw new ApiError(404, 'Workflow step not found')
 
-  const employee = await getEmployeeForUser(req.user.id)
-  if (String(workflow.branch_id) !== String(employee.branch_id) || String(step.employee_id) !== String(employee._id)) {
+  if (
+    String(workflow.branch_id) !== String(employee.branch_id) ||
+    String(step.employee_id) !== String(employee._id)
+  ) {
     throw new ApiError(403, 'Only the assigned employee can request supplies for this step')
   }
 
@@ -60,8 +140,9 @@ export const createRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, `The "${step.name}" stage does not require a supply request`)
   }
 
-  if (step.status !== 'assigned') {
-    throw new ApiError(409, 'Supplies can only be requested before accepting this step')
+  // Allow requesting supplies when assigned OR mid-job (accepted)
+  if (!['assigned', 'accepted'].includes(step.status)) {
+    throw new ApiError(409, 'Extra supplies can only be requested for an assigned or active process')
   }
 
   const existing = await SupplyRequest.findOne({ step_id, status: 'pending' })
@@ -72,11 +153,27 @@ export const createRequest = asyncHandler(async (req, res) => {
   const order = await Order.findById(workflow.order_id)
   if (!order) throw new ApiError(404, 'Order not found')
 
-  const calculated = calculateSuppliesForStep({ order, stepName: step.name })
-  const resolved = await resolveSuppliesToProducts({
-    branch_id: workflow.branch_id,
-    supplies: calculated,
-  })
+  let resolvedItems
+  if (Array.isArray(items) && items.length > 0) {
+    resolvedItems = items.map((i) => ({
+      product_id: i.product_id,
+      product_name: i.product_name,
+      quantity: i.quantity,
+      unit: i.unit,
+    }))
+  } else {
+    const calculated = calculateSuppliesForStep({ order, stepName: step.name })
+    const resolved = await resolveSuppliesToProducts({
+      branch_id: workflow.branch_id,
+      supplies: calculated,
+    })
+    resolvedItems = resolved.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      unit: item.unit,
+    }))
+  }
 
   const request = await SupplyRequest.create({
     order_id: order._id,
@@ -84,12 +181,9 @@ export const createRequest = asyncHandler(async (req, res) => {
     step_id,
     branch_id: workflow.branch_id,
     requested_by: employee._id,
-    calculated_items: resolved.map((item) => ({
-      product_id: item.product_id,
-      product_name: item.product_name,
-      quantity: item.quantity,
-      unit: item.unit,
-    })),
+    request_type: 'extra_supplies',
+    reason: reason?.trim() || undefined,
+    calculated_items: resolvedItems,
   })
 
   const officers = await Employee.find({
@@ -110,7 +204,7 @@ export const createRequest = asyncHandler(async (req, res) => {
           user_id: officer.user_id._id,
           order_id: order._id,
           type: 'supply_requested',
-          message: `New supply request for ${reference} (${step.name}) awaiting your review.`,
+          message: `Extra supply request for ${reference} (${step.name}) awaiting your review.`,
         }),
       ),
   )
@@ -133,8 +227,13 @@ export const listRequests = asyncHandler(async (req, res) => {
     filter.branch_id = req.query.branch_id
   }
   if (req.query.status) {
-    if (!['pending', 'approved', 'rejected'].includes(req.query.status)) throw new ApiError(400, 'Invalid request status')
+    if (!['pending', 'approved', 'rejected'].includes(req.query.status)) {
+      throw new ApiError(400, 'Invalid request status')
+    }
     filter.status = req.query.status
+  }
+  if (req.query.request_type) {
+    filter.request_type = req.query.request_type
   }
 
   const requests = await SupplyRequest.find(filter)
@@ -191,18 +290,71 @@ export const approveRequest = asyncHandler(async (req, res) => {
   }
   const productIds = new Set()
   for (const item of items) {
-    if (!item || typeof item.product_id !== 'string' || !mongoose.isObjectIdOrHexString(item.product_id) || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+    if (
+      !item ||
+      typeof item.product_id !== 'string' ||
+      !mongoose.isObjectIdOrHexString(item.product_id) ||
+      !Number.isFinite(item.quantity) ||
+      item.quantity <= 0
+    ) {
       throw new ApiError(400, 'Each item needs a valid product_id and positive quantity')
     }
     const productId = item.product_id.toLowerCase()
-    if (productIds.has(productId)) throw new ApiError(400, 'Each product may only appear once in an approval')
+    if (productIds.has(productId)) {
+      throw new ApiError(400, 'Each product may only appear once in an approval')
+    }
     productIds.add(productId)
   }
 
+  const officer = await getEmployeeForUser(req.user.id)
+
+  // 1. Restock approval flow
+  if (request.request_type === 'restock') {
+    for (const item of items) {
+      const product = await Product.findById(item.product_id)
+      if (!product || !product.is_active || String(product.branch_id) !== String(request.branch_id)) {
+        throw new ApiError(400, `Product not found or inactive at branch: ${item.product_name || item.product_id}`)
+      }
+      product.quantity += item.quantity
+      await product.save()
+
+      await StockMovement.create({
+        product_id: product._id,
+        branch_id: request.branch_id,
+        employee_id: officer._id,
+        type: 'purchase',
+        quantity: item.quantity,
+        notes: `Restock approved by inventory officer${request.reason ? ` (${request.reason})` : ''}`,
+      })
+    }
+
+    request.approved_items = items.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name ?? '',
+      quantity: item.quantity,
+      unit: item.unit,
+    }))
+    request.status = 'approved'
+    request.reviewed_by = officer._id
+    request.reviewed_at = new Date()
+    await request.save()
+
+    const requester = await Employee.findById(request.requested_by).populate('user_id', '_id')
+    if (requester?.user_id) {
+      await createNotification({
+        user_id: requester.user_id._id,
+        type: 'supply_approved',
+        message: `Your restock request for ${items.map((i) => i.product_name).join(', ')} was approved and stock was added.`,
+      })
+    }
+
+    await request.populate(requestPopulate)
+    return apiResponse(res, 200, request, 'Restock request approved')
+  }
+
+  // 2. Extra supplies approval flow for an order
   const order = await Order.findById(request.order_id)
   if (!order) throw new ApiError(404, 'Order not found')
-
-  const officer = await getEmployeeForUser(req.user.id)
 
   request.approved_items = items.map((item) => ({
     product_id: item.product_id,
@@ -214,8 +366,7 @@ export const approveRequest = asyncHandler(async (req, res) => {
   request.reviewed_by = officer._id
   request.reviewed_at = new Date()
 
-  // Disburse happens against the officer's final decision, atomically,
-  // before the request itself is saved as approved.
+  // Disburse happens atomically
   await disburseApprovedSupplies({ order, supplyRequest: request })
 
   const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`
@@ -225,7 +376,7 @@ export const approveRequest = asyncHandler(async (req, res) => {
       user_id: attendant.user_id._id,
       order_id: order._id,
       type: 'supply_approved',
-      message: `Your supply request for ${reference} was approved. You can start now.`,
+      message: `Your extra supply request for ${reference} was approved.`,
     })
   }
 
@@ -254,20 +405,28 @@ export const rejectRequest = asyncHandler(async (req, res) => {
   request.rejection_reason = reason
   const rejected = await SupplyRequest.findOneAndUpdate(
     { _id: request._id, status: 'pending' },
-    { $set: { status: 'rejected', reviewed_by: officer._id, reviewed_at: request.reviewed_at, rejection_reason: reason } },
+    {
+      $set: {
+        status: 'rejected',
+        reviewed_by: officer._id,
+        reviewed_at: request.reviewed_at,
+        rejection_reason: reason,
+      },
+    },
     { new: true, runValidators: true },
   )
   if (!rejected) throw new ApiError(409, 'This request has already been reviewed')
 
-  const attendant = await Employee.findById(request.requested_by).populate('user_id', '_id')
-  const order = await Order.findById(request.order_id)
-  if (attendant?.user_id && order) {
-    const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`
+  const requester = await Employee.findById(request.requested_by).populate('user_id', '_id')
+  if (requester?.user_id) {
+    const reference = request.order_id
+      ? `ORD-${request.order_id.toString().slice(-6).toUpperCase()}`
+      : 'Restock request'
     await createNotification({
-      user_id: attendant.user_id._id,
-      order_id: order._id,
+      user_id: requester.user_id._id,
+      order_id: request.order_id || undefined,
       type: 'supply_rejected',
-      message: `Your supply request for ${reference} was rejected: ${reason}`,
+      message: `Your ${request.request_type === 'restock' ? 'restock request' : `supply request for ${reference}`} was rejected: ${reason}`,
     })
   }
 

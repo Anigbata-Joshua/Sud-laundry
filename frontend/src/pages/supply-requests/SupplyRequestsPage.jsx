@@ -119,8 +119,8 @@ export default function SupplyRequestsPage() {
     <>
       <PageHeading
         eyebrow="Inventory"
-        title="Supply requests"
-        subtitle="Review what attendants need before they start processing."
+        title="Supply & Restock Requests"
+        subtitle="Review extra mid-job supplies requested by attendants and restock requests from branch managers."
       />
       {message && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{message}</p>}
       <Panel className="mb-4 flex gap-2 p-3">
@@ -138,17 +138,33 @@ export default function SupplyRequestsPage() {
 
       <div className="grid gap-4">
         {requests.map((request) => {
-          const reference = `ORD-${request.order_id?._id?.slice(-6).toUpperCase() ?? '------'}`
+          const reference = request.order_id
+            ? `ORD-${request.order_id?._id?.slice(-6).toUpperCase() ?? '------'}`
+            : 'RESTOCK'
+          const isRestock = request.request_type === 'restock'
           return (
             <Panel key={request._id} className="overflow-hidden">
-              <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">
-                    {reference} · {request.branch_id?.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">
+                      {reference} · {request.branch_id?.name}
+                    </p>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                        isRestock ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
+                      }`}
+                    >
+                      {isRestock ? 'Restock' : 'Extra Supplies'}
+                    </span>
+                  </div>
                   <h2 className="text-sm font-extrabold">
-                    Requested by {request.requested_by?.user_id?.name ?? 'Attendant'}
+                    Requested by{' '}
+                    {request.requested_by?.user_id?.name ?? (isRestock ? 'Manager' : 'Attendant')}
                   </h2>
+                  {request.reason && (
+                    <p className="mt-0.5 text-xs text-gray-500 italic">Reason: {request.reason}</p>
+                  )}
                 </div>
                 <StatusBadge status={request.status} />
               </div>
@@ -198,14 +214,19 @@ export default function SupplyRequestsPage() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <Panel className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-extrabold">Approve supply request</h2>
+              <h2 className="text-lg font-extrabold">
+                {reviewing.request_type === 'restock'
+                  ? 'Approve restock request'
+                  : 'Approve supply request'}
+              </h2>
               <button type="button" onClick={() => setReviewing(null)}>
                 <X className="size-5" />
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Adjust quantities or products before disbursing — this is what actually gets deducted
-              from stock.
+              {reviewing.request_type === 'restock'
+                ? 'Adjust quantities or products before approving — this will increase on-hand stock in the branch inventory.'
+                : 'Adjust quantities or products before disbursing — this is what actually gets deducted from stock.'}
             </p>
             <div className="mt-4 grid gap-3">
               {reviewItems.map((item, index) => (
@@ -255,7 +276,11 @@ export default function SupplyRequestsPage() {
                 <Plus className="size-4" /> Add item
               </Button>
               <Button primary disabled={busy === reviewing._id} onClick={confirmApprove}>
-                {busy === reviewing._id ? 'Approving…' : 'Confirm & disburse'}
+                {busy === reviewing._id
+                  ? 'Approving…'
+                  : reviewing.request_type === 'restock'
+                    ? 'Confirm restock & add to inventory'
+                    : 'Confirm & disburse'}
               </Button>
             </div>
           </Panel>
