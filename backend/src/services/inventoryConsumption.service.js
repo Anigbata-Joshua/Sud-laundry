@@ -186,14 +186,15 @@ export async function notifyOfficersOfStockShortage({
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
     for (const recipient of recipients) {
-      const existing = (mongoose.connection.readyState === 1 || Notification.findOne?.mock)
-        ? await Notification.findOne({
-            user_id: recipient._id,
-            type: "other",
-            message: { $regex: new RegExp(productName, "i") },
-            createdAt: { $gte: thirtyMinutesAgo },
-          }).catch(() => null)
-        : null;
+      const existing = await Notification.findOne({
+        user_id: recipient._id,
+        type: "other",
+        message: { $regex: new RegExp(productName, "i") },
+        createdAt: { $gte: thirtyMinutesAgo },
+      }).catch((err) => {
+        logger.error("Failed to check existing notification:", { error: err.message });
+        return null;
+      });
 
       if (existing) {
         existing.message = message;
@@ -459,9 +460,6 @@ export async function consumeReservedSuppliesForStep({
     for (const item of stageItems) {
       const product = await Product.findById(item.product_id);
       if (product) {
-        const prevQuantity = product.quantity;
-        const prevReserved = product.reserved_quantity || 0;
-
         product.quantity = Math.max(0, product.quantity - item.quantity);
         product.reserved_quantity = Math.max(
           0,
@@ -470,8 +468,7 @@ export async function consumeReservedSuppliesForStep({
         await product.save();
         appliedProducts.push({
           productId: product._id,
-          prevQuantity,
-          prevReserved,
+          quantity: item.quantity,
         });
 
         const movement = await StockMovement.create([
@@ -532,9 +529,9 @@ export async function consumeReservedSuppliesForStep({
           Product.updateOne(
             { _id: p.productId },
             {
-              $set: {
-                quantity: p.prevQuantity,
-                reserved_quantity: p.prevReserved,
+              $inc: {
+                quantity: p.quantity,
+                reserved_quantity: p.quantity,
               },
             },
           ).catch((e) =>
@@ -877,14 +874,15 @@ export const notifyBranchManagersOfLowStock = async ({
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
     for (const manager of managers) {
-      const existing = (mongoose.connection.readyState === 1 || Notification.findOne?.mock)
-        ? await Notification.findOne({
-            user_id: manager._id,
-            type: "other",
-            message: { $regex: new RegExp(productName, "i") },
-            createdAt: { $gte: thirtyMinutesAgo },
-          }).catch(() => null)
-        : null;
+      const existing = await Notification.findOne({
+        user_id: manager._id,
+        type: "other",
+        message: { $regex: new RegExp(productName, "i") },
+        createdAt: { $gte: thirtyMinutesAgo },
+      }).catch((err) => {
+        logger.error("Failed to check existing notification:", { error: err.message });
+        return null;
+      });
 
       if (existing) {
         existing.message = alertMessage;

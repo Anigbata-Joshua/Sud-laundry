@@ -41,7 +41,6 @@ const errorHandler = (err, req, res, next) => {
         // Only expose the stack trace in development, never in production
         ...(env.isProduction ? {} : { stack: err.stack }),
     });
-    next();
 };
 
 export default errorHandler;

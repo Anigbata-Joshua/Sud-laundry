@@ -370,7 +370,7 @@ export const updateStep = asyncHandler(async (req, res) => {
           consumedResult.appliedProducts.map((p) =>
             Product.updateOne(
               { _id: p.productId },
-              { $set: { quantity: p.prevQuantity, reserved_quantity: p.prevReserved } },
+              { $inc: { quantity: p.quantity, reserved_quantity: p.quantity } },
             ).catch(() => {}),
           ),
         );

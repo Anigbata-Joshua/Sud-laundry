@@ -310,34 +310,61 @@ export const approveRequest = asyncHandler(async (req, res) => {
 
   // 1. Restock approval flow
   if (request.request_type === 'restock') {
-    for (const item of items) {
-      const product = await Product.findById(item.product_id)
-      if (!product || !product.is_active || String(product.branch_id) !== String(request.branch_id)) {
-        throw new ApiError(400, `Product not found or inactive at branch: ${item.product_name || item.product_id}`)
-      }
-      product.quantity += item.quantity
-      await product.save()
+    const session = await mongoose.startSession()
+    let updatedRequest
+    try {
+      await session.withTransaction(async () => {
+        // Atomic claim ensures idempotency
+        updatedRequest = await SupplyRequest.findOneAndUpdate(
+          { _id: request._id, status: 'pending' },
+          {
+            $set: {
+              status: 'approved',
+              approved_items: items.map((item) => ({
+                product_id: item.product_id,
+                product_name: item.product_name ?? '',
+                quantity: item.quantity,
+                unit: item.unit,
+              })),
+              reviewed_by: officer._id,
+              reviewed_at: new Date(),
+            },
+          },
+          { new: true, session },
+        )
+        if (!updatedRequest) {
+          throw new ApiError(409, 'This request has already been reviewed')
+        }
 
-      await StockMovement.create({
-        product_id: product._id,
-        branch_id: request.branch_id,
-        employee_id: officer._id,
-        type: 'purchase',
-        quantity: item.quantity,
-        notes: `Restock approved by inventory officer${request.reason ? ` (${request.reason})` : ''}`,
+        for (const item of items) {
+          const product = await Product.findById(item.product_id).session(session)
+          if (!product || !product.is_active || String(product.branch_id) !== String(request.branch_id)) {
+            throw new ApiError(400, `Product not found or inactive at branch: ${item.product_name || item.product_id}`)
+          }
+          await Product.updateOne(
+            { _id: product._id },
+            { $inc: { quantity: item.quantity } },
+            { session },
+          )
+
+          await StockMovement.create(
+            [
+              {
+                product_id: product._id,
+                branch_id: request.branch_id,
+                employee_id: officer._id,
+                type: 'purchase',
+                quantity: item.quantity,
+                notes: `Restock approved by inventory officer${request.reason ? ` (${request.reason})` : ''}`,
+              },
+            ],
+            { session },
+          )
+        }
       })
+    } finally {
+      await session.endSession()
     }
-
-    request.approved_items = items.map((item) => ({
-      product_id: item.product_id,
-      product_name: item.product_name ?? '',
-      quantity: item.quantity,
-      unit: item.unit,
-    }))
-    request.status = 'approved'
-    request.reviewed_by = officer._id
-    request.reviewed_at = new Date()
-    await request.save()
 
     const requester = await Employee.findById(request.requested_by).populate('user_id', '_id')
     if (requester?.user_id) {
@@ -348,8 +375,10 @@ export const approveRequest = asyncHandler(async (req, res) => {
       })
     }
 
-    await request.populate(requestPopulate)
-    return apiResponse(res, 200, request, 'Restock request approved')
+    if (updatedRequest?.populate) {
+      await updatedRequest.populate(requestPopulate)
+    }
+    return apiResponse(res, 200, updatedRequest || request, 'Restock request approved')
   }
 
   // 2. Extra supplies approval flow for an order

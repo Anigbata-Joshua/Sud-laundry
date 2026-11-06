@@ -1,4 +1,4 @@
-import { test, afterEach, mock } from "node:test";
+import { test, afterEach, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
 import Order from "../src/models/order.model.js";
@@ -43,6 +43,9 @@ const { default: authenticate } =
 const { default: jwt } = await import("jsonwebtoken");
 
 afterEach(() => mock.restoreAll());
+beforeEach(() => {
+  mock.method(Notification, "findOne", async () => null);
+});
 const id = () => new mongoose.Types.ObjectId().toString();
 const branchId = id(),
   otherBranchId = id(),

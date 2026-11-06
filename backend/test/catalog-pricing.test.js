@@ -1,7 +1,7 @@
 // Owner: Josh
 // Purpose: Unit tests for catalog item CRUD, copy-from-branch, and supply tier piece sizing.
 
-import { test, afterEach, mock } from 'node:test';
+import { test, afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import CatalogItem from '../src/models/catalogItem.model.js';
@@ -27,6 +27,9 @@ process.env.JWT_SECRET = 'local-unit-tests-only';
 process.env.REDIS_URL = 'redis://127.0.0.1:1';
 
 afterEach(() => mock.restoreAll());
+beforeEach(() => {
+  mock.method(Notification, 'findOne', async () => null);
+});
 
 const id = () => new mongoose.Types.ObjectId().toString();
 const branchA = id();

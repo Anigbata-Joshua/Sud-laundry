@@ -19,15 +19,8 @@ import Employee from '../models/employee.model.js';
 import ApiError from '../utils/apiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import apiResponse from '../utils/apiResponse.js';
-
-export const CORE_RECIPE_SUPPLIES = [
-    { name: 'Laundry Detergent', unit: 'scoop', default_reorder_point: 20 },
-    { name: 'Fabric Softener', unit: 'cap', default_reorder_point: 10 },
-    { name: 'Ironing Starch', unit: 'spray', default_reorder_point: 10 },
-    { name: 'Dry Cleaning Solvent', unit: 'unit', default_reorder_point: 10 },
-    { name: 'Packaging Nylon', unit: 'pieces', default_reorder_point: 20 },
-    { name: 'Hanger', unit: 'pieces', default_reorder_point: 20 },
-];
+import { CORE_RECIPE_SUPPLIES } from '../config/serviceSupplies.config.js';
+export { CORE_RECIPE_SUPPLIES };
 
 // GET /products
 // Admin can optionally filter by branch.
