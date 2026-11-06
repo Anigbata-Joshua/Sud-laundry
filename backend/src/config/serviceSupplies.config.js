@@ -90,4 +90,53 @@ export function getTier(quantity) {
     return 'large';
 }
 
+// Derive core supplies required across all service recipes and packaging
+const DEFAULT_REORDER_POINTS = {
+    'Laundry Detergent': 20,
+    'Fabric Softener': 10,
+    'Ironing Starch': 10,
+    'Dry Cleaning Solvent': 10,
+    'Packaging Nylon': 20,
+    'Hanger': 20,
+};
+
+const DEFAULT_SEED_QUANTITIES = {
+    'Laundry Detergent': 100,
+    'Fabric Softener': 50,
+    'Ironing Starch': 50,
+    'Dry Cleaning Solvent': 50,
+    'Packaging Nylon': 100,
+    'Hanger': 100,
+};
+
+export function getCoreRecipeSupplies() {
+    const suppliesMap = new Map();
+    const addSupply = (name, unit) => {
+        if (!suppliesMap.has(name)) {
+            suppliesMap.set(name, {
+                name,
+                unit,
+                default_reorder_point: DEFAULT_REORDER_POINTS[name] || 10,
+                default_quantity: DEFAULT_SEED_QUANTITIES[name] || 50,
+            });
+        }
+    };
+    for (const recipe of Object.values(SERVICE_SUPPLIES_RECIPE)) {
+        if (recipe.perUnit) {
+            for (const s of recipe.perUnit) addSupply(s.productName, s.unit);
+        } else {
+            for (const tierList of Object.values(recipe)) {
+                if (Array.isArray(tierList)) {
+                    for (const s of tierList) addSupply(s.productName, s.unit);
+                }
+            }
+        }
+    }
+    for (const pkg of DEFAULT_PACKAGING_PER_UNIT) {
+        addSupply(pkg.productName, pkg.unit);
+    }
+    return Array.from(suppliesMap.values());
+}
+
+export const CORE_RECIPE_SUPPLIES = getCoreRecipeSupplies();
 export default SERVICE_SUPPLIES_RECIPE;

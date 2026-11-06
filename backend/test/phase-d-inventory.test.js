@@ -1,7 +1,7 @@
 // Owner: Josh
 // Purpose: Phase D tests — Needs-attention endpoint, role actions, notification grouping, seed idempotency, and concurrency/atomicity.
 
-import { test, afterEach, mock } from 'node:test';
+import { test, afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 
@@ -31,6 +31,9 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'local-unit-tests-only';
 
 afterEach(() => mock.restoreAll());
+beforeEach(() => {
+  mock.method(Notification, 'findOne', async () => null);
+});
 
 const id = () => new mongoose.Types.ObjectId().toString();
 const branchA = id();
@@ -60,6 +63,7 @@ function chain(result) {
   p.sort = () => p;
   p.limit = () => p;
   p.distinct = () => Promise.resolve(Array.isArray(result) ? result : []);
+  p.session = () => p;
   return p;
 }
 
@@ -201,7 +205,7 @@ test('4. Branch manager creates restock request; inventory officer approves and 
     save: mock.fn(async function () { return this; }),
   };
   mock.method(Product, 'findById', (pId) =>
-    String(pId) === String(productId) ? Promise.resolve(prodDoc) : Promise.resolve(null),
+    String(pId) === String(productId) ? chain(prodDoc) : chain(null),
   );
 
   let createdSupplyRequest = null;
@@ -243,6 +247,23 @@ test('4. Branch manager creates restock request; inventory officer approves and 
   };
   mock.method(SupplyRequest, 'findById', () => chain(existingRequestDoc));
 
+  const session = {
+    withTransaction: async (fn) => fn(),
+    endSession: async () => {},
+  };
+  mock.method(mongoose, 'startSession', async () => session);
+  mock.method(SupplyRequest, 'findOneAndUpdate', async (filter, update) => {
+    existingRequestDoc.status = update.$set.status;
+    existingRequestDoc.approved_items = update.$set.approved_items;
+    return existingRequestDoc;
+  });
+  mock.method(Product, 'updateOne', async (filter, update) => {
+    if (update?.$inc?.quantity) {
+      prodDoc.quantity += update.$inc.quantity;
+    }
+    return { modifiedCount: 1 };
+  });
+
   const movementCreateMock = mock.method(StockMovement, 'create', async () => [{}]);
 
   const approveReq = {
@@ -259,7 +280,8 @@ test('4. Branch manager creates restock request; inventory officer approves and 
   // Stock increased by 40 (10 -> 50)
   assert.equal(prodDoc.quantity, 50);
   assert.equal(movementCreateMock.mock.callCount(), 1);
-  const mov = movementCreateMock.mock.calls[0].arguments[0];
+  const callArg = movementCreateMock.mock.calls[0].arguments[0];
+  const mov = Array.isArray(callArg) ? callArg[0] : callArg;
   assert.equal(mov.type, 'purchase');
   assert.equal(mov.quantity, 40);
 });
@@ -523,10 +545,305 @@ test('9. Attendant step accept rolls back consumed supplies and stock movements 
     /Database write failure during workflow update/,
   );
 
-  // Verifying rollback happened
+  // Verifying rollback happened with $inc
   assert.equal(updateProductMock.mock.callCount(), 1);
+  const rollbackUpdate = updateProductMock.mock.calls[0].arguments[1];
+  assert.equal(rollbackUpdate.$inc.quantity, 2);
+  assert.equal(rollbackUpdate.$inc.reserved_quantity, 2);
   assert.equal(deleteMovementMock.mock.callCount(), 1);
   assert.equal(orderDoc.supplies_reserved[0].consumed, false);
   assert.equal(orderDoc.status, 'received');
   assert.equal(step.status, 'assigned');
+});
+
+// 10. Concurrency test: rollback in updateStep uses $inc and does NOT clobber concurrent order changes
+test('10. Concurrency test: rollback in updateStep uses $inc and preserves concurrent stock updates', async () => {
+  const orderAId = id();
+  const prodId = id();
+  const employeeUserId = id();
+  const employeeDocId = id();
+  const stepId = id();
+
+  let liveProduct = {
+    _id: prodId,
+    name: 'Laundry Detergent',
+    quantity: 100,
+    reserved_quantity: 10,
+    save: async function () { return this; },
+  };
+
+  mock.method(Employee, 'findOne', async () => ({ _id: employeeDocId, user_id: employeeUserId, branch_id: branchA }));
+  mock.method(Product, 'findById', async () => liveProduct);
+  mock.method(StockMovement, 'create', async () => [{ _id: id() }]);
+  mock.method(StockMovement, 'deleteMany', async () => ({ deletedCount: 1 }));
+
+  // Product.updateOne applies atomic $inc to liveProduct
+  mock.method(Product, 'updateOne', async (filter, update) => {
+    if (update.$inc) {
+      if (update.$inc.quantity) liveProduct.quantity += update.$inc.quantity;
+      if (update.$inc.reserved_quantity) liveProduct.reserved_quantity += update.$inc.reserved_quantity;
+    }
+    return { modifiedCount: 1 };
+  });
+
+  const orderADoc = {
+    _id: orderAId,
+    branch_id: branchA,
+    customer_id: id(),
+    status: 'received',
+    supplies_reserved: [
+      { product_id: prodId, name: 'Laundry Detergent', quantity: 4, unit: 'scoop', stage: 'processing', consumed: false },
+    ],
+    supplies_used: [],
+    save: async function () { return this; },
+  };
+  mock.method(Order, 'findById', async () => orderADoc);
+
+  const step = {
+    _id: stepId,
+    name: 'processing',
+    status: 'assigned',
+    employee_id: employeeDocId,
+    sequence: 1,
+  };
+  const workflowDoc = {
+    order_id: orderAId,
+    branch_id: branchA,
+    status: 'active',
+    steps: Object.assign([step], {
+      id: () => step,
+      some: Array.prototype.some,
+      every: Array.prototype.every,
+    }),
+    save: async () => {
+      // Simulate concurrent order B consuming 20 units while Order A's workflow save is being processed
+      liveProduct.quantity -= 20; // 96 -> 76
+      throw new Error('Simulated crash on workflow save');
+    },
+    populate: () => Promise.resolve(workflowDoc),
+  };
+  mock.method(ProcessingWorkflow, 'findById', async () => workflowDoc);
+
+  await assert.rejects(
+    invoke(workflowController.updateStep, {
+      user: { id: employeeUserId, role: 'employee', branch_id: branchA },
+      params: { id: id(), stepId },
+      body: { action: 'accept' },
+    }),
+    /Simulated crash on workflow save/,
+  );
+
+  // Initial: 100
+  // Order A consumed: -4 -> 96
+  // Concurrent Order B: -20 -> 76
+  // Order A rolled back via $inc: +4 -> 80
+  // If absolute $set rollback were used, it would have reset to old 100, wiping out Order B's -20!
+  assert.equal(liveProduct.quantity, 80, 'Concurrent stock changes must be preserved by $inc reversal');
+});
+
+// 11. Restock approval is idempotent: a second approval attempt is rejected with 409
+test('11. Restock approval is idempotent and rejects second approval without duplicate stock increment', async () => {
+  const officerUserId = id();
+  const prodId = id();
+  const requestId = id();
+  let stockQuantity = 50;
+
+  mock.method(Branch, 'findById', () => Promise.resolve({ _id: branchA, name: 'Test Branch' }));
+  mock.method(Employee, 'findOne', () => Promise.resolve({ _id: id(), user_id: officerUserId, branch_id: branchA }));
+  mock.method(Employee, 'findById', () => chain({ user_id: { _id: id() } }));
+
+  const prodDoc = {
+    _id: prodId,
+    name: 'Laundry Detergent',
+    unit: 'scoop',
+    quantity: stockQuantity,
+    branch_id: branchA,
+    is_active: true,
+  };
+  mock.method(Product, 'findById', () => chain(prodDoc));
+
+  const session = {
+    withTransaction: async (fn) => fn(),
+    endSession: async () => {},
+  };
+  mock.method(mongoose, 'startSession', async () => session);
+
+  let requestStatus = 'pending';
+  mock.method(SupplyRequest, 'findById', () => chain({
+    _id: requestId,
+    request_type: 'restock',
+    branch_id: branchA,
+    status: requestStatus,
+    populate: () => chain({}),
+  }));
+
+  mock.method(SupplyRequest, 'findOneAndUpdate', async (filter, update) => {
+    if (filter.status !== 'pending' || requestStatus !== 'pending') {
+      return null; // Atomic findOneAndUpdate fails if already reviewed
+    }
+    requestStatus = update.$set.status;
+    return { _id: requestId, status: requestStatus };
+  });
+
+  mock.method(Product, 'updateOne', async (filter, update) => {
+    stockQuantity += update.$inc.quantity;
+    return { modifiedCount: 1 };
+  });
+
+  mock.method(Notification, 'create', async () => ({}));
+  const movementMock = mock.method(StockMovement, 'create', async () => [{}]);
+
+  const req = {
+    user: { id: officerUserId, role: 'inventory_officer', branch_id: branchA },
+    params: { id: requestId },
+    body: { items: [{ product_id: prodId, quantity: 20 }] },
+  };
+
+  // First approval: succeeds
+  const res1 = await invoke(supplyRequestController.approveRequest, req);
+  assert.equal(res1.code, 200);
+  assert.equal(stockQuantity, 70);
+  assert.equal(movementMock.mock.callCount(), 1);
+
+  // Second approval: fails with 409 and does NOT increase stock
+  await assert.rejects(
+    invoke(supplyRequestController.approveRequest, req),
+    (err) => err.statusCode === 409 && /already been reviewed/.test(err.message),
+  );
+  assert.equal(stockQuantity, 70, 'Stock must not be incremented on duplicate approval');
+  assert.equal(movementMock.mock.callCount(), 1, 'No additional stock movements created');
+});
+
+// 12. Restock approval is atomic: failure midway rolls back transaction
+test('12. Restock approval is atomic: item validation failure rolls back the session', async () => {
+  const officerUserId = id();
+  const prodId = id();
+  const requestId = id();
+  let stockQuantity = 50;
+
+  mock.method(Branch, 'findById', () => Promise.resolve({ _id: branchA, name: 'Test Branch' }));
+  mock.method(Employee, 'findOne', () => Promise.resolve({ _id: id(), user_id: officerUserId, branch_id: branchA }));
+  mock.method(Product, 'findById', () => chain(null)); // Product not found!
+
+  let transactionRolledBack = false;
+  const session = {
+    withTransaction: async (fn) => {
+      try {
+        await fn();
+      } catch (err) {
+        transactionRolledBack = true;
+        throw err;
+      }
+    },
+    endSession: async () => {},
+  };
+  mock.method(mongoose, 'startSession', async () => session);
+
+  mock.method(SupplyRequest, 'findById', () => chain({
+    _id: requestId,
+    request_type: 'restock',
+    branch_id: branchA,
+    status: 'pending',
+  }));
+
+  mock.method(SupplyRequest, 'findOneAndUpdate', async () => ({ _id: requestId, status: 'approved' }));
+
+  await assert.rejects(
+    invoke(supplyRequestController.approveRequest, {
+      user: { id: officerUserId, role: 'inventory_officer', branch_id: branchA },
+      params: { id: requestId },
+      body: { items: [{ product_id: prodId, quantity: 20 }] },
+    }),
+    (err) => err.statusCode === 400 && /Product not found or inactive/.test(err.message),
+  );
+
+  assert.equal(transactionRolledBack, true, 'Transaction must abort on error');
+  assert.equal(stockQuantity, 50, 'Stock remains unchanged');
+});
+
+// 13. Role scoping: employee, front_desk, branch_manager, and inventory_officer only see their own branch products
+test('13. Product read endpoints enforce own-branch scoping for employee, front_desk, branch_manager, and inventory_officer', async () => {
+  const branchB = id();
+  const staffRoles = ['employee', 'front_desk', 'branch_manager', 'inventory_officer'];
+
+  for (const role of staffRoles) {
+    let capturedFilter = null;
+    mock.method(Product, 'find', (filter) => {
+      capturedFilter = filter;
+      return chain([]);
+    });
+
+    const user = { id: id(), role, branch_id: branchA };
+
+    // Requesting with foreign branch_id query parameter
+    const res = await invoke(productController.getAllProducts, {
+      user,
+      query: { branch_id: branchB },
+    });
+
+    assert.equal(res.code, 200);
+    assert.equal(
+      capturedFilter.branch_id,
+      branchA,
+      `Role "${role}" must be restricted to their own branch_id, ignoring foreign query param`,
+    );
+  }
+
+  // Cross-branch product lookup by ID is rejected with 403 for staff
+  mock.method(Product, 'findById', () => chain({
+    _id: id(),
+    name: 'Detergent',
+    branch_id: branchB, // belongs to Branch B
+  }));
+
+  for (const role of staffRoles) {
+    await assert.rejects(
+      invoke(productController.getProductById, {
+        user: { id: id(), role, branch_id: branchA },
+        params: { id: id() },
+      }),
+      (err) => err.statusCode === 403,
+      `Role "${role}" must receive 403 when trying to access a product from another branch`,
+    );
+  }
+});
+
+// 14. Needs-attention is branch-scoped for everyone except admin
+test('14. GET /products/needs-attention is branch-scoped for staff and flexible for admin', async () => {
+  const branchB = id();
+  mock.method(Branch, 'findById', (bId) => chain({ _id: bId, name: 'Branch ' + bId }));
+
+  let capturedFindFilter = null;
+  mock.method(Product, 'find', (filter) => {
+    capturedFindFilter = filter;
+    return chain([]);
+  });
+
+  // Non-admin roles cannot override their branch with query param
+  const staffRoles = ['employee', 'front_desk', 'branch_manager', 'inventory_officer'];
+  for (const role of staffRoles) {
+    const res = await invoke(productController.getProductsNeedingAttention, {
+      user: { id: id(), role, branch_id: branchA },
+      query: { branch_id: branchB }, // foreign branch requested
+    });
+
+    assert.equal(res.code, 200);
+    assert.equal(
+      capturedFindFilter.branch_id,
+      branchA,
+      `Role "${role}" needs-attention view must be locked to branchA`,
+    );
+  }
+
+  // Admin CAN query another branch
+  const adminRes = await invoke(productController.getProductsNeedingAttention, {
+    user: { id: id(), role: 'admin' },
+    query: { branch_id: branchB },
+  });
+  assert.equal(adminRes.code, 200);
+  assert.equal(
+    capturedFindFilter.branch_id,
+    branchB,
+    'Admin must be able to specify any branch for needs-attention',
+  );
 });
