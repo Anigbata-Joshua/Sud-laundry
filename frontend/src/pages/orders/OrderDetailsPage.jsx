@@ -306,6 +306,33 @@ export default function OrderDetailsPage() {
 
       {user.role === 'customer' && <CustomerOrderTracker status={order.status} />}
 
+      {order.is_stalled && user.role !== 'customer' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs text-rose-800">
+          <div className="flex items-center gap-2">
+            <span className="font-bold">⚠️ Stalled Order:</span>
+            <span>
+              {order.stalled_reason === 'assignment' &&
+                'Assigned attendant has not accepted this task within the time limit.'}
+              {order.stalled_reason === 'quality_check' &&
+                'Order has been sitting in quality check review for longer than expected.'}
+              {order.stalled_reason === 'unassigned' &&
+                'Order has been received with no attendant assigned.'}
+              {!['assignment', 'quality_check', 'unassigned'].includes(order.stalled_reason) &&
+                'This order requires operational attention.'}
+            </span>
+          </div>
+          {['branch_manager', 'admin'].includes(user.role) && activeWorkflow && (
+            <Button
+              size="sm"
+              className="border-rose-300 bg-white text-rose-700 hover:bg-rose-100"
+              onClick={() => setReassignModalOpen(true)}
+            >
+              Reassign attendant
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
         <div className="grid gap-4">
           <Panel className="p-5">
@@ -314,6 +341,7 @@ export default function OrderDetailsPage() {
                 status={order.status}
                 label={user.role === 'customer' ? getCustomerStatusLabel(order.status) : undefined}
               />
+              {order.is_stalled && <StatusBadge status="stalled" label="Stalled" />}
               <StatusBadge status={order.payment_status} />
               <strong className="ml-auto text-xl">
                 {formatNaira(order.amount_due ?? order.total_price)}

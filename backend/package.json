@@ -12,7 +12,8 @@
     "dev": "nodemon --no-deprecation src/server.js",
     "seed:services": "node --no-deprecation src/seeders/service.seeder.js",
     "seed:supply-products": "node --no-deprecation scripts/seedSupplyProducts.js",
-    "seed:catalog": "node --no-deprecation scripts/seedCatalogItems.js"
+    "seed:catalog": "node --no-deprecation scripts/seedCatalogItems.js",
+    "check:timeouts": "node --no-deprecation scripts/runWorkflowTimeoutCheck.js"
   },
   "keywords": [],
   "author": "",

@@ -70,6 +70,15 @@ export const env = {
   expressSurchargePercent: Number(process.env.EXPRESS_SURCHARGE_PERCENT) || 30,
   adminDigestSchedule: process.env.ADMIN_DIGEST_SCHEDULE || "0 8 * * 1",
 
+  // Workflow timeouts and stalled order alerts (Phase E)
+  stalledAssignmentMinutes:
+    parseInt(process.env.STALLED_ASSIGNMENT_MINUTES, 10) || 30,
+  stalledQcMinutes: parseInt(process.env.STALLED_QC_MINUTES, 10) || 60,
+  stalledRealertHours: parseInt(process.env.STALLED_REALERT_HOURS, 10) || 4,
+  stalledMaxAgeHours: parseInt(process.env.STALLED_MAX_AGE_HOURS, 10) || 72,
+  workflowTimeoutSchedule:
+    process.env.WORKFLOW_TIMEOUT_SCHEDULE || "*/10 * * * *",
+
   // Email settings
   useMockEmail: process.env.USE_MOCK_EMAIL === "true",
   resendApiKey: process.env.RESEND_API_KEY || "",

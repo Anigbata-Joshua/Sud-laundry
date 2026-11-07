@@ -53,7 +53,10 @@ export default function OrderTable({ rows, showActions = false }) {
               <td className="border-b border-gray-100 px-3 py-3">{order.service}</td>
               <td className="border-b border-gray-100 px-3 py-3">{order.branch}</td>
               <td className="border-b border-gray-100 px-3 py-3">
-                <StatusBadge status={order.status} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <StatusBadge status={order.status} />
+                  {order.is_stalled && <StatusBadge status="stalled" label="Stalled" />}
+                </div>
               </td>
               <td className="border-b border-gray-100 px-3 py-3">
                 <StatusBadge status={order.payment} />

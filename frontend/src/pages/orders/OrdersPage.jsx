@@ -41,6 +41,8 @@ function formatOrder(order, index) {
     pieces: order.items?.reduce((total, item) => total + item.quantity, 0) ?? 0,
     branch: order.branch_id?.name ?? 'Branch',
     status: order.status,
+    is_stalled: Boolean(order.is_stalled),
+    stalled_reason: order.stalled_reason,
     payment: order.payment_status,
     total: Number(order.amount_due) > 0 ? order.amount_due : order.total_price,
     tone: tones[index % tones.length],

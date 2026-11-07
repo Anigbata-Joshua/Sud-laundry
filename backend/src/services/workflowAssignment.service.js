@@ -171,6 +171,7 @@ export async function autoAssignProcessingWorkflow({ order, createdByUserId }) {
         sequence: 1,
         employee_id: bestAttendant._id,
         status: 'assigned',
+        assigned_at: new Date(),
       },
     ],
   });

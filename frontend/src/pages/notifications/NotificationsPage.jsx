@@ -1,3 +1,4 @@
+import { STALLED_ALERT_PREFIX } from '../../constants/workflowTimeout.constants'
 import { useCallback, useEffect, useState } from 'react'
 import { Bell, CheckCheck, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +14,9 @@ import { useAuth } from '../../hooks/useAuth'
 
 function getNotificationTitle(item) {
   if (item.type === 'other') {
+    if (item.message?.startsWith(STALLED_ALERT_PREFIX) || /stalled/i.test(item.message)) {
+      return 'Stalled Order Alert'
+    }
     if (/stock|out of stock|shortage|restock/i.test(item.message)) {
       return 'Stock Alert'
     }
@@ -83,7 +87,13 @@ export default function NotificationsPage() {
       const orderId = typeof item.order_id === 'object' ? item.order_id._id : item.order_id
       if (orderId) {
         navigate(`/orders/${orderId}`)
+        return
       }
+    }
+
+    if (item.message?.startsWith(STALLED_ALERT_PREFIX)) {
+      navigate('/orders')
+      return
     }
   }
 
