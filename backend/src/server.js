@@ -5,6 +5,7 @@ import logger from "./utils/logger.js";
 import "./jobs/lowStockCheck.job.js";
 import { startAutoPickupJob } from "./jobs/autoPickup.job.js";
 import { startAdminDigestJob } from "./jobs/adminDigest.job.js";
+import { startWorkflowTimeoutJob } from "./jobs/workflowTimeout.job.js";
 import { migrateInventoryRoles } from "./services/inventoryRoleMigration.service.js";
 
 // Server entry point
@@ -35,6 +36,7 @@ await connectDatabase();
 await migrateInventoryRoles();
 const autoPickupJob = startAutoPickupJob();
 const adminDigestJob = startAdminDigestJob();
+const workflowTimeoutJob = startWorkflowTimeoutJob();
 
 const PORT = env.port;
 const server = app.listen(PORT, () => {
@@ -54,6 +56,7 @@ const server = app.listen(PORT, () => {
 const gracefulShutdown = async (signal) => {
   autoPickupJob.stop();
   adminDigestJob.stop();
+  workflowTimeoutJob.stop();
   logger.info(`🛑 Received ${signal}. Shutting down gracefully...`);
   try {
     await closeDatabase();

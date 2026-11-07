@@ -11,6 +11,7 @@ const processStepSchema = new mongoose.Schema(
       enum: ['assigned', 'accepted', 'completed'],
       default: 'assigned',
     },
+    assigned_at: { type: Date, default: Date.now },
     accepted_at: { type: Date, default: null },
     completed_at: { type: Date, default: null },
   },

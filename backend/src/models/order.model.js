@@ -153,6 +153,8 @@ const orderSchema = new mongoose.Schema(
     cancelled_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     cancelled_at: { type: Date },
     refund_amount: { type: Number },
+    is_stalled: { type: Boolean, default: false },
+    stalled_reason: { type: String, default: null, trim: true },
     amount_due: { type: Number, default: 0 },
     cancelled_on_customer_request: { type: Boolean, default: false },
   },

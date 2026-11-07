@@ -14,6 +14,7 @@ const tones = {
   refunded: 'bg-gray-100 text-gray-500',
   part_payment: 'bg-amber-50 text-amber-700',
   'on leave': 'bg-amber-50 text-amber-700',
+  stalled: 'bg-rose-50 text-rose-700 border border-rose-200',
 }
 
 export default function StatusBadge({ children, status = children, label }) {

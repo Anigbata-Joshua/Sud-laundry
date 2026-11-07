@@ -346,6 +346,8 @@ export const updateStep = asyncHandler(async (req, res) => {
     step.accepted_at = new Date();
 
     order.status = "processing";
+    order.is_stalled = false;
+    order.stalled_reason = null;
     const needsStartedAt = !order.processing_started_at;
     if (needsStartedAt) {
       order.processing_started_at = new Date();
@@ -462,6 +464,8 @@ export const reviewQuality = asyncHandler(async (req, res) => {
   const reference = `ORD-${order._id.toString().slice(-6).toUpperCase()}`;
 
   // handle pass or fail
+  order.is_stalled = false;
+  order.stalled_reason = null;
   if (req.body.result === "pass") {
     order.status = "ready";
     order.ready_at = new Date();
@@ -617,13 +621,16 @@ export const reassignWorkflow = asyncHandler(async (req, res) => {
 
   activeStep.employee_id = targetEmployee._id;
   activeStep.status = "assigned";
+  activeStep.assigned_at = new Date();
   activeStep.accepted_at = null;
   workflow.qc_notes = null;
 
   if (order.status === "processing") {
     order.status = "received";
-    await order.save();
   }
+  order.is_stalled = false;
+  order.stalled_reason = null;
+  await order.save();
 
   await workflow.save();
 
