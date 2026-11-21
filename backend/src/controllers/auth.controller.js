@@ -59,7 +59,7 @@ export const login = asyncHandler(async (req, res, next) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-        throw new ApiError(401, 'Invalid email or password');
+        throw  new ApiError(401, 'Invalid email or password');
     }
 
     // Check if user is active

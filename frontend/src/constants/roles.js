@@ -20,5 +20,6 @@ export function getRoleHome(role) {
   if (role === ROLES.EMPLOYEE) return '/processing'
   if (role === ROLES.FRONT_DESK) return '/orders'
   if (role === ROLES.INVENTORY_OFFICER) return '/inventory'
+  if (role === ROLES.CUSTOMER) return '/orders'
   return '/'
 }

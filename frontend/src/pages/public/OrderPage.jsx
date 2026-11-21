@@ -19,6 +19,7 @@ import { useToast } from '../../hooks/useToast'
 import { formatNaira } from '../../utils/formatters'
 import BranchCard from '../../components/branches/BranchCard'
 import GarmentServiceSelector from '../../components/orders/GarmentServiceSelector'
+import BrandLoader from '../../components/common/BrandLoader'
 
 function earliestPickup() {
   const date = new Date(Date.now() + 60 * 60 * 1000)
@@ -199,11 +200,7 @@ export default function OrderPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="grid min-h-[70vh] place-items-center">
-        <div className="size-10 animate-spin rounded-full border-4 border-sky-100 border-t-brand" />
-      </div>
-    )
+    return <BrandLoader message="Loading pickup options…" />
   }
 
   if (!isAuthenticated) {
@@ -220,34 +217,69 @@ export default function OrderPage() {
 
   return (
     <div className="min-h-screen bg-canvas font-sans pb-24">
-      {/* Header Banner */}
-      <section className="bg-ink text-white pt-12 pb-16 px-4 sm:px-8 border-b border-white/10">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-2 w-fit bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full mb-4">
-            <Sparkles className="size-3.5 text-accent" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-100">
-              Premium Laundry Booking
+      {/* Header Banner with Rich Visual Imagery, Classic Gradient Overlays & Animated Accents */}
+      <section className="relative overflow-hidden bg-slate-950 text-white pt-16 pb-24 px-4 sm:px-8 border-b border-white/10">
+        {/* Background Picture with AVIF/WebP */}
+        <picture className="absolute inset-0 size-full">
+          <source srcSet="/images/hero-laundry-full.avif" type="image/avif" />
+          <source srcSet="/images/hero-laundry-full.webp" type="image/webp" />
+          <img
+            src="/images/hero-laundry-full.jpg"
+            alt="Swirl laundry care pickup facility"
+            className="size-full object-cover object-center opacity-30 scale-105 transition-transform duration-1000 ease-out"
+          />
+        </picture>
+
+        {/* Multi-stop Deep Indigo & Slate Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-indigo-950/60" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-transparent to-transparent pointer-events-none" />
+
+        {/* Ambient Glow Orbs */}
+        <div className="absolute top-0 right-1/4 size-72 rounded-full bg-indigo-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 left-10 size-60 rounded-full bg-purple-500/20 blur-2xl pointer-events-none animate-pulse" />
+
+        <div className="relative z-10 max-w-6xl mx-auto">
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+            <Sparkles className="size-3.5 text-indigo-300" />
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-200">
+              Doorstep Pickup & Care
             </span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight drop-shadow-sm max-w-3xl">
             Schedule your laundry collection
           </h1>
-          <p className="mt-3 text-slate-300 max-w-xl text-sm sm:text-base leading-relaxed">
-            Select your preferred branch, pick garments with specialized care options, and book an
-            easy collection window.
+
+          <p className="mt-4 text-slate-200 max-w-2xl text-sm sm:text-base leading-relaxed">
+            <span className="font-serif italic text-indigo-300 mr-2 font-normal text-lg">
+              Effortless care.
+            </span>
+            Select your local branch, customize garment-specific wash & press treatments, and
+            reserve a convenient pickup window.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-6 text-xs font-semibold text-slate-300">
-            <span className="flex items-center gap-2">
+          <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-semibold">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 text-slate-200 shadow-xs hover:bg-white/15 transition-all">
               <CheckCircle2 className="size-4 text-emerald-400" /> 24h Express Available
             </span>
-            <span className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 text-slate-200 shadow-xs hover:bg-white/15 transition-all">
               <CheckCircle2 className="size-4 text-emerald-400" /> Eco-Pure Fabric Wash
             </span>
-            <span className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-emerald-400" /> Doorstep Real-Time Tracking
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 text-slate-200 shadow-xs hover:bg-white/15 transition-all">
+              <CheckCircle2 className="size-4 text-emerald-400" /> Live Doorstep Tracking
             </span>
           </div>
+        </div>
+
+        {/* Fancy organic wave edge transition to canvas */}
+        <div className="absolute bottom-0 inset-x-0 h-6 sm:h-8 text-canvas pointer-events-none overflow-hidden z-20">
+          <svg
+            className="w-full h-full fill-current"
+            viewBox="0 0 1440 48"
+            preserveAspectRatio="none"
+          >
+            <path d="M0,24 C360,48 720,0 1080,24 C1260,36 1380,44 1440,48 L1440,48 L0,48 Z" />
+          </svg>
         </div>
       </section>
 
@@ -644,62 +676,82 @@ function WrongRoleNotice() {
 }
 
 function Confirmation({ order }) {
-  const reference = `ORD-${order._id.slice(-6).toUpperCase()}`
-  const timeline = [
-    { label: 'Order Received & Reserved', done: true },
-    { label: 'Pickup Scheduled', done: false },
-    { label: 'In-Facility Processing', done: false },
-    { label: 'Quality Check & Delivery', done: false },
-  ]
+  const reference = order.order_number || `ORD-${order._id.slice(-6).toUpperCase()}`
+  const items = Array.isArray(order.items) ? order.items : []
+  const subtotal = order.total_price ?? items.reduce((sum, i) => sum + (i.subtotal || 0), 0)
+  const expressSurcharge = order.express_surcharge ?? 0
+  const totalDue = order.amount_due ?? subtotal + expressSurcharge
 
   return (
     <section className="grid min-h-[80vh] place-items-center px-4 py-16 bg-canvas">
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-line bg-white shadow-2xl">
-        <div className="relative h-44 w-full overflow-hidden bg-ink">
-          <img
-            src="/images/hero-laundry-full.jpg"
-            alt="Clean laundry processing"
-            className="size-full object-cover opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
-          <div className="absolute bottom-4 left-6 flex items-center gap-3">
-            <span className="size-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg">
-              <Check className="size-5 stroke-[3]" />
-            </span>
-            <div>
-              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
-                Order Confirmed
-              </p>
-              <p className="font-mono text-base font-bold text-white">{reference}</p>
-            </div>
-          </div>
+      <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-line bg-white shadow-2xl">
+        <div className="p-6 sm:p-8 text-center border-b border-line bg-sky-50/40">
+          <picture className="mx-auto block w-28 h-28 sm:w-32 sm:h-32 mb-4 rounded-2xl overflow-hidden border border-line shadow-sm bg-white">
+            <source srcSet="/images/order-scheduled.avif" type="image/avif" />
+            <source srcSet="/images/order-scheduled.webp" type="image/webp" />
+            <img
+              src="/images/order-scheduled.webp"
+              alt="Order scheduled illustration"
+              className="size-full object-cover"
+              loading="lazy"
+            />
+          </picture>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-black uppercase tracking-wider">
+            <Check className="size-3.5 stroke-[3]" /> Order Scheduled
+          </span>
+          <h1 className="mt-3 text-2xl font-extrabold text-ink tracking-tight">
+            Thank you! Your pickup is reserved.
+          </h1>
+          <p className="mt-1 font-mono text-sm font-bold text-brand">{reference}</p>
+          <p className="mt-2 text-xs text-muted max-w-md mx-auto">
+            We will notify you once an attendant accepts your order and begins processing.
+          </p>
         </div>
 
         <div className="p-6 sm:p-8">
-          <h1 className="text-xl font-extrabold text-ink tracking-tight">
-            Thank you! Your pickup is scheduled.
-          </h1>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            We've assigned your order to the branch team. Stock has been reserved and our staff will
-            collect your garments at the requested window.
-          </p>
-
-          <ul className="mt-6 grid gap-3 border-t border-line pt-5">
-            {timeline.map((step) => (
-              <li key={step.label} className="flex items-center gap-3 text-xs">
-                <span
-                  className={`size-5 rounded-full flex items-center justify-center ${
-                    step.done ? 'bg-brand text-white' : 'border-2 border-slate-200'
-                  }`}
+          <h2 className="text-xs font-black uppercase tracking-wider text-muted mb-3">
+            Garment & Service Breakdown
+          </h2>
+          <div className="divide-y divide-line rounded-2xl border border-line bg-canvas/40 px-4 py-1 mb-6">
+            {items.map((item, idx) => {
+              const name = item.item_name || item.name || 'Garment item'
+              const service = item.service_name || item.service?.name || 'Laundry service'
+              const lineTotal = item.subtotal ?? (item.unit_price || 0) * (item.quantity || 1)
+              return (
+                <div
+                  key={item._id || idx}
+                  className="flex items-center justify-between py-3 text-xs"
                 >
-                  {step.done && <Check className="size-3 stroke-[3]" />}
+                  <div>
+                    <p className="font-bold text-ink">{name}</p>
+                    <p className="text-[11px] text-muted">
+                      {service} &times; {item.quantity}
+                    </p>
+                  </div>
+                  <p className="font-mono font-bold text-ink">{formatNaira(lineTotal)}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2 border-t border-line pt-4 text-xs">
+            <div className="flex justify-between text-muted">
+              <span>Subtotal</span>
+              <span className="font-mono font-medium text-ink">{formatNaira(subtotal)}</span>
+            </div>
+            {expressSurcharge > 0 && (
+              <div className="flex justify-between text-amber-700">
+                <span className="flex items-center gap-1">
+                  <Zap className="size-3.5 fill-amber-500 text-amber-500" /> Express Surcharge
                 </span>
-                <span className={step.done ? 'font-bold text-ink' : 'text-slate-400'}>
-                  {step.label}
-                </span>
-              </li>
-            ))}
-          </ul>
+                <span className="font-mono font-semibold">+{formatNaira(expressSurcharge)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-baseline pt-2 border-t border-line text-sm">
+              <span className="font-extrabold text-ink">Total Due</span>
+              <span className="font-mono text-lg font-black text-ink">{formatNaira(totalDue)}</span>
+            </div>
+          </div>
 
           <div className="mt-8 grid sm:grid-cols-2 gap-3">
             <Link

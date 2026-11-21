@@ -38,30 +38,41 @@ import PublicLayout from '../layouts/PublicLayout'
 import HomePage from '../pages/public/HomePage'
 import ContactPage from '../pages/public/ContactPage'
 import OrderPage from '../pages/public/OrderPage'
+import PricingPage from '../pages/public/PricingPage'
+import PublicServicesPage from '../pages/public/PublicServicesPage'
 
 export default function AppRoutes() {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
+
+  const isStaff =
+    isAuthenticated &&
+    ['admin', 'branch_manager', 'inventory_officer', 'employee', 'front_desk'].includes(user?.role)
 
   return (
     <Routes>
-      {/* Public marketing site — no login required. Kept at its own paths
-          (rather than "/") so it doesn't collide with the signed-in app,
-          which already owns "/" for both customer and staff dashboards. */}
+      {/* Public marketing site — no login required */}
       <Route element={<PublicLayout />}>
+        {!isStaff && <Route index element={<HomePage />} />}
+        {!isStaff && <Route path="/" element={<HomePage />} />}
         <Route path="/home" element={<HomePage />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/order" element={<OrderPage />} />
+        {!isStaff && <Route path="/services" element={<PublicServicesPage />} />}
       </Route>
+
       <Route element={<AuthLayout />}>
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
       </Route>
+
       <Route element={<ProtectedRoute />}>
         {user?.role === 'customer' ? (
           <Route element={<CustomerLayout />}>
             <Route index element={<CustomerOrdersPage />} />
+            <Route path="orders" element={<CustomerOrdersPage />} />
             <Route path="orders/new" element={<CreateOrderPage />} />
             <Route path="orders/:id" element={<OrderDetailsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />

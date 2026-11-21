@@ -112,8 +112,8 @@ export default function OrdersPage() {
         subtitle="Track every order from intake to delivery."
       >
         <ExportMenu
-          title="Suds Orders"
-          filename={`suds-orders-${new Date().toISOString().slice(0, 10)}`}
+          title="Swirl Orders"
+          filename={`swirl-orders-${new Date().toISOString().slice(0, 10)}`}
           columns={exportColumns}
           rows={exportRows}
         />
