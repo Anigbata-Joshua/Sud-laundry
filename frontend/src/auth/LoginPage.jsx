@@ -1,9 +1,22 @@
-import { getRoleHome } from '../constants/roles'
 import { useState } from 'react'
-import { Droplets, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRight,
+  Building2,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  Package,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import Button from '../components/common/Button'
+import { getRoleHome } from '../constants/roles'
+import BrandLogo from '../components/common/BrandLogo'
+import { BRAND } from '../constants/brand'
 import { useAuth } from '../hooks/useAuth'
+import AuthVisualHero from './AuthVisualHero'
 
 function getErrorMessage(error) {
   if (error.code === 'STAFF_ONLY') {
@@ -20,6 +33,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [portalMode, setPortalMode] = useState('customer') // 'customer' | 'staff'
   const { isAuthenticated, isLoading, login } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -53,56 +67,85 @@ export default function LoginPage() {
 
   return (
     <>
-      <section className="relative hidden overflow-hidden bg-sidebar p-12 text-white lg:flex lg:flex-col">
-        <div className="absolute -left-28 top-1/3 size-96 rounded-full bg-sky-500/15 blur-3xl" />
-        <div className="absolute -right-28 bottom-0 size-96 rounded-full bg-teal-400/10 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 shadow-sm shadow-sky-900/50">
-            <Droplets className="size-5 text-white" />
-          </span>
-          <div className="grid">
-            <strong className="text-lg">Suds</strong>
-            <small className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-              Operations
-            </small>
-          </div>
-        </div>
-        <div className="relative my-auto max-w-lg">
-          <span className="mb-6 grid size-12 place-items-center rounded-2xl bg-white/10 text-sky-300">
-            <ShieldCheck className="size-6" />
-          </span>
-          <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
-            Keep every branch moving from one place.
-          </h1>
-          <p className="mt-5 max-w-md text-sm leading-7 text-gray-400">
-            Monitor orders, production, inventory, staff, and payments across your laundry
-            operation.
-          </p>
-        </div>
-        <p className="relative text-[11px] text-gray-500">
-          Secure administrator access · Suds Operations
-        </p>
-      </section>
+      {/* Left visual hero with lush gradients, fancy edge and live operations card */}
+      <AuthVisualHero
+        title="Keep every garment moving with precision."
+        subtitle={`Monitor orders, real-time wash stages, inventory care, and doorstep collections across ${BRAND.name}.`}
+        badgeText="Staff & Customer Portal"
+      />
 
-      <section className="flex items-center justify-center px-6 py-12 sm:px-12">
-        <div className="w-full max-w-md">
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <span className="grid size-10 place-items-center rounded-xl bg-brand text-white">
-              <Droplets className="size-5" />
+      {/* Right form section */}
+      <section className="relative flex items-center justify-center px-4 py-12 sm:px-8 lg:px-12 bg-slate-50 min-h-screen">
+        {/* Subtle ambient radial glow on form side */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(99,102,241,0.07),rgba(255,255,255,0))] pointer-events-none" />
+
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-7 sm:p-9 shadow-xl shadow-slate-200/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Top subtle decorative accent ribbon */}
+          <div className="absolute top-0 inset-x-8 h-1 rounded-b-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600" />
+
+          {/* Mobile brand logo */}
+          <div className="mb-6 flex items-center justify-center lg:hidden">
+            <BrandLogo />
+          </div>
+
+          {/* Micro-badge */}
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100/80 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-700 shadow-2xs">
+              <Sparkles className="size-3 text-indigo-600" />
+              {portalMode === 'customer' ? 'Customer Gateway' : 'Staff Operations Desk'}
             </span>
-            <strong className="text-xl">Suds</strong>
+            <span className="text-[11px] font-semibold text-slate-400">Secure Access</span>
           </div>
-          <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-brand">
-            Staff portal
-          </p>
-          <h2 className="text-3xl font-extrabold tracking-tight">Welcome back</h2>
-          <p className="mt-2 text-sm text-muted">Sign in with your staff account to continue.</p>
 
-          <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
-            <label className="grid gap-2 text-xs font-bold text-gray-700">
+          <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            Welcome back
+          </h2>
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+            {portalMode === 'customer'
+              ? `Sign in to schedule pickups, track garments, and download invoices with ${BRAND.name}.`
+              : `Sign in to access your branch wash queue, garment staging, and route dispatch.`}
+          </p>
+
+          {/* Segmented Mode Selector for Customer vs Staff */}
+          <div className="mt-5 grid grid-cols-2 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/60 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setPortalMode('customer')
+                setError('')
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 ${
+                portalMode === 'customer'
+                  ? 'bg-white text-indigo-700 shadow-xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Package className="size-3.5" />
+              Customer
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPortalMode('staff')
+                setError('')
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 ${
+                portalMode === 'staff'
+                  ? 'bg-white text-indigo-700 shadow-xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Building2 className="size-3.5" />
+              Staff & Operations
+            </button>
+          </div>
+
+          <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
+            {/* Email Address */}
+            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
               Email address
-              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-sky-100">
-                <Mail className="size-4 text-gray-400" />
+              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs">
+                <Mail className="size-4 text-slate-400 group-focus-within:text-indigo-600 group-focus-within:scale-105 transition-all duration-200 shrink-0" />
                 <input
                   required
                   autoComplete="email"
@@ -110,16 +153,27 @@ export default function LoginPage() {
                   name="email"
                   value={credentials.email}
                   onChange={updateField}
-                  placeholder="admin@suds.ng"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-normal outline-none"
+                  placeholder={
+                    portalMode === 'customer' ? 'ada@example.com' : 'staff@swirllaundry.com'
+                  }
+                  className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </span>
             </label>
 
-            <label className="grid gap-2 text-xs font-bold text-gray-700">
-              Password
-              <span className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-3.5 focus-within:border-brand focus-within:ring-3 focus-within:ring-sky-100">
-                <LockKeyhole className="size-4 text-gray-400" />
+            {/* Password */}
+            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              <span className="flex items-center justify-between">
+                <span>Password</span>
+                <Link
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors normal-case"
+                  to="/forgot-password"
+                >
+                  Forgot password?
+                </Link>
+              </span>
+              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs">
+                <LockKeyhole className="size-4 text-slate-400 group-focus-within:text-indigo-600 group-focus-within:scale-105 transition-all duration-200 shrink-0" />
                 <input
                   required
                   minLength="6"
@@ -128,13 +182,13 @@ export default function LoginPage() {
                   name="password"
                   value={credentials.password}
                   onChange={updateField}
-                  placeholder="Enter your password"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-normal outline-none"
+                  placeholder="••••••••"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
                 />
                 <button
                   type="button"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="rounded-lg p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                   onClick={() => setShowPassword((current) => !current)}
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -142,31 +196,49 @@ export default function LoginPage() {
               </span>
             </label>
 
-            <Link className="justify-self-end text-xs font-bold text-brand" to="/forgot-password">
-              Forgot password?
-            </Link>
-
             {error && (
-              <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">
-                {error}
-              </p>
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-2xl bg-rose-50 border border-rose-200 p-3.5 text-xs font-semibold text-rose-800 shadow-2xs animate-in fade-in duration-200"
+              >
+                <AlertCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
             )}
 
-            <Button
-              primary
+            <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-1 py-3.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative group overflow-hidden mt-2 w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 py-3.5 px-6 font-extrabold text-white text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/35 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in to dashboard'}
-            </Button>
+              {/* Subtle hover sheen */}
+              <span className="absolute inset-0 bg-white/10 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out pointer-events-none" />
+
+              <span>{isSubmitting ? 'Signing in…' : 'Sign in to account'}</span>
+              {!isSubmitting && (
+                <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform duration-200" />
+              )}
+            </button>
           </form>
-          <p className="mt-8 text-center text-[11px] text-gray-400">
-            Need an account?{' '}
-            <Link className="font-bold text-brand" to="/register">
-              Register
-            </Link>
-          </p>
+
+          {/* Register Callout */}
+          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-500">
+              Need a customer account?{' '}
+              <Link
+                className="font-extrabold text-indigo-600 hover:text-indigo-800 transition-colors"
+                to="/register"
+              >
+                Create an account
+              </Link>
+            </p>
+          </div>
+
+          {/* Security trust badge */}
+          <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400">
+            <ShieldCheck className="size-3.5 text-emerald-600 shrink-0" />
+            <span>256-bit TLS encrypted · Verified fabric care</span>
+          </div>
         </div>
       </section>
     </>

@@ -7,6 +7,13 @@ import mongoose from 'mongoose';
 import User from '../src/models/user.model.js';
 import Employee from '../src/models/employee.model.js';
 import Order from '../src/models/order.model.js';
+import Service from '../src/models/service.model.js';
+import Branch from '../src/models/branch.model.js';
+import Product from '../src/models/product.model.js';
+import Supplier from '../src/models/supplier.model.js';
+import LeaveRequest from '../src/models/leaveRequest.model.js';
+import Payment from '../src/models/payment.model.js';
+import ProcessingWorkflow from '../src/models/processingWorkflow.model.js';
 import { env } from '../src/config/env.js';
 import generateToken from '../src/utils/generateToken.js';
 
@@ -104,6 +111,15 @@ async function runSuite() {
     // Connect to database directly for test fixtures role promotion
     if (mongoose.connection.readyState === 0) {
         await mongoose.connect(env.mongoUri);
+    }
+
+    // Refuse to run unless database name clearly looks like a test database
+    const dbName = mongoose.connection.name || (env.mongoUri ? env.mongoUri.split('/').pop().split('?')[0] : '');
+    if (!/test/i.test(dbName)) {
+        console.error('\n⛔ SAFETY GUARD: Refusing to run tests on database "' + dbName + '".');
+        console.error('   Production tests must only run on a test database whose name contains "test" (e.g. laundry_test).\n');
+        await mongoose.connection.close();
+        process.exit(1);
     }
 
     const runTimestamp = Date.now();
@@ -669,6 +685,31 @@ async function runSuite() {
             totalBurstTime,
             { avgLatencyMs: avgLatency }
         );
+    }
+
+    // Cleanup everything created during the test run
+    try {
+        console.log('\n🧹 Cleaning up test entities created during run...');
+        if (entities.orderId) {
+            await Order.deleteOne({ _id: entities.orderId });
+            await ProcessingWorkflow.deleteMany({ order_id: entities.orderId });
+        }
+        if (entities.serviceId) {
+            await Service.deleteOne({ _id: entities.serviceId });
+        }
+        await Service.deleteMany({ name: { $regex: new RegExp(String(runTimestamp)) } });
+        if (entities.productId) await Product.deleteOne({ _id: entities.productId });
+        if (entities.detergentProductId) await Product.deleteOne({ _id: entities.detergentProductId });
+        if (entities.supplierId) await Supplier.deleteOne({ _id: entities.supplierId });
+        if (entities.leaveRequestId) await LeaveRequest.deleteOne({ _id: entities.leaveRequestId });
+        if (entities.paymentId) await Payment.deleteOne({ _id: entities.paymentId });
+        if (entities.employeeId) await Employee.deleteOne({ _id: entities.employeeId });
+        if (entities.managerEmployeeId) await Employee.deleteOne({ _id: entities.managerEmployeeId });
+        await User.deleteMany({ email: { $regex: new RegExp(String(runTimestamp)) } });
+        if (entities.branchId) await Branch.deleteOne({ _id: entities.branchId });
+        console.log('✅ Test cleanup completed successfully.');
+    } catch (cleanupErr) {
+        console.warn('⚠️ Warning: Error during test entity cleanup:', cleanupErr.message);
     }
 
     // Close database connection

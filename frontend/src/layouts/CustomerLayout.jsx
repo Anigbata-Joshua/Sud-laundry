@@ -1,12 +1,14 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Bell, LogOut, Plus, Shirt, UserRound } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import BrandLogo from '../components/common/BrandLogo'
 
 export default function CustomerLayout() {
   const { user, logout } = useAuth()
   const location = useLocation()
 
   const isActive = (path) => {
+    if (path === '/orders') return location.pathname.startsWith('/orders')
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
   }
@@ -17,16 +19,13 @@ export default function CustomerLayout() {
       <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex w-[92%] max-w-5xl items-center justify-between py-3.5 sm:py-4">
           <Link to="/" className="flex items-center gap-2.5 font-extrabold text-ink group">
-            <span className="grid size-9 place-items-center rounded-xl bg-brand text-white shadow-sm shadow-sky-900/20 group-hover:bg-brand-hover transition-colors">
-              <Shirt className="size-4.5" />
-            </span>
-            <span className="text-[17px] tracking-tight">Suds</span>
+            <BrandLogo variant="compact" />
           </Link>
 
           <nav className="hidden items-center gap-6 text-xs font-bold sm:flex">
             <Link
-              to="/"
-              className={`transition-colors ${isActive('/') ? 'text-brand' : 'text-slate-600 hover:text-ink'}`}
+              to="/orders"
+              className={`transition-colors ${isActive('/orders') ? 'text-brand' : 'text-slate-600 hover:text-ink'}`}
             >
               My orders
             </Link>
@@ -80,9 +79,9 @@ export default function CustomerLayout() {
       {/* Mobile Bottom Navigation Bar (app-like feel) */}
       <nav className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around border-t border-line bg-white/95 px-2 py-2 backdrop-blur-lg sm:hidden shadow-lg">
         <Link
-          to="/"
+          to="/orders"
           className={`flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-bold ${
-            isActive('/') ? 'text-brand' : 'text-slate-500'
+            isActive('/orders') ? 'text-brand' : 'text-slate-500'
           }`}
         >
           <Shirt className="size-4.5" />

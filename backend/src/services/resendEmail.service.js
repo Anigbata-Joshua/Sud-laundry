@@ -14,7 +14,7 @@ if (env.resendApiKey) {
     logger.warn('⚠️ RESEND_API_KEY is not set — email sending is disabled.');
 }
 
-const FROM_ADDRESS = `Suds Laundry <onboarding@${env.resendFromDomain}>`;
+const FROM_ADDRESS = `Swirl Laundry <onboarding@${env.resendFromDomain}>`;
 
 export const sendMail = async ({ to, subject, text, html }) => {
     if (!resend) {

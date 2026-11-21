@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Building2, ChevronDown, Droplets, LogOut, X } from 'lucide-react'
+import { Building2, ChevronDown, LogOut, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getBranches } from '../../api/branches.api'
 import { navigationGroups, ALL_STAFF_ROLES } from '../../constants/navigation'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../common/Avatar'
+import BrandLogo from '../common/BrandLogo'
 
 export default function Sidebar({ open, onClose, branchId = '', onBranchChange }) {
   const { logout, user } = useAuth()
@@ -49,16 +50,8 @@ export default function Sidebar({ open, onClose, branchId = '', onBranchChange }
     <aside
       className={`fixed inset-y-0 left-0 z-30 flex w-61 flex-col border-r border-slate-800/80 bg-slate-900 px-3.5 py-5 text-slate-400 transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
     >
-      <div className="flex items-center gap-3 px-2 pb-7">
-        <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sm shadow-sky-900/40">
-          <Droplets className="size-[18px]" />
-        </span>
-        <div className="grid flex-1">
-          <strong className="text-sm font-black text-white tracking-wide">Suds</strong>
-          <small className="text-[9px] uppercase tracking-widest text-sky-400 font-semibold">
-            Fabric Care & Ops
-          </small>
-        </div>
+      <div className="flex items-center justify-between px-2 pb-7">
+        <BrandLogo variant="sidebar" inverted={true} />
         <button type="button" className="text-white lg:hidden" onClick={onClose}>
           <X className="size-5" />
         </button>

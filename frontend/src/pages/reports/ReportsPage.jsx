@@ -119,8 +119,8 @@ export default function ReportsPage() {
         subtitle="Live financial and operational performance from the database."
       >
         <ExportMenu
-          title="Suds performance report"
-          filename={`suds-report-${dates.startDate}-${dates.endDate}`}
+          title="Swirl performance report"
+          filename={`swirl-report-${dates.startDate}-${dates.endDate}`}
           columns={[
             { key: 'section', label: 'Section' },
             { key: 'name', label: 'Name / date' },
