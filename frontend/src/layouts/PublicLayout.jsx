@@ -174,8 +174,8 @@ export default function PublicLayout() {
               <BrandLogo inverted={true} />
             </div>
             <p className="mt-3 max-w-64 text-[13px] leading-relaxed text-slate-400">
-              {BRAND.tagline}. Door-to-door laundry and dry cleaning with 24-hour turnaround,
-              tracked from pickup to delivery.
+              {BRAND.tagline} Door-to-door laundry and dry cleaning with 24-hour turnaround, tracked
+              from pickup to delivery.
             </p>
             <div className="mt-5 flex gap-2">
               {[AtSign, MessageCircle, Globe].map((Icon, index) => (
@@ -193,7 +193,7 @@ export default function PublicLayout() {
 
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">
-              Services & Pricing
+              Explore
             </p>
             <ul className="mt-4 grid gap-2.5 text-[13px]">
               <li>
@@ -208,7 +208,7 @@ export default function PublicLayout() {
               </li>
               <li>
                 <Link to="/pricing" className="hover:text-white transition">
-                  Pricing & Calculator
+                  Pricing
                 </Link>
               </li>
               <li>

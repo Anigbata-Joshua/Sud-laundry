@@ -263,7 +263,7 @@ export default function OrderPage() {
               <CheckCircle2 className="size-4 text-emerald-400" /> 24h Express Available
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 text-slate-200 shadow-xs hover:bg-white/15 transition-all">
-              <CheckCircle2 className="size-4 text-emerald-400" /> Eco-Pure Fabric Wash
+              <CheckCircle2 className="size-4 text-emerald-400" /> Fabric-Specific Care
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 text-slate-200 shadow-xs hover:bg-white/15 transition-all">
               <CheckCircle2 className="size-4 text-emerald-400" /> Live Doorstep Tracking
