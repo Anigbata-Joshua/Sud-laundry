@@ -568,7 +568,7 @@ export default function OrderPage() {
                 <div className="mt-5 space-y-2 border-t border-white/10 pt-4 text-[11px] text-slate-400">
                   <p className="flex items-center gap-2">
                     <ShieldCheck className="size-3.5 text-emerald-400 shrink-0" />
-                    <span>100% Care Guarantee & SMS tracking updates.</span>
+                    <span>Garment care & order tracking updates.</span>
                   </p>
                   <p className="flex items-center gap-2">
                     <Clock className="size-3.5 text-accent shrink-0" />

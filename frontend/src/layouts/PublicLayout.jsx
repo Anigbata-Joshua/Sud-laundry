@@ -26,6 +26,17 @@ export default function PublicLayout() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
+
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col justify-between">
       <a
@@ -43,7 +54,7 @@ export default function PublicLayout() {
         }`}
       >
         <div className="mx-auto flex h-16 w-[92%] max-w-6xl items-center justify-between sm:h-[74px]">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
             <BrandLogo />
           </Link>
 
@@ -108,7 +119,7 @@ export default function PublicLayout() {
 
         {/* Mobile slide-down drawer */}
         {menuOpen && (
-          <div className="border-t border-line bg-white/98 backdrop-blur-xl px-[4%] pb-6 pt-4 md:hidden animate-in slide-in-from-top-2 duration-200 shadow-xl">
+          <div className="border-t border-line bg-white/98 backdrop-blur-xl px-[4%] pb-6 pt-4 md:hidden animate-in slide-in-from-top-2 duration-200 shadow-xl max-h-[calc(100vh-4rem)] overflow-y-auto">
             <nav className="grid gap-1 text-sm font-semibold text-slate-700">
               {NAV_LINKS.map((link) => {
                 const isAnchor = link.to.includes('#')

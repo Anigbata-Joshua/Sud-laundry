@@ -11,7 +11,7 @@ const CORE_SERVICES = [
     category: 'Laundry',
     turnaround_hours: 72,
     blurb:
-      'Everyday laundry washed in eco-friendly detergents, dried, and neatly bundled into stacked folded packs.',
+      'Everyday laundry washed with quality detergents, dried, and neatly bundled into stacked folded packs.',
     icon: Droplets,
   },
   {

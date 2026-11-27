@@ -364,7 +364,7 @@ export default function GarmentServiceSelector({
         )}
 
         {/* Category Tabs */}
-        <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto pb-1">
+        <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
@@ -418,7 +418,7 @@ export default function GarmentServiceSelector({
                   <div>
                     <div className="flex items-start justify-between gap-1">
                       <span
-                        className={`text-xs font-bold leading-snug line-clamp-2 min-h-[2rem] break-words ${
+                        className={`text-xs font-bold leading-snug break-words ${
                           isOffered ? 'text-ink group-hover:text-brand' : 'text-slate-500'
                         }`}
                         title={item.name}
@@ -439,8 +439,8 @@ export default function GarmentServiceSelector({
                         <span className="font-extrabold text-brand text-sm">
                           {formatNaira(serviceEntry.price)}
                         </span>
-                        <span className="rounded-lg bg-white p-1 text-slate-500 shadow-2xs group-hover:bg-brand group-hover:text-white transition-colors">
-                          <Plus className="size-3" />
+                        <span className="flex size-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-white text-slate-600 shadow-2xs group-hover:bg-brand group-hover:text-white transition-colors">
+                          <Plus className="size-4" />
                         </span>
                       </div>
                     ) : (
@@ -448,8 +448,8 @@ export default function GarmentServiceSelector({
                         <span className="text-[10px] font-semibold text-slate-400 italic">
                           Not offered for this service
                         </span>
-                        <span className="rounded-lg bg-slate-200/60 p-1 text-slate-400">
-                          <Minus className="size-3" />
+                        <span className="flex size-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-slate-200/60 text-slate-400">
+                          <Minus className="size-4" />
                         </span>
                       </div>
                     )}
@@ -524,30 +524,33 @@ export default function GarmentServiceSelector({
 
                   {/* Quantity Stepper */}
                   <div className="flex items-center gap-2 self-start sm:self-center">
-                    <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50">
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 h-11">
                       <button
                         type="button"
+                        aria-label="Decrease quantity"
                         disabled={line.quantity <= 1}
                         onClick={() => handleQuantityChange(index, line.quantity - 1)}
-                        className="p-1.5 text-slate-500 hover:text-ink disabled:opacity-30"
+                        className="flex size-11 min-h-[44px] min-w-[44px] items-center justify-center text-slate-500 hover:text-ink disabled:opacity-30 cursor-pointer"
                       >
-                        <Minus className="size-3.5" />
+                        <Minus className="size-4" />
                       </button>
                       <input
                         type="number"
                         min="1"
                         max="500"
+                        aria-label="Item quantity"
                         value={line.quantity}
                         onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        className="w-12 text-center text-xs font-bold bg-transparent text-ink focus:outline-none"
+                        className="w-12 text-center text-xs font-bold bg-transparent text-ink focus:outline-none h-11"
                       />
                       <button
                         type="button"
+                        aria-label="Increase quantity"
                         disabled={line.quantity >= 500}
                         onClick={() => handleQuantityChange(index, line.quantity + 1)}
-                        className="p-1.5 text-slate-500 hover:text-ink disabled:opacity-30"
+                        className="flex size-11 min-h-[44px] min-w-[44px] items-center justify-center text-slate-500 hover:text-ink disabled:opacity-30 cursor-pointer"
                       >
-                        <Plus className="size-3.5" />
+                        <Plus className="size-4" />
                       </button>
                     </div>
 
