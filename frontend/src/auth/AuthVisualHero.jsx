@@ -1,12 +1,36 @@
-import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CheckCircle2, ShieldCheck } from 'lucide-react'
 import BrandLogo from '../components/common/BrandLogo'
 import { BRAND } from '../constants/brand'
+import { getBranches } from '../api/branches.api'
 
 export default function AuthVisualHero({
   title = 'Keep every garment moving with precision.',
   subtitle = `Monitor orders, real-time wash stages, inventory care, and doorstep collections across ${BRAND.name}.`,
   badgeText = 'Operations & Customer Gateway',
 }) {
+  const [branchCount, setBranchCount] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    getBranches()
+      .then((res) => {
+        const branches = res.data?.data ?? res.data ?? []
+        const activeBranches = Array.isArray(branches)
+          ? branches.filter((b) => b.is_active !== false)
+          : []
+        if (isMounted && activeBranches.length > 0) {
+          setBranchCount(activeBranches.length)
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully without showing fabricated counts
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <section className="relative hidden overflow-hidden bg-slate-950 p-10 lg:p-12 text-white lg:flex lg:flex-col justify-between select-none min-h-screen">
       {/* Background picture with AVIF/WebP */}
@@ -64,7 +88,7 @@ export default function AuthVisualHero({
 
         <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">{subtitle}</p>
 
-        {/* Bespoke Live Laundry Operations Card with smooth float */}
+        {/* Live Laundry Operations Card with smooth float */}
         <div className="mt-8 rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-xl shadow-2xl animate-float-slow max-w-md">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div className="flex items-center gap-2">
@@ -73,10 +97,14 @@ export default function AuthVisualHero({
                 <span className="relative inline-flex rounded-full size-2.5 bg-emerald-400" />
               </span>
               <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
-                Live Operations Network
+                Service Operations
               </span>
             </div>
-            <span className="text-[11px] font-semibold text-slate-300">4 Branches Active</span>
+            {branchCount !== null && (
+              <span className="text-[11px] font-semibold text-slate-300">
+                {branchCount} {branchCount === 1 ? 'Branch' : 'Branches'} Active
+              </span>
+            )}
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
@@ -93,18 +121,21 @@ export default function AuthVisualHero({
               <p className="mt-1 text-sm font-black text-white">Free Pickup</p>
             </div>
             <div className="rounded-2xl bg-white/5 p-2.5 border border-white/10">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Care</p>
-              <p className="mt-1 text-sm font-black text-white">Eco-Pure</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Tracking
+              </p>
+              <p className="mt-1 text-sm font-black text-white">Real-Time</p>
             </div>
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between text-[11px] text-slate-300 pt-3 border-t border-white/10">
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300 pt-3 border-t border-white/10">
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="size-3.5 text-emerald-400" />
-              Real-time Garment Tracking
+              Doorstep Collection & Delivery
             </span>
-            <span className="inline-flex items-center gap-1 font-bold text-amber-300">
-              <Sparkles className="size-3" /> 4.9/5 Rating
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+              Real-time Tracking
             </span>
           </div>
         </div>
@@ -113,9 +144,9 @@ export default function AuthVisualHero({
       {/* Footer */}
       <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/10 pt-4">
         <span>
-          © {new Date().getFullYear()} {BRAND.name} · Precision Fabric Care
+          © {new Date().getFullYear()} {BRAND.name}. All rights reserved.
         </span>
-        <span className="text-slate-400">256-bit TLS Encrypted</span>
+        <span className="text-slate-400">{BRAND.tagline}</span>
       </div>
     </section>
   )

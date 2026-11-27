@@ -8,7 +8,6 @@ import {
   LockKeyhole,
   Mail,
   Package,
-  ShieldCheck,
   Sparkles,
 } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
@@ -79,7 +78,7 @@ export default function LoginPage() {
         {/* Subtle ambient radial glow on form side */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(99,102,241,0.07),rgba(255,255,255,0))] pointer-events-none" />
 
-        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-7 sm:p-9 shadow-xl shadow-slate-200/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-9 shadow-xl shadow-slate-200/60 animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0">
           {/* Top subtle decorative accent ribbon */}
           <div className="absolute top-0 inset-x-8 h-1 rounded-b-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600" />
 
@@ -94,7 +93,7 @@ export default function LoginPage() {
               <Sparkles className="size-3 text-indigo-600" />
               {portalMode === 'customer' ? 'Customer Gateway' : 'Staff Operations Desk'}
             </span>
-            <span className="text-[11px] font-semibold text-slate-400">Secure Access</span>
+            <span className="text-[11px] font-semibold text-slate-400">Account Access</span>
           </div>
 
           <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
@@ -107,21 +106,21 @@ export default function LoginPage() {
           </p>
 
           {/* Segmented Mode Selector for Customer vs Staff */}
-          <div className="mt-5 grid grid-cols-2 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/60 text-xs font-bold">
+          <div className="mt-5 grid grid-cols-2 p-1 rounded-2xl bg-slate-100/80 border border-slate-200/60 text-xs font-bold min-w-0 w-full">
             <button
               type="button"
               onClick={() => {
                 setPortalMode('customer')
                 setError('')
               }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-0 ${
                 portalMode === 'customer'
                   ? 'bg-white text-indigo-700 shadow-xs font-extrabold'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Package className="size-3.5" />
-              Customer
+              <Package className="size-3.5 shrink-0" />
+              <span className="truncate">Customer</span>
             </button>
             <button
               type="button"
@@ -129,22 +128,22 @@ export default function LoginPage() {
                 setPortalMode('staff')
                 setError('')
               }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-0 ${
                 portalMode === 'staff'
                   ? 'bg-white text-indigo-700 shadow-xs font-extrabold'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Building2 className="size-3.5" />
-              Staff & Operations
+              <Building2 className="size-3.5 shrink-0" />
+              <span className="truncate">Staff & Operations</span>
             </button>
           </div>
 
-          <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
+          <form className="mt-6 grid gap-4 min-w-0 w-full" onSubmit={handleSubmit}>
             {/* Email Address */}
-            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 min-w-0 w-full">
               Email address
-              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs">
+              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs min-w-0 w-full">
                 <Mail className="size-4 text-slate-400 group-focus-within:text-indigo-600 group-focus-within:scale-105 transition-all duration-200 shrink-0" />
                 <input
                   required
@@ -156,13 +155,13 @@ export default function LoginPage() {
                   placeholder={
                     portalMode === 'customer' ? 'ada@example.com' : 'staff@swirllaundry.com'
                   }
-                  className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
+                  className="min-w-0 flex-1 w-full bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </span>
             </label>
 
             {/* Password */}
-            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 min-w-0 w-full">
               <span className="flex items-center justify-between">
                 <span>Password</span>
                 <Link
@@ -172,7 +171,7 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </span>
-              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs">
+              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs min-w-0 w-full">
                 <LockKeyhole className="size-4 text-slate-400 group-focus-within:text-indigo-600 group-focus-within:scale-105 transition-all duration-200 shrink-0" />
                 <input
                   required
@@ -183,7 +182,7 @@ export default function LoginPage() {
                   value={credentials.password}
                   onChange={updateField}
                   placeholder="••••••••"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
+                  className="min-w-0 flex-1 w-full bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
                 />
                 <button
                   type="button"
@@ -234,10 +233,11 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Security trust badge */}
+          {/* Footer branding */}
           <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400">
-            <ShieldCheck className="size-3.5 text-emerald-600 shrink-0" />
-            <span>256-bit TLS encrypted · Verified fabric care</span>
+            <span>
+              {BRAND.name} · {BRAND.tagline}
+            </span>
           </div>
         </div>
       </section>

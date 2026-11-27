@@ -1,13 +1,5 @@
 import { useState } from 'react'
-import {
-  AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Mail,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Mail, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { forgotPassword } from '../api/auth.api'
 import BrandLogo from '../components/common/BrandLogo'
@@ -47,7 +39,7 @@ export default function ForgotPasswordPage() {
       <section className="relative flex items-center justify-center px-4 py-12 sm:px-8 lg:px-12 bg-slate-50 min-h-screen">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(99,102,241,0.07),rgba(255,255,255,0))] pointer-events-none" />
 
-        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-7 sm:p-9 shadow-xl shadow-slate-200/60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-9 shadow-xl shadow-slate-200/60 animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0">
           <div className="absolute top-0 inset-x-8 h-1 rounded-b-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600" />
 
           <div className="mb-6 flex items-center justify-center lg:hidden">
@@ -69,10 +61,10 @@ export default function ForgotPasswordPage() {
             Enter your account email to receive a secure password recovery link.
           </p>
 
-          <form className="mt-6 grid gap-4" onSubmit={submit}>
-            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+          <form className="mt-6 grid gap-4 min-w-0 w-full" onSubmit={submit}>
+            <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 min-w-0 w-full">
               Email address
-              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs">
+              <span className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 hover:border-slate-300 transition-all duration-200 shadow-2xs min-w-0 w-full">
                 <Mail className="size-4 text-slate-400 group-focus-within:text-indigo-600 group-focus-within:scale-105 transition-all duration-200 shrink-0" />
                 <input
                   required
@@ -81,7 +73,7 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="name@example.com"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
+                  className="min-w-0 flex-1 w-full bg-transparent text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </span>
             </label>
@@ -128,8 +120,9 @@ export default function ForgotPasswordPage() {
           </div>
 
           <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400">
-            <ShieldCheck className="size-3.5 text-emerald-600 shrink-0" />
-            <span>256-bit TLS encrypted · Verified fabric care</span>
+            <span>
+              {BRAND.name} · {BRAND.tagline}
+            </span>
           </div>
         </div>
       </section>

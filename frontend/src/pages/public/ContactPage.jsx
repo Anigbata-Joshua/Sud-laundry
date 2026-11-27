@@ -147,7 +147,7 @@ export default function ContactPage() {
 
             <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-300">
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="size-4 text-emerald-400" /> Mon – Sat: 8:00 AM – 7:00 PM
+                <CheckCircle2 className="size-4 text-emerald-400" /> {BRAND.contact.hours}
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="size-4 text-emerald-400" /> Rapid Turnaround
@@ -172,6 +172,10 @@ export default function ContactPage() {
               <div className="flex items-center gap-2.5">
                 <Mail className="size-4 text-indigo-300 shrink-0" />
                 <span className="font-semibold">{BRAND.contact.email}</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <MapPin className="size-4 text-indigo-300 shrink-0 mt-0.5" />
+                <span>{BRAND.contact.address}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Clock className="size-4 text-indigo-300 shrink-0" />
@@ -302,9 +306,10 @@ export default function ContactPage() {
             </div>
 
             {/* Quick Info Cards */}
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <InfoCard icon={Phone} label="Call our team" value={BRAND.contact.phone} />
               <InfoCard icon={Mail} label="Email us directly" value={BRAND.contact.email} />
+              <InfoCard icon={MapPin} label="Main office" value={BRAND.contact.address} />
               <InfoCard icon={Clock} label="Operating hours" value={BRAND.contact.hours} />
             </div>
 
